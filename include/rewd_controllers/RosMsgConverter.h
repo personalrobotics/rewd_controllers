@@ -51,10 +51,10 @@ namespace rewd_controllers {
 
     void JointStateToJntArray(const sensor_msgs::JointState& jointState, const std::vector<std::string> jointNames, KDL::JntArray& jointArray);
 
-    // void JointStateToJntArrayVel(const sensor_msgs::JointState& jointState, const std::vector<std::string> jointNames, KDL::JntArrayVel& jointArray);
+    void JointStateToJntArrayVel(const sensor_msgs::JointState& jointState, const std::vector<std::string> jointNames, KDL::JntArrayVel& jointArray);
 
-    // /// Acc term contains effort ///
-    // void JointStateToJntArrayAcc(const sensor_msgs::JointState& jointState, const std::vector<std::string> jointNames, KDL::JntArrayAcc& jointArray);
+    /// Acc term contains effort ///
+    void JointStateToJntArrayAcc(const sensor_msgs::JointState& jointState, const std::vector<std::string> jointNames, KDL::JntArrayAcc& jointArray);
 
 //     void JointStateToJntMap(const sensor_msgs::JointState& jointState, std::map<std::string, double> &jointMap);
 

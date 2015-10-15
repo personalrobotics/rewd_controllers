@@ -1,9 +1,14 @@
 // TODO license/acknowlegement
 
 #include <rewd_controllers/joint_group_position_controller.h>
+#include <rewd_controllers/RosMsgConverter.h>
 #include <angles/angles.h>
+#include <kdl/chain.hpp>
 #include <kdl/jntarray.hpp>
+#include <kdl/jntarrayvel.hpp>
+#include <kdl/jntarrayacc.hpp>
 #include <kdl/tree.hpp>
+#include <kdl_extension/JointDynamicsData.h>
 #include <kdl_extension/KdlChainIdRne.h>
 #include <pluginlib/class_list_macros.h>
 
@@ -130,9 +135,15 @@ void JointGroupPositionController::update(const ros::Time& time, const ros::Dura
   // command_structs_ = *(commands_.readFromRT()); // TODO map of pointers?
   joint_state_command = *(command_buffer.readFromRT());
 
-  const KDL::Tree& tree = kdl_tree_id.getTree(); // TODO 
-  KDL::JntArray joint_positions = KDL::JntArray(tree.getNrOfJoints());
-  // TODO use RosMsgConverters
+  const KDL::Tree& tree = kdl_tree_id.getTree();
+  KDL::JntArray q, q_dot, q_dotdot;
+  // JointStateToJntArray(*joint_state_command, joint_state_command->name, q);
+  // JointStateToJntArrayVel(*joint_state_command, joint_state_command->name, q_dot);
+  // JointStateToJntArrayAcc(*joint_state_command, joint_state_command->name, q_dotdot);
+  KDL::Chain chain;
+  kdl_tree_id.getChain("herb_base", "right/wam7", chain); // TODO hardcoded hack; figure out how to specify chain
+  kdl_extension::JointDynamicsData jd;
+  jd.PopulateJointInfo(chain, q, q_dot, q_dotdot); // TODO
 
   // std::map<std::string, KDL::TreeElement> segments = tree.getSegments();
   // for (std::map<std::string, KDL::TreeElement>::iterator it = segments.begin(); it != segments.end(); ++it) {

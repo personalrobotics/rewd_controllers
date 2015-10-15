@@ -2,7 +2,7 @@
 
 // #include "nasa_common_utilities/Logger.h"
 #include <tf_conversions/tf_kdl.h>
-// #include <boost/tuple/tuple.hpp>
+#include <boost/tuple/tuple.hpp>
 
 using namespace rewd_controllers;
 /**
@@ -79,151 +79,151 @@ void JointStateToJntArray(const sensor_msgs::JointState& jointState,
  * @details extracts joints from jointState based on jointNames. If jointNames and jointArray
  * are the same size, resizing jointArray is avoided
  */
-// void JointStateToJntArrayVel(const sensor_msgs::JointState& jointState,
-//                              const std::vector<std::string> jointNames,
-//                              KDL::JntArrayVel& jointArray)
-// {
-//     if (jointArray.q.rows() != jointNames.size())
-//     {
-//         jointArray.resize(jointNames.size());
-//     }
+void JointStateToJntArrayVel(const sensor_msgs::JointState& jointState,
+                             const std::vector<std::string> jointNames,
+                             KDL::JntArrayVel& jointArray)
+{
+    if (jointArray.q.rows() != jointNames.size())
+    {
+        jointArray.resize(jointNames.size());
+    }
 
-//     if (jointState.name.size() != jointState.position.size())
-//     {
-//         // length mismatch
-//         std::stringstream err;
-//         err << "JointStateToJntArray() - jointState name length doesn't match positions length";
-//         RCS::Logger::log("gov.nasa.controllers.JointStateToJntArray", log4cpp::Priority::ERROR, err.str());
-//         throw std::logic_error(err.str());
-//         return;
-//     }
+    if (jointState.name.size() != jointState.position.size())
+    {
+        // length mismatch
+        std::stringstream err;
+        err << "JointStateToJntArray() - jointState name length doesn't match positions length";
+        // RCS::Logger::log("gov.nasa.controllers.JointStateToJntArray", log4cpp::Priority::ERROR, err.str());
+        throw std::logic_error(err.str());
+        return;
+    }
 
-//     bool noVels = false;
+    bool noVels = false;
 
-//     if (jointState.name.size() != jointState.velocity.size())
-//     {
-//         if (jointState.velocity.size() == 0)
-//         {
-//             noVels = true;
-//         }
-//         else
-//         {
-//             // length mismatch
-//             std::stringstream err;
-//             err << "JointStateToJntArray() - jointState name length doesn't match positions length";
-//             RCS::Logger::log("gov.nasa.controllers.JointStateToJntArray", log4cpp::Priority::ERROR, err.str());
-//             throw std::logic_error(err.str());
-//             return;
-//         }
-//     }
+    if (jointState.name.size() != jointState.velocity.size())
+    {
+        if (jointState.velocity.size() == 0)
+        {
+            noVels = true;
+        }
+        else
+        {
+            // length mismatch
+            std::stringstream err;
+            err << "JointStateToJntArray() - jointState name length doesn't match positions length";
+            // RCS::Logger::log("gov.nasa.controllers.JointStateToJntArray", log4cpp::Priority::ERROR, err.str());
+            throw std::logic_error(err.str());
+            return;
+        }
+    }
 
-//     // if M = jointState.name.size() & N = jointNames.size(),
-//     // a simple repetitive search would be worst case O(M*N);
-//     // let's sort instead to get worst case O((M+N)*log(M))
-//     std::map<std::string, std::pair<double, double> > jsMap;
-//     for (unsigned int i = 0; i < jointState.name.size(); ++i)
-//     {
-//         if (noVels)
-//         {
-//             jsMap[jointState.name[i]] = std::make_pair(jointState.position[i], 0.);
-//         }
-//         else
-//         {
-//             jsMap[jointState.name[i]] = std::make_pair(jointState.position[i], jointState.velocity[i]);
-//         }
-//     }
+    // if M = jointState.name.size() & N = jointNames.size(),
+    // a simple repetitive search would be worst case O(M*N);
+    // let's sort instead to get worst case O((M+N)*log(M))
+    std::map<std::string, std::pair<double, double> > jsMap;
+    for (unsigned int i = 0; i < jointState.name.size(); ++i)
+    {
+        if (noVels)
+        {
+            jsMap[jointState.name[i]] = std::make_pair(jointState.position[i], 0.);
+        }
+        else
+        {
+            jsMap[jointState.name[i]] = std::make_pair(jointState.position[i], jointState.velocity[i]);
+        }
+    }
 
-//     std::string jointName;
-//     for (unsigned int nameIndex = 0; nameIndex < jointNames.size(); ++nameIndex)
-//     {
-//         jointName = jointNames[nameIndex];
+    std::string jointName;
+    for (unsigned int nameIndex = 0; nameIndex < jointNames.size(); ++nameIndex)
+    {
+        jointName = jointNames[nameIndex];
 
-//         std::map<std::string, std::pair<double, double> >::iterator jsMapIt = jsMap.find(jointName);
-//         if (jsMapIt == jsMap.end())
-//         {
-//             // not found
-//             std::stringstream err;
-//             err << "JointStateToJntArrayVel() - jointState doesn't contain joint: " << jointName;
-//             RCS::Logger::log("gov.nasa.controllers.JointStateToJntArrayVel", log4cpp::Priority::ERROR, err.str());
-//             throw std::logic_error(err.str());
-//             return;
-//         }
-//         else
-//         {
-//             jointArray.q(nameIndex)    = jsMapIt->second.first;
-//             jointArray.qdot(nameIndex) = jsMapIt->second.second;
-//         }
-//     }
-// }
+        std::map<std::string, std::pair<double, double> >::iterator jsMapIt = jsMap.find(jointName);
+        if (jsMapIt == jsMap.end())
+        {
+            // not found
+            std::stringstream err;
+            err << "JointStateToJntArrayVel() - jointState doesn't contain joint: " << jointName;
+            // RCS::Logger::log("gov.nasa.controllers.JointStateToJntArrayVel", log4cpp::Priority::ERROR, err.str());
+            throw std::logic_error(err.str());
+            return;
+        }
+        else
+        {
+            jointArray.q(nameIndex)    = jsMapIt->second.first;
+            jointArray.qdot(nameIndex) = jsMapIt->second.second;
+        }
+    }
+}
 
-// void JointStateToJntArrayAcc(const sensor_msgs::JointState& jointState,
-//                              const std::vector<std::string> jointNames,
-//                              KDL::JntArrayAcc &jointArray)
-// {
-//     if (jointArray.q.rows() != jointNames.size())
-//     {
-//         jointArray.resize(jointNames.size());
-//     }
+void JointStateToJntArrayAcc(const sensor_msgs::JointState& jointState,
+                             const std::vector<std::string> jointNames,
+                             KDL::JntArrayAcc &jointArray)
+{
+    if (jointArray.q.rows() != jointNames.size())
+    {
+        jointArray.resize(jointNames.size());
+    }
 
-//     if (jointState.name.size() != jointState.position.size())
-//     {
-//         // length mismatch
-//         std::stringstream err;
-//         err << "JointStateToJntArray() - jointState name length doesn't match positions length";
-//         RCS::Logger::log("gov.nasa.controllers.JointStateToJntArray", log4cpp::Priority::ERROR, err.str());
-//         throw std::logic_error(err.str());
-//         return;
-//     }
+    if (jointState.name.size() != jointState.position.size())
+    {
+        // length mismatch
+        std::stringstream err;
+        err << "JointStateToJntArray() - jointState name length doesn't match positions length";
+        // RCS::Logger::log("gov.nasa.controllers.JointStateToJntArray", log4cpp::Priority::ERROR, err.str());
+        throw std::logic_error(err.str());
+        return;
+    }
 
-//     if (jointState.name.size() != jointState.velocity.size())
-//     {
-//         // length mismatch
-//         std::stringstream err;
-//         err << "JointStateToJntArray() - jointState name length doesn't match positions length";
-//         RCS::Logger::log("gov.nasa.controllers.JointStateToJntArray", log4cpp::Priority::ERROR, err.str());
-//         throw std::logic_error(err.str());
-//         return;
-//     }
+    if (jointState.name.size() != jointState.velocity.size())
+    {
+        // length mismatch
+        std::stringstream err;
+        err << "JointStateToJntArray() - jointState name length doesn't match positions length";
+        // RCS::Logger::log("gov.nasa.controllers.JointStateToJntArray", log4cpp::Priority::ERROR, err.str());
+        throw std::logic_error(err.str());
+        return;
+    }
 
-//     if (jointState.name.size() != jointState.effort.size())
-//     {
-//         // length mismatch
-//         std::stringstream err;
-//         err << "JointStateToJntArray() - jointState name length doesn't match positions length";
-//         RCS::Logger::log("gov.nasa.controllers.JointStateToJntArray", log4cpp::Priority::ERROR, err.str());
-//         throw std::logic_error(err.str());
-//         return;
-//     }
+    if (jointState.name.size() != jointState.effort.size())
+    {
+        // length mismatch
+        std::stringstream err;
+        err << "JointStateToJntArray() - jointState name length doesn't match positions length";
+        // RCS::Logger::log("gov.nasa.controllers.JointStateToJntArray", log4cpp::Priority::ERROR, err.str());
+        throw std::logic_error(err.str());
+        return;
+    }
 
-//     // if M = jointState.name.size() & N = jointNames.size(),
-//     // a simple repetitive search would be worst case O(M*N);
-//     // let's sort instead to get worst case O((M+N)*log(M))
-//     std::map<std::string, boost::tuples::tuple<double, double, double> > jsMap;
-//     for (unsigned int i = 0; i < jointState.name.size(); ++i)
-//     {
-//         jsMap[jointState.name[i]] = boost::tuples::make_tuple(jointState.position[i], jointState.velocity[i], jointState.effort[i]);
-//     }
+    // if M = jointState.name.size() & N = jointNames.size(),
+    // a simple repetitive search would be worst case O(M*N);
+    // let's sort instead to get worst case O((M+N)*log(M))
+    std::map<std::string, boost::tuples::tuple<double, double, double> > jsMap;
+    for (unsigned int i = 0; i < jointState.name.size(); ++i)
+    {
+        jsMap[jointState.name[i]] = boost::tuples::make_tuple(jointState.position[i], jointState.velocity[i], jointState.effort[i]);
+    }
 
-//     for (unsigned int nameIndex = 0; nameIndex < jointNames.size(); ++nameIndex)
-//     {
-//         std::map<std::string, boost::tuples::tuple<double, double, double> >::iterator jsMapIt = jsMap.find(jointNames[nameIndex]);
-//         if (jsMapIt == jsMap.end())
-//         {
-//             // not found
-//             std::stringstream err;
-//             err << "JointStateToJntArrayVel() - jointState doesn't contain joint: " << jointNames[nameIndex];
-//             RCS::Logger::log("gov.nasa.controllers.JointStateToJntArrayVel", log4cpp::Priority::ERROR, err.str());
-//             throw std::logic_error(err.str());
-//             return;
-//         }
-//         else
-//         {
-//             jointArray.q(nameIndex)       = jsMapIt->second.get<0>();
-//             jointArray.qdot(nameIndex)    = jsMapIt->second.get<1>();
-//             jointArray.qdotdot(nameIndex) = jsMapIt->second.get<2>();
-//         }
-//     }
-// }
+    for (unsigned int nameIndex = 0; nameIndex < jointNames.size(); ++nameIndex)
+    {
+        std::map<std::string, boost::tuples::tuple<double, double, double> >::iterator jsMapIt = jsMap.find(jointNames[nameIndex]);
+        if (jsMapIt == jsMap.end())
+        {
+            // not found
+            std::stringstream err;
+            err << "JointStateToJntArrayVel() - jointState doesn't contain joint: " << jointNames[nameIndex];
+            // RCS::Logger::log("gov.nasa.controllers.JointStateToJntArrayVel", log4cpp::Priority::ERROR, err.str());
+            throw std::logic_error(err.str());
+            return;
+        }
+        else
+        {
+            jointArray.q(nameIndex)       = jsMapIt->second.get<0>();
+            jointArray.qdot(nameIndex)    = jsMapIt->second.get<1>();
+            jointArray.qdotdot(nameIndex) = jsMapIt->second.get<2>();
+        }
+    }
+}
 
 /**
  * @brief PoseStateToFrame

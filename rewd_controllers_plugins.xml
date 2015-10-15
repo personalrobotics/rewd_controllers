@@ -1,0 +1,27 @@
+<library path="lib/librewd_controllers">
+
+  <class name="rewd_controllers/JointGroupPositionController" type="rewd_controllers::JointGroupPositionController" base_class_type="controller_interface::ControllerBase">
+    <description>
+      The JointGroupPositionController tracks position commands. It expects a EffortJointInterface type of hardware interface.
+    </description>
+  </class>
+
+  <!-- <class name="rewd_controllers/JointVelocityController" type="rewd_controllers::JointVelocityController" base_class_type="controller_interface::ControllerBase"> -->
+  <!--   <description> -->
+  <!--     The JointVelocityController tracks velocity commands. It expects a EffortJointInterface type of hardware interface. -->
+  <!--   </description> -->
+  <!-- </class> -->
+
+  <!-- <class name="rewd_controllers/JointEffortController" type="rewd_controllers::JointEffortController" base_class_type="controller_interface::ControllerBase"> -->
+  <!--   <description> -->
+  <!--     The JointEffortController tracks effort commands. It expects a EffortJointInterface type of hardware interface. -->
+  <!--   </description> -->
+  <!-- </class> -->
+
+  <!-- <class name="rewd_controllers/JointGroupEffortController" type="rewd_controllers::JointGroupEffortController" base_class_type="controller_interface::ControllerBase"> -->
+  <!--   <description> -->
+  <!--     The JointGroupEffortController tracks effort commands for a set of joints. It expects a EffortJointInterface type of hardware interface. -->
+  <!--   </description> -->
+  <!-- </class> -->
+
+</library>

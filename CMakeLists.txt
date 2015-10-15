@@ -11,7 +11,9 @@ find_package(catkin REQUIRED COMPONENTS
   kdl_extension
 )
 
-find_package(Boost REQUIRED COMPONENTS thread)
+find_package(Boost REQUIRED COMPONENTS
+  thread
+)
 find_package(orocos_kdl REQUIRED)
 
 include_directories(include
@@ -36,6 +38,7 @@ catkin_package(
 
 add_library(${PROJECT_NAME}
   src/${PROJECT_NAME}/joint_group_position_controller.cpp
+  src/${PROJECT_NAME}/RosMsgConverter.cpp
 )
 
 target_link_libraries(${PROJECT_NAME}

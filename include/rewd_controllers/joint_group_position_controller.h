@@ -49,12 +49,12 @@ public:
   /**
    * \brief Store position and velocity command in struct to allow easier realtime buffer usage
    */
-  struct Commands
-  {
-    double position_; // Last commanded position
-    double velocity_; // Last commanded velocity
-    bool has_velocity_; // false if no velocity command has been specified
-  };
+  // struct Commands
+  // {
+  //   double position_; // Last commanded position
+  //   double velocity_; // Last commanded velocity
+  //   bool has_velocity_; // false if no velocity command has been specified
+  // };
 
   JointGroupPositionController();
   ~JointGroupPositionController();
@@ -79,7 +79,7 @@ public:
    *
    * \param command
    */
-  void setCommands(std::vector<std::string> names, std::vector<double> pos_commands);
+  void setCommand(const sensor_msgs::JointStateConstPtr& joint_state);
 
   /*!
    * \brief Give set position of the joint for next update: revolute (angle) and prismatic (position)
@@ -130,8 +130,11 @@ public:
 
   std::map<std::string, hardware_interface::JointHandle> joints_;
   std::map<std::string, boost::shared_ptr<const urdf::Joint> > joint_urdfs_;
-  realtime_tools::RealtimeBuffer<std::map<std::string,Commands> > commands_;
-  std::map<std::string,Commands> command_structs_; // pre-allocated memory that is re-used to set the realtime buffer
+  realtime_tools::RealtimeBuffer<sensor_msgs::JointStateConstPtr> command_buffer;
+  sensor_msgs::JointStateConstPtr joint_state_command;
+  // realtime_tools::RealtimeBuffer<std::map<std::string,Commands> > commands_;
+  // std::map<std::string,Commands> command_structs_; // pre-allocated memory that is re-used to set the realtime buffer
+
 
 private:
   int loop_count_;
@@ -147,7 +150,7 @@ private:
   /**
    * \brief Callback from /command subscriber for setpoint
    */
-  void setCommandCB(const sensor_msgs::JointStateConstPtr& msg);
+  // void setCommandCB(const sensor_msgs::JointStateConstPtr& msg);
 
   /**
    * \brief Check that the command is within the hard limits of the joint. Checks for joint

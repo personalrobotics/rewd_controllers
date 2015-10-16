@@ -29,7 +29,10 @@ bool JointGroupPositionController::init(hardware_interface::EffortJointInterface
 
   std::set<std::string> joint_names_wo_dups(joint_names.begin(), joint_names.end());
   if (joint_names_wo_dups.size() != joint_names.size()) {
-    ROS_ERROR("Duplicate joint names were detected");
+    ROS_ERROR("Duplicate joint names were detected:");
+    for (int i = 0; i < joint_names.size(); ++i) {
+      ROS_ERROR("%s", joint_names[i].c_str());
+    }
     return false;
   }
 
@@ -41,9 +44,8 @@ bool JointGroupPositionController::init(hardware_interface::EffortJointInterface
   // Load PID Controllers using gains set on parameter server
   joint_pid_controllers.resize(number_of_joints);
   for (unsigned int i = 0; i < number_of_joints; ++i) {
-    joint_pid_controllers[i].reset(new control_toolbox::Pid());
     ros::NodeHandle pid_nh(n, std::string("gains/") + joint_names[i]);
-    if (!joint_pid_controllers[i]->init(pid_nh)) {
+    if (!joint_pid_controllers[i].init(pid_nh)) {
       return false;
     }
   }
@@ -55,7 +57,7 @@ bool JointGroupPositionController::init(hardware_interface::EffortJointInterface
   urdf::Model urdf;
   // TODO load "robot_description" string from parameter itself?
   if (!urdf.initParam("robot_description")) {
-    ROS_ERROR("Failed to parse urdf file");
+    ROS_ERROR("Failed to load 'robot_description' parameter");
     return false;
   }
 
@@ -74,7 +76,6 @@ bool JointGroupPositionController::init(hardware_interface::EffortJointInterface
   std::string base_link_name = joint_urdfs[0]->parent_link_name;
   std::string tool_link_name = joint_urdfs[number_of_joints - 1]->parent_link_name;
 
-  KDL::Tree kdl_tree;
   kdl_tree_id.setTree(kdl_tree);
   kdl_tree_id.loadFromParam("robot_description");
   kdl_tree_id.getChain(base_link_name, tool_link_name, controlled_chain);
@@ -116,8 +117,8 @@ void JointGroupPositionController::update(const ros::Time& time, const ros::Dura
     double command_position = joint_state_command[i];
     double error;
     double effort_command;
-    hardware_interface::JointHandle joint = joints[i];
-    boost::shared_ptr<const urdf::Joint> joint_urdf = joint_urdfs[i];
+    hardware_interface::JointHandle& joint = joints[i];
+    boost::shared_ptr<const urdf::Joint>& joint_urdf = joint_urdfs[i];
     double current_position = joint.getPosition();
 
     // TODO removed below?
@@ -135,13 +136,17 @@ void JointGroupPositionController::update(const ros::Time& time, const ros::Dura
     else if (joint_urdf->type == urdf::Joint::CONTINUOUS) {
         error = angles::shortest_angular_distance(current_position, command_position);
     }
-    else { //prismatic
+    else if (joint_urdf->type == urdf::Joint::PRISMATIC) {
         error = command_position - current_position;
+    }
+    else {
+      ROS_ERROR("Unknown joint type");
+      continue;
     }
 
     // Set the PID error and compute the PID command with nonuniform
     // time step size.
-    effort_command = joint_pid_controllers[i]->computeCommand(error, period);
+    effort_command = joint_pid_controllers[i].computeCommand(error, period);
 
     joint.setCommand(effort_command);
     // TODO log dynamics information

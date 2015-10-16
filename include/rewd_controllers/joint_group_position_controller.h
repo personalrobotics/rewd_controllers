@@ -85,10 +85,11 @@ namespace rewd_controllers {
   private:
     unsigned int number_of_joints;
     std::vector<std::string> joint_names;
-    std::vector<boost::shared_ptr<control_toolbox::Pid> > joint_pid_controllers;
+    std::vector<control_toolbox::Pid> joint_pid_controllers;
     std::vector<hardware_interface::JointHandle> joints;
     std::vector<boost::shared_ptr<const urdf::Joint> > joint_urdfs;
     kdl_extension::KdlTreeId kdl_tree_id;
+    KDL::Tree kdl_tree;
     KDL::Chain controlled_chain;
     std::string base_link_name, tool_link_name;
     realtime_tools::RealtimeBuffer<Command> command_buffer;

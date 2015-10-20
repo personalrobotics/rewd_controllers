@@ -37,6 +37,10 @@ bool JointGroupPositionController::init(hardware_interface::EffortJointInterface
   }
 
   number_of_joints = joint_names.size();
+  if (!number_of_joints) {
+    ROS_ERROR("No joints specified in 'joints' parameter");
+    return false;
+  }
 
   // Initialize command struct vector sizes
   joint_state_command.reserve(number_of_joints);
@@ -50,9 +54,6 @@ bool JointGroupPositionController::init(hardware_interface::EffortJointInterface
     }
   }
 
-  // Start command subscriber
-  command_sub = n.subscribe("command", 1, &JointGroupPositionController::setCommand, this);
-
   // Get URDF
   urdf::Model urdf;
   // TODO load "robot_description" string from parameter itself?
@@ -62,6 +63,8 @@ bool JointGroupPositionController::init(hardware_interface::EffortJointInterface
   }
 
   // Get joint handles and URDFS and save to maps
+  joints.resize(number_of_joints);
+  joint_urdfs.resize(number_of_joints);
   for (unsigned int i = 0; i < number_of_joints; ++i) {
     joints[i] = robot->getHandle(joint_names[i]);
     joint_urdfs[i] = urdf.getJoint(joint_names[i]);
@@ -78,7 +81,9 @@ bool JointGroupPositionController::init(hardware_interface::EffortJointInterface
 
   kdl_tree_id.setTree(kdl_tree);
   kdl_tree_id.loadFromParam("robot_description");
-  // kdl_tree_id.getChain(base_link_name, tool_link_name, controlled_chain);
+
+  // Start command subscriber
+  command_sub = n.subscribe("command", 1, &JointGroupPositionController::setCommand, this);
 
   return true;
 }
@@ -93,15 +98,14 @@ void JointGroupPositionController::starting(const ros::Time& time) {
 }
 
 void JointGroupPositionController::update(const ros::Time& time, const ros::Duration& period) {
+  // TODO find error/log/debug solution for realtime
 
   joint_state_command = *(command_buffer.readFromRT());
 
-  // KDL::JntArray q, q_dot, q_dotdot;
   kdl_extension::JointDynamicsData jd;
-  // jd.PopulateJointInfo(controlled_chain, q, q_dot, q_dotdot);
   jd.InitializeMaps(kdl_tree);
-  KDL::Twist v_in; // TODO where does this come from?
-  KDL::Twist a_in; // TODO where does this come from?
+  KDL::Twist v_in; // TODO from base
+  KDL::Twist a_in; // TODO from base
   KDL::Wrench f_out;
   KDL::RigidBodyInertia I_out;
   kdl_tree_id.treeRecursiveNewtonEuler(jd, "null", "null", v_in, a_in, f_out, I_out);
@@ -158,7 +162,12 @@ void JointGroupPositionController::update(const ros::Time& time, const ros::Dura
 void JointGroupPositionController::setCommand(const sensor_msgs::JointState& msg) {
   if (msg.name.size() != number_of_joints
       || msg.position.size() != number_of_joints) {
-    ROS_ERROR("Number of joints specified in JointState message [%d] does not match number of controlled joints [%d]", msg.name.size(), number_of_joints);
+    ROS_ERROR("Number of joint names specified in JointState message [%d] does not match number of controlled joints [%d]", msg.name.size(), number_of_joints);
+    return;
+  }
+
+  if (msg.position.size() != number_of_joints) {
+    ROS_ERROR("Number of joint positions specified in JointState message [%d] does not match number of controlled joints [%d]", msg.position.size(), number_of_joints);
     return;
   }
 

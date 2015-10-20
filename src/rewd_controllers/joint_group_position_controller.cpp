@@ -3,11 +3,13 @@
 #include <rewd_controllers/joint_group_position_controller.h>
 #include <rewd_controllers/RosMsgConverter.h>
 #include <angles/angles.h>
+#include <hardware_interface/hardware_interface.h>
 #include <kdl/chain.hpp>
 #include <kdl/jntarray.hpp>
 #include <kdl/jntarrayvel.hpp>
 #include <kdl/jntarrayacc.hpp>
 #include <kdl/tree.hpp>
+#include <kdl_parser/kdl_parser.hpp>
 #include <kdl_extension/JointDynamicsData.h>
 #include <kdl_extension/KdlChainIdRne.h>
 #include <pluginlib/class_list_macros.h>
@@ -43,7 +45,7 @@ bool JointGroupPositionController::init(hardware_interface::EffortJointInterface
   }
 
   // Initialize command struct vector sizes
-  joint_state_command.reserve(number_of_joints);
+  joint_state_command.resize(number_of_joints);
 
   // Load PID Controllers using gains set on parameter server
   joint_pid_controllers.resize(number_of_joints);
@@ -66,7 +68,14 @@ bool JointGroupPositionController::init(hardware_interface::EffortJointInterface
   joints.resize(number_of_joints);
   joint_urdfs.resize(number_of_joints);
   for (unsigned int i = 0; i < number_of_joints; ++i) {
-    joints[i] = robot->getHandle(joint_names[i]);
+    try {
+      joints[i] = robot->getHandle(joint_names[i]);
+    }
+    catch (const hardware_interface::HardwareInterfaceException& e) {
+      ROS_ERROR("Exception getting joint '%s': %s", joint_names[i].c_str(), e.what());
+      return false;
+    }
+
     joint_urdfs[i] = urdf.getJoint(joint_names[i]);
 
     if (!joint_urdfs[i]) {
@@ -75,12 +84,13 @@ bool JointGroupPositionController::init(hardware_interface::EffortJointInterface
     }
   }
 
-  // Determine beginning and end links
-  std::string base_link_name = joint_urdfs[0]->parent_link_name;
-  std::string tool_link_name = joint_urdfs[number_of_joints - 1]->parent_link_name;
+  if (!kdl_parser::treeFromUrdfModel(urdf, kdl_tree)) {
+    ROS_ERROR("Failed to construct kdl tree");
+    return false;
+  }
 
   kdl_tree_id.setTree(kdl_tree);
-  kdl_tree_id.loadFromParam("robot_description");
+
 
   // Start command subscriber
   command_sub = n.subscribe("command", 1, &JointGroupPositionController::setCommand, this);
@@ -102,15 +112,19 @@ void JointGroupPositionController::update(const ros::Time& time, const ros::Dura
 
   joint_state_command = *(command_buffer.readFromRT());
 
-  kdl_extension::JointDynamicsData jd;
   jd.InitializeMaps(kdl_tree);
-  KDL::Twist v_in; // TODO from base
-  KDL::Twist a_in; // TODO from base
+  KDL::Twist v_in = KDL::Twist::Zero(); // TODO from base
+  KDL::Twist a_in = KDL::Twist::Zero(); // TODO from base
   KDL::Wrench f_out;
   KDL::RigidBodyInertia I_out;
-  kdl_tree_id.treeRecursiveNewtonEuler(jd, "null", "null", v_in, a_in, f_out, I_out);
+  kdl_tree_id.treeRecursiveNewtonEuler(jd, "herb_base", "null", v_in, a_in, f_out, I_out); // TODO take base_frame from parameter
 
-  ROS_DEBUG("INVERSE DYNAMICS tx=%d ty=%d tz=%d", f_out[3], f_out[4], f_out[5]);
+  for (unsigned int i = 0; i < number_of_joints; ++i) {
+    std::map<std::string, double>::const_iterator torque_it = jd.jointTorqueCommandMap.find(joint_names[i]);
+    if (torque_it != jd.jointTorqueCommandMap.end()) {
+      ROS_DEBUG("INVERSE DYNAMICS TORQUE '%s' = %d", joint_names[i].c_str(), torque_it->second);
+    }
+  }
 
   // TODO get inverse dynamics
   // TODO 1. log combined, ID, and PID effort

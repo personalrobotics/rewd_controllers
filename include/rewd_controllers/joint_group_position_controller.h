@@ -88,6 +88,7 @@ namespace rewd_controllers {
     std::vector<control_toolbox::Pid> joint_pid_controllers;
     std::vector<hardware_interface::JointHandle> joints;
     std::vector<boost::shared_ptr<const urdf::Joint> > joint_urdfs;
+    kdl_extension::JointDynamicsData jd;
     kdl_extension::KdlTreeId kdl_tree_id;
     KDL::Tree kdl_tree;
     KDL::Chain controlled_chain;

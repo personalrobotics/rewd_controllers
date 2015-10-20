@@ -78,7 +78,7 @@ bool JointGroupPositionController::init(hardware_interface::EffortJointInterface
 
   kdl_tree_id.setTree(kdl_tree);
   kdl_tree_id.loadFromParam("robot_description");
-  kdl_tree_id.getChain(base_link_name, tool_link_name, controlled_chain);
+  // kdl_tree_id.getChain(base_link_name, tool_link_name, controlled_chain);
 
   return true;
 }
@@ -96,15 +96,17 @@ void JointGroupPositionController::update(const ros::Time& time, const ros::Dura
 
   joint_state_command = *(command_buffer.readFromRT());
 
-  KDL::JntArray q, q_dot, q_dotdot;
+  // KDL::JntArray q, q_dot, q_dotdot;
   kdl_extension::JointDynamicsData jd;
-  jd.PopulateJointInfo(controlled_chain, q, q_dot, q_dotdot);
+  // jd.PopulateJointInfo(controlled_chain, q, q_dot, q_dotdot);
+  jd.InitializeMaps(kdl_tree);
   KDL::Twist v_in; // TODO where does this come from?
   KDL::Twist a_in; // TODO where does this come from?
   KDL::Wrench f_out;
   KDL::RigidBodyInertia I_out;
   kdl_tree_id.treeRecursiveNewtonEuler(jd, "null", "null", v_in, a_in, f_out, I_out);
 
+  ROS_DEBUG("INVERSE DYNAMICS tx=%d ty=%d tz=%d", f_out[3], f_out[4], f_out[5]);
 
   // TODO get inverse dynamics
   // TODO 1. log combined, ID, and PID effort
@@ -149,7 +151,7 @@ void JointGroupPositionController::update(const ros::Time& time, const ros::Dura
     effort_command = joint_pid_controllers[i].computeCommand(error, period);
 
     joint.setCommand(effort_command);
-    // TODO log dynamics information
+    ROS_DEBUG("PID EFFORT COMMAND: %s = %d", joint_names[i].c_str(), effort_command);
   }
 }
 

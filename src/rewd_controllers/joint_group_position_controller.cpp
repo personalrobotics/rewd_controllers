@@ -23,6 +23,7 @@ JointGroupPositionController::~JointGroupPositionController() {
 }
 
 bool JointGroupPositionController::init(hardware_interface::EffortJointInterface *robot, ros::NodeHandle &n) {
+  hardware_robot = robot;
   // Get joint name from parameter server
   if (!n.getParam("joints", joint_names)) {
     ROS_ERROR("No joints given (namespace: %s)", n.getNamespace().c_str());
@@ -49,7 +50,7 @@ bool JointGroupPositionController::init(hardware_interface::EffortJointInterface
 
   // Load PID Controllers using gains set on parameter server
   joint_pid_controllers.resize(number_of_joints);
-  for (unsigned int i = 0; i < number_of_joints; ++i) {
+  for (size_t i = 0; i < number_of_joints; ++i) {
     ros::NodeHandle pid_nh(n, std::string("gains/") + joint_names[i]);
     if (!joint_pid_controllers[i].init(pid_nh)) {
       return false;
@@ -64,10 +65,10 @@ bool JointGroupPositionController::init(hardware_interface::EffortJointInterface
     return false;
   }
 
-  // Get joint handles and URDFS and save to maps
+  // Get joint handles and URDFS and save
   joints.resize(number_of_joints);
   joint_urdfs.resize(number_of_joints);
-  for (unsigned int i = 0; i < number_of_joints; ++i) {
+  for (size_t i = 0; i < number_of_joints; ++i) {
     try {
       joints[i] = robot->getHandle(joint_names[i]);
     }
@@ -84,13 +85,13 @@ bool JointGroupPositionController::init(hardware_interface::EffortJointInterface
     }
   }
 
+  // Initialize KDL from urdf
   if (!kdl_parser::treeFromUrdfModel(urdf, kdl_tree)) {
     ROS_ERROR("Failed to construct kdl tree");
     return false;
   }
-
+  jd.InitializeMaps(kdl_tree);
   kdl_tree_id.setTree(kdl_tree);
-
 
   // Start command subscriber
   command_sub = n.subscribe("command", 1, &JointGroupPositionController::setCommand, this);
@@ -99,7 +100,7 @@ bool JointGroupPositionController::init(hardware_interface::EffortJointInterface
 }
 
 void JointGroupPositionController::starting(const ros::Time& time) {
-  for (unsigned int i = 0; i < number_of_joints; ++i) {
+  for (size_t i = 0; i < number_of_joints; ++i) {
     joint_state_command[i] = joints[i].getPosition();
     joint_pid_controllers[i].reset();
   }
@@ -112,28 +113,40 @@ void JointGroupPositionController::update(const ros::Time& time, const ros::Dura
 
   joint_state_command = *(command_buffer.readFromRT());
 
-  jd.InitializeMaps(kdl_tree);
-  KDL::Twist v_in = KDL::Twist::Zero(); // TODO from base
-  KDL::Twist a_in = KDL::Twist::Zero(); // TODO from base
-  KDL::Wrench f_out;
-  KDL::RigidBodyInertia I_out;
+  // Update input vel/acc
+  v_in = KDL::Twist::Zero(); // TODO from base
+  a_in = KDL::Twist::Zero(); // TODO from base
+
+  // Update joint state
+  hardware_interface::JointHandle joint;
+  for (std::map<std::string, kdl_extension::JntDynData>::iterator jnt_it = jd.jointDataMap.begin();
+       jnt_it != jd.jointDataMap.end(); ++jnt_it) {
+    try {
+      joint = hardware_robot->getHandle(jnt_it->first);
+      jnt_it->second.pos = joint.getPosition();
+      jnt_it->second.vel = joint.getVelocity();
+      // jnt_it->second.acc = dvel/dt; // TODO need to calculate and set acceleration?
+    }
+    catch (const hardware_interface::HardwareInterfaceException& e) {
+      ROS_ERROR("Exception getting JointHandle for '%s': %s", jnt_it->first.c_str(), e.what());
+      // TODO how to handle?
+      return;
+    }
+  }
+
   kdl_tree_id.treeRecursiveNewtonEuler(jd, "herb_base", "null", v_in, a_in, f_out, I_out); // TODO take base_frame from parameter
 
-  for (unsigned int i = 0; i < number_of_joints; ++i) {
+  // TODO remove
+  // Log torques from ID
+  for (size_t i = 0; i < number_of_joints; ++i) {
     std::map<std::string, double>::const_iterator torque_it = jd.jointTorqueCommandMap.find(joint_names[i]);
     if (torque_it != jd.jointTorqueCommandMap.end()) {
       ROS_DEBUG("INVERSE DYNAMICS TORQUE '%s' = %d", joint_names[i].c_str(), torque_it->second);
     }
   }
 
-  // TODO get inverse dynamics
-  // TODO 1. log combined, ID, and PID effort
-  // TODO 2. add ID to PID effort
-  // TODO double check herb model inertia w/ data sheet
-  // TODO check torques needed by PID to keep arm still (inertia)
-
-
-  for(unsigned int i = 0; i < number_of_joints; ++i) {
+  // PID control of each joint
+  for(size_t i = 0; i < number_of_joints; ++i) {
     double command_position = joint_state_command[i];
     double error;
     double effort_command;
@@ -168,6 +181,7 @@ void JointGroupPositionController::update(const ros::Time& time, const ros::Dura
     // time step size.
     effort_command = joint_pid_controllers[i].computeCommand(error, period);
 
+    // TODO incorporate ID
     joint.setCommand(effort_command);
     ROS_DEBUG("PID EFFORT COMMAND: %s = %d", joint_names[i].c_str(), effort_command);
   }
@@ -185,8 +199,8 @@ void JointGroupPositionController::setCommand(const sensor_msgs::JointState& msg
     return;
   }
 
-  for (unsigned int i = 0; i < number_of_joints; ++i) {
-    for (unsigned int k = 0; k < number_of_joints; ++k) {
+  for (size_t i = 0; i < number_of_joints; ++i) {
+    for (size_t k = 0; k < number_of_joints; ++k) {
       if (joint_names[k] == msg.name[i]) {
         joint_state_command[k] = msg.position[i];
       }
@@ -198,6 +212,7 @@ void JointGroupPositionController::setCommand(const sensor_msgs::JointState& msg
 
   command_buffer.writeFromNonRT(joint_state_command);
 }
+
 
 // TODO verify the fix to angles obsoletes this function
 // // Note: we may want to remove this function once issue https://github.com/ros/angles/issues/2 is resolved

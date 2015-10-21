@@ -83,19 +83,33 @@ namespace rewd_controllers {
     void update(const ros::Time& time, const ros::Duration& period);
 
   private:
-    unsigned int number_of_joints;
-    std::vector<std::string> joint_names;
+
+    // Controller
+    Command joint_state_command;
+    hardware_interface::EffortJointInterface *hardware_robot;
+    realtime_tools::RealtimeBuffer<Command> command_buffer;
+    ros::Subscriber command_sub;
     std::vector<control_toolbox::Pid> joint_pid_controllers;
     std::vector<hardware_interface::JointHandle> joints;
+
+    // Model
     std::vector<boost::shared_ptr<const urdf::Joint> > joint_urdfs;
+
+    // Housekeepting convenience
+    std::vector<std::string> joint_names;
+    size_t number_of_joints;
+
+    // KDL for RNE on Trees
     kdl_extension::JointDynamicsData jd;
     kdl_extension::KdlTreeId kdl_tree_id;
+
+    // KDL
     KDL::Tree kdl_tree;
-    KDL::Chain controlled_chain;
-    std::string base_link_name, tool_link_name;
-    realtime_tools::RealtimeBuffer<Command> command_buffer;
-    Command joint_state_command;
-    ros::Subscriber command_sub;
+    KDL::Twist v_in;
+    KDL::Twist a_in;
+    KDL::Wrench f_out;
+    KDL::RigidBodyInertia I_out;
+
 
     /**
      * \brief Check that the command is within the hard limits of the joint. Checks for joint

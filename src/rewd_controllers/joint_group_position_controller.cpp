@@ -130,7 +130,6 @@ void JointGroupPositionController::update(const ros::Time& time, const ros::Dura
     catch (const hardware_interface::HardwareInterfaceException& e) {
       ROS_ERROR("Exception getting JointHandle for '%s': %s", jnt_it->first.c_str(), e.what());
       // TODO how to handle?
-      return;
     }
   }
 

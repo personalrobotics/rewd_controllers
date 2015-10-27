@@ -23,6 +23,7 @@
   <depend>forward_command_controller</depend>
   <depend>dynamic_reconfigure</depend>
   <depend>kdl_extension</depend>
+  <depend>kdl_parser</depend>
 
   <export>
     <controller_interface plugin="${prefix}/rewd_controllers_plugins.xml"/>

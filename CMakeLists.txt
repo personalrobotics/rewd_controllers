@@ -9,6 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   realtime_tools
   urdf
   kdl_extension
+  kdl_parser
 )
 
 find_package(Boost REQUIRED COMPONENTS

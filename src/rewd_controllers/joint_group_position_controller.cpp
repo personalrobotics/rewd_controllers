@@ -93,8 +93,18 @@ bool JointGroupPositionController::init(hardware_interface::EffortJointInterface
   jd.InitializeMaps(kdl_tree);
   kdl_tree_id.setTree(kdl_tree);
 
+
+  // Initialize logging
+  logfile.open("rewd_commands.log");
+  if (!logfile.is_open()) {
+    ROS_ERROR("Failed to open logfile");
+    return false;
+  }
+
   // Start command subscriber
   command_sub = n.subscribe("command", 1, &JointGroupPositionController::setCommand, this);
+
+  ROS_INFO("JointGroupPositionController initialized successfully");
 
   return true;
 }
@@ -106,6 +116,7 @@ void JointGroupPositionController::starting(const ros::Time& time) {
   }
 
   command_buffer.initRT(joint_state_command);
+  ROS_INFO("JointGroupPositionController started successfully");
 }
 
 void JointGroupPositionController::update(const ros::Time& time, const ros::Duration& period) {
@@ -128,19 +139,25 @@ void JointGroupPositionController::update(const ros::Time& time, const ros::Dura
       // jnt_it->second.acc = dvel/dt; // TODO need to calculate and set acceleration?
     }
     catch (const hardware_interface::HardwareInterfaceException& e) {
-      ROS_ERROR("Exception getting JointHandle for '%s': %s", jnt_it->first.c_str(), e.what());
-      // TODO how to handle?
+      if (std::find(joint_names.begin(), joint_names.end(), jnt_it->first) != joint_names.end()) {
+        // Can't find controlled joint
+        ROS_ERROR("Exception getting JointHandle for '%s': %s", jnt_it->first.c_str(), e.what());
+      }
+      else {
+        // Can't find non-controlled joint
+        ROS_DEBUG("Exception getting JointHandle for '%s': %s", jnt_it->first.c_str(), e.what());
+      }
     }
   }
-
-  kdl_tree_id.treeRecursiveNewtonEuler(jd, "herb_base", "null", v_in, a_in, f_out, I_out); // TODO take base_frame from parameter
+  // TODO take base_frame from parameter 
+  kdl_tree_id.treeRecursiveNewtonEuler(jd, "/herb_base", "null", v_in, a_in, f_out, I_out); 
 
   // TODO remove
   // Log torques from ID
   for (size_t i = 0; i < number_of_joints; ++i) {
     std::map<std::string, double>::const_iterator torque_it = jd.jointTorqueCommandMap.find(joint_names[i]);
     if (torque_it != jd.jointTorqueCommandMap.end()) {
-      ROS_DEBUG("INVERSE DYNAMICS TORQUE '%s' = %d", joint_names[i].c_str(), torque_it->second);
+      logfile << "ID Torque: " << joint_names[i] << " = " << torque_it->second << "\n";
     }
   }
 
@@ -157,13 +174,16 @@ void JointGroupPositionController::update(const ros::Time& time, const ros::Dura
     // Make sure joint is within limits if applicable
     // enforceJointLimits(joint_urdf, command_position); // TODO
 
+
     // Compute position error
     if (joint_urdf->type == urdf::Joint::REVOLUTE) {
-        angles::shortest_angular_distance_with_limits(current_position,
-                                                      command_position,
-                                                      joint_urdf->limits->lower,
-                                                      joint_urdf->limits->upper,
-                                                      error);
+        error = command_position - current_position;
+       // TODO use this when add enforceJointLimits
+       // angles::shortest_angular_distance_with_limits(current_position,
+       //                                               command_position,
+       //                                               joint_urdf->limits->lower,
+       //                                               joint_urdf->limits->upper,
+       //                                               error);
     }
     else if (joint_urdf->type == urdf::Joint::CONTINUOUS) {
         error = angles::shortest_angular_distance(current_position, command_position);
@@ -176,13 +196,18 @@ void JointGroupPositionController::update(const ros::Time& time, const ros::Dura
       continue;
     }
 
+    // TODO rm
+
     // Set the PID error and compute the PID command with nonuniform
     // time step size.
     effort_command = joint_pid_controllers[i].computeCommand(error, period);
 
     // TODO incorporate ID
     joint.setCommand(effort_command);
-    ROS_DEBUG("PID EFFORT COMMAND: %s = %d", joint_names[i].c_str(), effort_command);
+    // std::cout << "joint: " << joint_names[i] << "\ncurrent_position: " << current_position << "\ncommand_position: " 
+    //           << command_position << "\nerror: " << error << "\nlimit_upper: " << joint_urdf->limits->upper << "\nlimit_lower: " << joint_urdf->limits->lower << std::endl;
+
+    logfile << "PID Effort Command: " << joint_names[i] << " = " << effort_command << "\n";
   }
 }
 
@@ -198,10 +223,12 @@ void JointGroupPositionController::setCommand(const sensor_msgs::JointState& msg
     return;
   }
 
+  Command position_command;
+  position_command.resize(number_of_joints);
   for (size_t i = 0; i < number_of_joints; ++i) {
     for (size_t k = 0; k < number_of_joints; ++k) {
       if (joint_names[k] == msg.name[i]) {
-        joint_state_command[k] = msg.position[i];
+        position_command[k] = msg.position[i];
       }
       else if (i == k) {
         ROS_ERROR("Unknown joint in JointState message: '%s'", msg.name[i].c_str());
@@ -209,7 +236,7 @@ void JointGroupPositionController::setCommand(const sensor_msgs::JointState& msg
     }
   }
 
-  command_buffer.writeFromNonRT(joint_state_command);
+  command_buffer.writeFromNonRT(position_command);
 }
 
 

@@ -32,6 +32,7 @@
 #include <control_toolbox/pid.h>
 #include <controller_interface/controller.h>
 #include <hardware_interface/joint_command_interface.h>
+#include <fstream>
 #include <kdl_extension/KdlTreeId.h>
 #include <realtime_tools/realtime_buffer.h>
 #include <realtime_tools/realtime_publisher.h>
@@ -83,6 +84,8 @@ namespace rewd_controllers {
     void update(const ros::Time& time, const ros::Duration& period);
 
   private:
+    // Logging
+    std::ofstream logfile;
 
     // Controller
     Command joint_state_command;

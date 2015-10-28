@@ -63,6 +63,40 @@ bool JointGroupPositionController::init(
       return false;
     }
     controlled_skeleton_->addDof(dof, true);
+
+    controlled_joint_map_.emplace(
+      dof->getName(), controlled_skeleton_->getNumDofs() - 1);
+  }
+
+  // Get all joint handles.
+  controlled_joint_handles_.reserve(controlled_skeleton_->getNumDofs());
+  for (dart::dynamics::DegreeOfFreedom const *const dof : controlled_skeleton_->getDofs()) {
+    std::string const &dof_name = dof->getName();
+    hardware_interface::JointHandle handle;
+
+    try {
+      handle = hardware_robot->getHandle(dof_name);
+    } catch (hardware_interface::HardwareInterfaceException const &e) {
+      ROS_ERROR("Failed getting JointHandle for controlled DOF '%s'.", dof_name.c_str());
+      return false;
+    }
+
+    controlled_joint_handles_.push_back(handle);
+  }
+
+  joint_handles_.reserve(skeleton_->getNumDofs());
+  for (dart::dynamics::DegreeOfFreedom const *const dof : skeleton_->getDofs()) {
+    std::string const &dof_name = dof->getName();
+    hardware_interface::JointHandle handle;
+
+    try {
+      handle = hardware_robot->getHandle(dof_name);
+    } catch (hardware_interface::HardwareInterfaceException const &e) {
+      ROS_WARN("Failed getting JointHandle for DOF '%s'.", dof_name.c_str());
+      continue;
+    }
+
+    joint_handles_.push_back(handle);
   }
 
   // Initialize command struct vector sizes
@@ -72,7 +106,8 @@ bool JointGroupPositionController::init(
   // Load PID Controllers using gains set on parameter server
   joint_pid_controllers.resize(number_of_joints);
   for (size_t i = 0; i < number_of_joints; ++i) {
-    ros::NodeHandle pid_nh(n, std::string("gains/") + joint_names[i]);
+    std::string const &dof_name = controlled_skeleton_->getDof(i)->getName();
+    ros::NodeHandle pid_nh(n, std::string("gains/") + dof_name);
     if (!joint_pid_controllers[i].init(pid_nh)) {
       return false;
     }
@@ -94,7 +129,7 @@ bool JointGroupPositionController::init(
 
 void JointGroupPositionController::starting(const ros::Time& time) {
   for (size_t i = 0; i < number_of_joints; ++i) {
-    joint_state_command[i] = joints[i].getPosition();
+    joint_state_command[i] = controlled_joint_handles_[i].getPosition();
     joint_pid_controllers[i].reset();
   }
 
@@ -102,56 +137,76 @@ void JointGroupPositionController::starting(const ros::Time& time) {
   ROS_INFO("JointGroupPositionController started successfully");
 }
 
-void JointGroupPositionController::update(const ros::Time& time, const ros::Duration& period) {
+void JointGroupPositionController::update(
+  const ros::Time& time, const ros::Duration& period)
+{
   joint_state_command = *(command_buffer.readFromRT());
 
+  for (hardware_interface::JointHandle &handle : joint_handles_) {
+    dart::dynamics::DegreeOfFreedom *const dof
+      = skeleton_->getDof(handle.getName());
+    if (!dof)
+      continue; // This should never happen.
+
+    dof->setPosition(handle.getPosition());
+    dof->setVelocity(handle.getVelocity());
+    dof->setAcceleration(0.);
+  }
+
+  skeleton_->computeInverseDynamics();
+
   // PID control of each joint
-  for(size_t i = 0; i < number_of_joints; ++i) {
-    double command_position = joint_state_command[i];
-    double error;
-    double effort_command;
-    hardware_interface::JointHandle& joint = joints[i];
-    boost::shared_ptr<const urdf::Joint>& joint_urdf = joint_urdfs[i];
-    double current_position = joint.getPosition();
+  for (size_t i = 0; i < number_of_joints; ++i) {
+    dart::dynamics::DegreeOfFreedom *const dof
+      = controlled_skeleton_->getDof(i);
+    dart::dynamics::Joint *const joint = dof->getJoint();
 
-    // TODO removed below?
-    // Make sure joint is within limits if applicable
-    // enforceJointLimits(joint_urdf, command_position); // TODO
+    double const position_desired = joint_state_command[i];
+    double const position_actual = dof->getPosition();
 
+    // TODO: Make sure joint is within limits if applicable
+    // enforceJointLimits(joint_urdf, command_position);
 
     // Compute position error
-    if (joint_urdf->type == urdf::Joint::REVOLUTE) {
-        error = command_position - current_position;
+    double position_error;
+    if (joint->getType() == dart::dynamics::RevoluteJoint::getStaticType()) {
+      if (dof->isCyclic()) {
+        position_error = angles::shortest_angular_distance(
+          position_desired, position_actual);
+      } else {
+        position_error = position_desired - position_actual;
        // TODO use this when add enforceJointLimits
-       // angles::shortest_angular_distance_with_limits(current_position,
-       //                                               command_position,
-       //                                               joint_urdf->limits->lower,
-       //                                               joint_urdf->limits->upper,
-       //                                               error);
+#if 0
+       angles::shortest_angular_distance_with_limits(current_position,
+                                                     command_position,
+                                                     joint_urdf->limits->lower,
+                                                     joint_urdf->limits->upper,
+                                                     error);
+#endif
+      }
+    } else if (joint->getType() == dart::dynamics::PrismaticJoint::getStaticType()) {
+      position_error = position_desired - position_actual;
+    } else {
+      position_error = 0.;
+      ROS_ERROR(
+        "DegreeOfFreedom '%s' is from joint '%s' with unknown type '%s'.",
+        dof->getName().c_str(), joint->getName().c_str(),
+        joint->getType().c_str());
     }
-    else if (joint_urdf->type == urdf::Joint::CONTINUOUS) {
-        error = angles::shortest_angular_distance(current_position, command_position);
-    }
-    else if (joint_urdf->type == urdf::Joint::PRISMATIC) {
-        error = command_position - current_position;
-    }
-    else {
-      ROS_ERROR("Unknown joint type");
-      continue;
-    }
-
-    // TODO rm
 
     // Set the PID error and compute the PID command with nonuniform
     // time step size.
-    effort_command = joint_pid_controllers[i].computeCommand(error, period);
+    double const effort_inversedynamics = dof->getForce();
+    double const effort_pid = joint_pid_controllers[i].computeCommand(
+      position_error, period);
+    double const effort_command = effort_pid; // TODO incorporate ID.
 
-    // TODO incorporate ID
-    joint.setCommand(effort_command);
-    // std::cout << "joint: " << joint_names[i] << "\ncurrent_position: " << current_position << "\ncommand_position: " 
-    //           << command_position << "\nerror: " << error << "\nlimit_upper: " << joint_urdf->limits->upper << "\nlimit_lower: " << joint_urdf->limits->lower << std::endl;
+    hardware_interface::JointHandle &joint_handle
+      = controlled_joint_handles_[i];
+    joint_handle.setCommand(effort_command);
 
-    logfile << "PID Effort Command: " << joint_names[i] << " = " << effort_command << "\n";
+    logfile << "Joint [" << dof->getName() << "]: PID = " << effort_pid
+            << " ID = " << effort_inversedynamics << "\n";
   }
 }
 
@@ -167,17 +222,19 @@ void JointGroupPositionController::setCommand(const sensor_msgs::JointState& msg
     return;
   }
 
-  Command position_command;
-  position_command.resize(number_of_joints);
+  std::vector<double> position_command(controlled_skeleton_->getNumDofs());
+
   for (size_t i = 0; i < number_of_joints; ++i) {
-    for (size_t k = 0; k < number_of_joints; ++k) {
-      if (joint_names[k] == msg.name[i]) {
-        position_command[k] = msg.position[i];
-      }
-      else if (i == k) {
-        ROS_ERROR("Unknown joint in JointState message: '%s'", msg.name[i].c_str());
-      }
+    std::string const &joint_name = msg.name[i];
+
+    auto const it = controlled_joint_map_.find(joint_name);
+    if (it == std::end(controlled_joint_map_)) {
+      ROS_ERROR("Unknown joint '%s' in message at index %d.",
+        joint_name.c_str(), i);
+      continue;
     }
+
+    position_command[i] = msg.position[i];
   }
 
   command_buffer.writeFromNonRT(position_command);

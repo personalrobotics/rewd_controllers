@@ -38,10 +38,9 @@
 #include <ros/node_handle.h>
 #include <sensor_msgs/JointState.h>
 #include <dart/dynamics/SmartPointer.h>
-#include <urdf/model.h>
+#include <unordered_map>
 
 namespace rewd_controllers {
-  typedef std::vector<double> Command;
 
   class JointGroupPositionController: public controller_interface::Controller<hardware_interface::EffortJointInterface> {
   public:
@@ -88,20 +87,21 @@ namespace rewd_controllers {
     std::ofstream logfile;
 
     // Controller
-    Command joint_state_command;
+    std::vector<double> joint_state_command;
     hardware_interface::EffortJointInterface *hardware_robot;
-    realtime_tools::RealtimeBuffer<Command> command_buffer;
+    realtime_tools::RealtimeBuffer<std::vector<double> > command_buffer;
     ros::Subscriber command_sub;
     std::vector<control_toolbox::Pid> joint_pid_controllers;
-    std::vector<hardware_interface::JointHandle> joints;
 
     // Model
     dart::dynamics::SkeletonPtr skeleton_;
+    std::vector<hardware_interface::JointHandle> joint_handles_;
+
     dart::dynamics::GroupPtr controlled_skeleton_;
-    std::vector<boost::shared_ptr<const urdf::Joint> > joint_urdfs;
+    std::vector<hardware_interface::JointHandle> controlled_joint_handles_;
+    std::unordered_map<std::string, size_t> controlled_joint_map_;
 
     // Housekeepting convenience
-    std::vector<std::string> joint_names;
     size_t number_of_joints;
 
     /**

@@ -33,7 +33,6 @@
 #include <controller_interface/controller.h>
 #include <hardware_interface/joint_command_interface.h>
 #include <fstream>
-#include <kdl_extension/KdlTreeId.h>
 #include <realtime_tools/realtime_buffer.h>
 #include <realtime_tools/realtime_publisher.h>
 #include <ros/node_handle.h>
@@ -101,18 +100,6 @@ namespace rewd_controllers {
     // Housekeepting convenience
     std::vector<std::string> joint_names;
     size_t number_of_joints;
-
-    // KDL for RNE on Trees
-    kdl_extension::JointDynamicsData jd;
-    kdl_extension::KdlTreeId kdl_tree_id;
-
-    // KDL
-    KDL::Tree kdl_tree;
-    KDL::Twist v_in;
-    KDL::Twist a_in;
-    KDL::Wrench f_out;
-    KDL::RigidBodyInertia I_out;
-
 
     /**
      * \brief Check that the command is within the hard limits of the joint. Checks for joint

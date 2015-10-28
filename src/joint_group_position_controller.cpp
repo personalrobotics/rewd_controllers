@@ -4,14 +4,6 @@
 #include <rewd_controllers/RosMsgConverter.h>
 #include <angles/angles.h>
 #include <hardware_interface/hardware_interface.h>
-#include <kdl/chain.hpp>
-#include <kdl/jntarray.hpp>
-#include <kdl/jntarrayvel.hpp>
-#include <kdl/jntarrayacc.hpp>
-#include <kdl/tree.hpp>
-#include <kdl_parser/kdl_parser.hpp>
-#include <kdl_extension/JointDynamicsData.h>
-#include <kdl_extension/KdlChainIdRne.h>
 #include <pluginlib/class_list_macros.h>
 
 using namespace rewd_controllers;
@@ -85,15 +77,6 @@ bool JointGroupPositionController::init(hardware_interface::EffortJointInterface
     }
   }
 
-  // Initialize KDL from urdf
-  if (!kdl_parser::treeFromUrdfModel(urdf, kdl_tree)) {
-    ROS_ERROR("Failed to construct kdl tree");
-    return false;
-  }
-  jd.InitializeMaps(kdl_tree);
-  kdl_tree_id.setTree(kdl_tree);
-
-
   // Initialize logging
   logfile.open("rewd_commands.log");
   if (!logfile.is_open()) {
@@ -120,46 +103,7 @@ void JointGroupPositionController::starting(const ros::Time& time) {
 }
 
 void JointGroupPositionController::update(const ros::Time& time, const ros::Duration& period) {
-  // TODO find error/log/debug solution for realtime
-
   joint_state_command = *(command_buffer.readFromRT());
-
-  // Update input vel/acc
-  v_in = KDL::Twist::Zero(); // TODO from base
-  a_in = KDL::Twist::Zero(); // TODO from base
-
-  // Update joint state
-  hardware_interface::JointHandle joint;
-  for (std::map<std::string, kdl_extension::JntDynData>::iterator jnt_it = jd.jointDataMap.begin();
-       jnt_it != jd.jointDataMap.end(); ++jnt_it) {
-    try {
-      joint = hardware_robot->getHandle(jnt_it->first);
-      jnt_it->second.pos = joint.getPosition();
-      jnt_it->second.vel = joint.getVelocity();
-      // jnt_it->second.acc = dvel/dt; // TODO need to calculate and set acceleration?
-    }
-    catch (const hardware_interface::HardwareInterfaceException& e) {
-      if (std::find(joint_names.begin(), joint_names.end(), jnt_it->first) != joint_names.end()) {
-        // Can't find controlled joint
-        ROS_ERROR("Exception getting JointHandle for '%s': %s", jnt_it->first.c_str(), e.what());
-      }
-      else {
-        // Can't find non-controlled joint
-        ROS_DEBUG("Exception getting JointHandle for '%s': %s", jnt_it->first.c_str(), e.what());
-      }
-    }
-  }
-  // TODO take base_frame from parameter 
-  kdl_tree_id.treeRecursiveNewtonEuler(jd, "/herb_base", "null", v_in, a_in, f_out, I_out); 
-
-  // TODO remove
-  // Log torques from ID
-  for (size_t i = 0; i < number_of_joints; ++i) {
-    std::map<std::string, double>::const_iterator torque_it = jd.jointTorqueCommandMap.find(joint_names[i]);
-    if (torque_it != jd.jointTorqueCommandMap.end()) {
-      logfile << "ID Torque: " << joint_names[i] << " = " << torque_it->second << "\n";
-    }
-  }
 
   // PID control of each joint
   for(size_t i = 0; i < number_of_joints; ++i) {

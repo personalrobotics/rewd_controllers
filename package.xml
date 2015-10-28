@@ -3,18 +3,14 @@
   <name>rewd_controllers</name>
   <version>0.0.0</version>
   <description>The ROS Effort With Dynamics Controllers package</description>
-
   <maintainer email="cliddick@cmu.edu">Clint Liddick</maintainer>
-
   <license>BSD</license>
-
   <url type="repository">https://github.com/personalrobotics/pr_ros_controllers</url>
-
   <author email="cliddick@cmu.edu">Clint Liddick</author>
-
   <buildtool_depend>catkin</buildtool_depend>
   <depend>angles</depend>
   <depend>boost</depend>
+  <depend>dart</depend>
   <depend>controller_interface</depend> 
   <depend>control_msgs</depend> 
   <depend>control_toolbox</depend> 
@@ -22,9 +18,6 @@
   <depend>urdf</depend> 
   <depend>forward_command_controller</depend>
   <depend>dynamic_reconfigure</depend>
-  <depend>kdl_extension</depend>
-  <depend>kdl_parser</depend>
-
   <export>
     <controller_interface plugin="${prefix}/rewd_controllers_plugins.xml"/>
   </export>

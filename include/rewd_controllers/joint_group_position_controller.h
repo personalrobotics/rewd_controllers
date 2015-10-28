@@ -37,6 +37,7 @@
 #include <realtime_tools/realtime_publisher.h>
 #include <ros/node_handle.h>
 #include <sensor_msgs/JointState.h>
+#include <dart/dynamics/SmartPointer.h>
 #include <urdf/model.h>
 
 namespace rewd_controllers {
@@ -46,7 +47,7 @@ namespace rewd_controllers {
   public:
 
     JointGroupPositionController();
-    ~JointGroupPositionController();
+    virtual ~JointGroupPositionController();
 
     /** \brief The init function is called to initialize the controller from a
      * non-realtime thread with a pointer to the hardware interface, itself,
@@ -95,6 +96,8 @@ namespace rewd_controllers {
     std::vector<hardware_interface::JointHandle> joints;
 
     // Model
+    dart::dynamics::SkeletonPtr skeleton_;
+    dart::dynamics::GroupPtr controlled_skeleton_;
     std::vector<boost::shared_ptr<const urdf::Joint> > joint_urdfs;
 
     // Housekeepting convenience

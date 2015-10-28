@@ -16,6 +16,7 @@
   <depend>control_toolbox</depend> 
   <depend>realtime_tools</depend> 
   <depend>urdf</depend> 
+  <depend>r3</depend> 
   <depend>forward_command_controller</depend>
   <depend>dynamic_reconfigure</depend>
   <export>

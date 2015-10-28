@@ -5,39 +5,68 @@
 #include <angles/angles.h>
 #include <hardware_interface/hardware_interface.h>
 #include <pluginlib/class_list_macros.h>
+#include <dart/dynamics/dynamics.h>
+#include <dart/utils/urdf/DartLoader.h>
+#include <r3/util/CatkinResourceRetriever.h>
 
-using namespace rewd_controllers;
+namespace rewd_controllers {
 
-JointGroupPositionController::JointGroupPositionController() {}
-
-JointGroupPositionController::~JointGroupPositionController() {
-  command_sub.shutdown();
+JointGroupPositionController::JointGroupPositionController()
+{
 }
 
-bool JointGroupPositionController::init(hardware_interface::EffortJointInterface *robot, ros::NodeHandle &n) {
-  hardware_robot = robot;
-  // Get joint name from parameter server
-  if (!n.getParam("joints", joint_names)) {
-    ROS_ERROR("No joints given (namespace: %s)", n.getNamespace().c_str());
+JointGroupPositionController::~JointGroupPositionController()
+{
+}
+
+bool JointGroupPositionController::init(
+  hardware_interface::EffortJointInterface *robot, ros::NodeHandle &n)
+{
+  // Load the URDF XML from the parameter server.
+  std::string robot_description_parameter;
+  n.param<std::string>("robot_description_parameter",
+    robot_description_parameter, "/robot_description");
+
+  std::string robot_description;
+  if (!n.getParam(robot_description_parameter, robot_description)) {
+    ROS_ERROR("Failed loading URDF from '%s' parameter.",
+      robot_description_parameter.c_str());
     return false;
   }
 
-  std::set<std::string> joint_names_wo_dups(joint_names.begin(), joint_names.end());
-  if (joint_names_wo_dups.size() != joint_names.size()) {
-    ROS_ERROR("Duplicate joint names were detected:");
-    for (int i = 0; i < joint_names.size(); ++i) {
-      ROS_ERROR("%s", joint_names[i].c_str());
+  // Load the URDF as a DART model.
+  auto const resource_retriever
+    = std::make_shared<r3::util::CatkinResourceRetriever>();
+  dart::common::Uri const base_uri;
+
+  dart::utils::DartLoader urdf_loader;
+  skeleton_ = urdf_loader.parseSkeletonString(
+    robot_description, base_uri, resource_retriever);
+  if (!skeleton_) {
+    ROS_ERROR("Failed loading URDF as a DART Skeleton.");
+    return false;
+  }
+
+  // Build up the list of controlled DOFs.
+  std::vector<std::string> dof_names;
+  if (!n.getParam("joints", dof_names)) {
+    ROS_ERROR("Unable to read controlled DOFs from the parameter '%s/joints'.",
+      n.getNamespace().c_str());
+    return false;
+  }
+
+  controlled_skeleton_ = dart::dynamics::Group::create("controlled");
+  for (std::string const &dof_name : dof_names) {
+    dart::dynamics::DegreeOfFreedom *const dof = skeleton_->getDof(dof_name);
+    if (!dof) {
+      ROS_ERROR("There is no DOF named '%s'.", dof_name.c_str());
+      return false;
     }
-    return false;
-  }
-
-  number_of_joints = joint_names.size();
-  if (!number_of_joints) {
-    ROS_ERROR("No joints specified in 'joints' parameter");
-    return false;
+    controlled_skeleton_->addDof(dof, true);
   }
 
   // Initialize command struct vector sizes
+  number_of_joints = controlled_skeleton_->getNumDofs();
   joint_state_command.resize(number_of_joints);
 
   // Load PID Controllers using gains set on parameter server
@@ -46,34 +75,6 @@ bool JointGroupPositionController::init(hardware_interface::EffortJointInterface
     ros::NodeHandle pid_nh(n, std::string("gains/") + joint_names[i]);
     if (!joint_pid_controllers[i].init(pid_nh)) {
       return false;
-    }
-  }
-
-  // Get URDF
-  urdf::Model urdf;
-  // TODO load "robot_description" string from parameter itself?
-  if (!urdf.initParam("robot_description")) {
-    ROS_ERROR("Failed to load 'robot_description' parameter");
-    return false;
-  }
-
-  // Get joint handles and URDFS and save
-  joints.resize(number_of_joints);
-  joint_urdfs.resize(number_of_joints);
-  for (size_t i = 0; i < number_of_joints; ++i) {
-    try {
-      joints[i] = robot->getHandle(joint_names[i]);
-    }
-    catch (const hardware_interface::HardwareInterfaceException& e) {
-      ROS_ERROR("Exception getting joint '%s': %s", joint_names[i].c_str(), e.what());
-      return false;
-    }
-
-    joint_urdfs[i] = urdf.getJoint(joint_names[i]);
-
-    if (!joint_urdfs[i]) {
-        ROS_ERROR("Could not find joint '%s' in urdf", joint_names[i].c_str());
-        return false;
     }
   }
 
@@ -88,7 +89,6 @@ bool JointGroupPositionController::init(hardware_interface::EffortJointInterface
   command_sub = n.subscribe("command", 1, &JointGroupPositionController::setCommand, this);
 
   ROS_INFO("JointGroupPositionController initialized successfully");
-
   return true;
 }
 
@@ -203,4 +203,9 @@ void JointGroupPositionController::setCommand(const sensor_msgs::JointState& msg
 // }
 
 
-PLUGINLIB_EXPORT_CLASS( rewd_controllers::JointGroupPositionController, controller_interface::ControllerBase)
+} // namespace rewd_controllers
+
+PLUGINLIB_EXPORT_CLASS(
+  rewd_controllers::JointGroupPositionController,
+  controller_interface::ControllerBase)
+

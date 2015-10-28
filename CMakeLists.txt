@@ -11,15 +11,19 @@ find_package(catkin REQUIRED COMPONENTS
 
 find_package(Boost REQUIRED COMPONENTS thread)
 find_package(DART REQUIRED COMPONENTS core)
+find_package(r3 REQUIRED)
 
 include_directories(SYSTEM
   ${Boost_INCLUDE_DIRS}
   ${DART_INCLUDE_DIRS}
+  ${r3_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
 )
 include_directories(
   include
 )
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 catkin_package(
   CATKIN_DEPENDS
@@ -30,6 +34,7 @@ catkin_package(
     realtime_tools
     urdf
   DEPENDS
+    r3
     DART
   INCLUDE_DIRS
     include
@@ -44,6 +49,7 @@ target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
   ${Boost_LIBRARIES}
   ${DART_LIBRARIES}
+  ${r3_LIBRARIES}
 )
 
 install(DIRECTORY include

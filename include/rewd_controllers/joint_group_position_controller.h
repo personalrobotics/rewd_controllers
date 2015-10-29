@@ -88,7 +88,6 @@ namespace rewd_controllers {
 
     // Controller
     std::vector<double> joint_state_command;
-    hardware_interface::EffortJointInterface *hardware_robot;
     realtime_tools::RealtimeBuffer<std::vector<double> > command_buffer;
     ros::Subscriber command_sub;
     std::vector<control_toolbox::Pid> joint_pid_controllers;

@@ -75,7 +75,7 @@ bool JointGroupPositionController::init(
     hardware_interface::JointHandle handle;
 
     try {
-      handle = hardware_robot->getHandle(dof_name);
+      handle = robot->getHandle(dof_name);
     } catch (hardware_interface::HardwareInterfaceException const &e) {
       ROS_ERROR("Failed getting JointHandle for controlled DOF '%s'.", dof_name.c_str());
       return false;
@@ -90,7 +90,7 @@ bool JointGroupPositionController::init(
     hardware_interface::JointHandle handle;
 
     try {
-      handle = hardware_robot->getHandle(dof_name);
+      handle = robot->getHandle(dof_name);
     } catch (hardware_interface::HardwareInterfaceException const &e) {
       ROS_WARN("Failed getting JointHandle for DOF '%s'.", dof_name.c_str());
       continue;

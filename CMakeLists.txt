@@ -9,7 +9,8 @@ find_package(catkin REQUIRED COMPONENTS
   urdf
 )
 
-find_package(Boost REQUIRED COMPONENTS thread)
+# TODO: filesystem shouldn't be required here.
+find_package(Boost REQUIRED COMPONENTS filesystem thread)
 find_package(DART REQUIRED COMPONENTS core)
 find_package(r3 REQUIRED)
 
@@ -46,6 +47,17 @@ add_library(${PROJECT_NAME} SHARED
   src/joint_group_position_controller.cpp
 )
 target_link_libraries(${PROJECT_NAME}
+  ${catkin_LIBRARIES}
+  ${Boost_LIBRARIES}
+  ${DART_LIBRARIES}
+  ${r3_LIBRARIES}
+)
+
+add_executable(test_inversedynamics
+  src/inversedynamics_test.cpp
+)
+target_link_libraries(test_inversedynamics
+  assimp
   ${catkin_LIBRARIES}
   ${Boost_LIBRARIES}
   ${DART_LIBRARIES}

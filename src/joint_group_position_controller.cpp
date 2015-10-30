@@ -39,6 +39,7 @@ bool JointGroupPositionController::init(
     = std::make_shared<r3::util::CatkinResourceRetriever>();
   dart::common::Uri const base_uri;
 
+  ROS_INFO("Loading DART model from URDF...");
   dart::utils::DartLoader urdf_loader;
   skeleton_ = urdf_loader.parseSkeletonString(
     robot_description, base_uri, resource_retriever);
@@ -46,8 +47,10 @@ bool JointGroupPositionController::init(
     ROS_ERROR("Failed loading URDF as a DART Skeleton.");
     return false;
   }
+  ROS_INFO("Loading DART model from URDF...DONE");
 
   // Build up the list of controlled DOFs.
+  ROS_INFO("Getting joint names");
   std::vector<std::string> dof_names;
   if (!n.getParam("joints", dof_names)) {
     ROS_ERROR("Unable to read controlled DOFs from the parameter '%s/joints'.",
@@ -55,6 +58,7 @@ bool JointGroupPositionController::init(
     return false;
   }
 
+  ROS_INFO("Creating controlled Skeleton");
   controlled_skeleton_ = dart::dynamics::Group::create("controlled");
   for (std::string const &dof_name : dof_names) {
     dart::dynamics::DegreeOfFreedom *const dof = skeleton_->getDof(dof_name);
@@ -69,6 +73,7 @@ bool JointGroupPositionController::init(
   }
 
   // Get all joint handles.
+  ROS_INFO("Getting controlled JointHandles");
   controlled_joint_handles_.reserve(controlled_skeleton_->getNumDofs());
   for (dart::dynamics::DegreeOfFreedom const *const dof : controlled_skeleton_->getDofs()) {
     std::string const &dof_name = dof->getName();
@@ -84,6 +89,7 @@ bool JointGroupPositionController::init(
     controlled_joint_handles_.push_back(handle);
   }
 
+  ROS_INFO("Getting all JointHandles");
   joint_handles_.reserve(skeleton_->getNumDofs());
   for (dart::dynamics::DegreeOfFreedom const *const dof : skeleton_->getDofs()) {
     std::string const &dof_name = dof->getName();
@@ -100,10 +106,12 @@ bool JointGroupPositionController::init(
   }
 
   // Initialize command struct vector sizes
+  ROS_INFO("Allocating setpoint buffer");
   number_of_joints = controlled_skeleton_->getNumDofs();
   joint_state_command.resize(number_of_joints);
 
   // Load PID Controllers using gains set on parameter server
+  ROS_INFO("Initializing PID controllers");
   joint_pid_controllers.resize(number_of_joints);
   for (size_t i = 0; i < number_of_joints; ++i) {
     std::string const &dof_name = controlled_skeleton_->getDof(i)->getName();
@@ -114,6 +122,7 @@ bool JointGroupPositionController::init(
   }
 
   // Initialize logging
+  ROS_INFO("Opening log file");
   logfile.open("rewd_commands.log");
   if (!logfile.is_open()) {
     ROS_ERROR("Failed to open logfile");

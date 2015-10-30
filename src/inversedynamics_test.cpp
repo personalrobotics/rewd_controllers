@@ -53,11 +53,29 @@ int main(int argc, char **argv)
     }
   }
 
+  for (dart::dynamics::BodyNode *const bodynode : controlled_skeleton->getBodyNodes()) {
+    double Ixx, Iyy, Izz, Ixy, Ixz, Iyz;
+    bodynode->getMomentOfInertia(Ixx, Iyy, Izz, Ixy, Ixz, Iyz);
+
+    std::cout << "BodyNode '" << bodynode->getName() << "':\n"
+              << "  position = " << bodynode->getTransform().translation().transpose() << "\n"
+              << "  mass = " << bodynode->getMass() << "\n"
+              << "  com = " << bodynode->getLocalCOM().transpose() << "\n"
+              << "  Ixx = " << Ixx << " Ixy = " << Ixy << " Ixz = " << Ixz << "\n"
+              << "  Iyy = " << Iyy << " Iyz = " << Iyz << "\n"
+              << "  Izz = " << Izz << "\n"
+              << std::endl;
+  }
+
   std::istream &input_file = std::cin;
 
   size_t const num_dof = controlled_skeleton->getNumDofs();
   controlled_skeleton->setVelocities(Eigen::VectorXd::Zero(num_dof));
   controlled_skeleton->setAccelerations(Eigen::VectorXd::Zero(num_dof));
+
+  skeleton->setGravity(Eigen::Vector3d(0, 0, -9.81));
+
+  skeleton->getBodyNode("/right/hand_base")->remove();
 
   for (size_t iline = 0; input_file; ++iline) {
     // Read joint positions and torques from the input file.
@@ -69,18 +87,22 @@ int main(int argc, char **argv)
     for (size_t i = 0; i < num_dof && input_file; ++i)
       input_file >> torques_actual[i];
 
-    if (!input_file) {
-      std::cerr << "Failed reading line " << (iline + 1) << "." << std::endl;
-      break;
-    }
-
     // Compute the inverse dynamics solution.
+    controlled_skeleton->setPositions(positions);
     skeleton->computeInverseDynamics();
+
     Eigen::VectorXd const torques_computed = controlled_skeleton->getForces();
     Eigen::VectorXd const torques_error = torques_actual - torques_computed;
 
+    std::cout << "[" << iline << "] Positions: " << positions.transpose() << "\n"
+              << "[" << iline << "] Actual Torque: " << torques_actual.transpose() << "\n"
+              << "[" << iline << "] Computed Torque: " << torques_computed.transpose()
+              << std::endl;
+
     for (size_t i = 0; i < num_dof; ++i)
       std::cout << torques_error[i] << " ";
+
+    std::cout << "\n";
   }
   return 0;
 }

@@ -11,9 +11,13 @@
 
 namespace rewd_controllers {
 
-JointGroupPositionController::JointGroupPositionController() {}
+JointGroupPositionController::JointGroupPositionController()
+{
+}
 
-JointGroupPositionController::~JointGroupPositionController() {}
+JointGroupPositionController::~JointGroupPositionController()
+{
+}
 
 bool JointGroupPositionController::init(
   hardware_interface::EffortJointInterface *robot, ros::NodeHandle &n)
@@ -117,14 +121,6 @@ bool JointGroupPositionController::init(
     }
   }
 
-  // Initialize logging
-  ROS_INFO("Opening log file");
-  logfile.open("rewd_commands.log");
-  if (!logfile.is_open()) {
-    ROS_ERROR("Failed to open logfile");
-    return false;
-  }
-
   // Start command subscriber
   command_sub = n.subscribe("command", 1, &JointGroupPositionController::setCommand, this);
 
@@ -158,7 +154,9 @@ void JointGroupPositionController::update(
     dof->setAcceleration(0.);
   }
 
-  // calculate PID and set desired model acceleration for each controlled joint
+  skeleton_->computeInverseDynamics();
+
+  // PID control of each joint
   for (size_t i = 0; i < number_of_joints; ++i) {
     dart::dynamics::DegreeOfFreedom *const dof
       = controlled_skeleton_->getDof(i);
@@ -199,23 +197,14 @@ void JointGroupPositionController::update(
 
     // Set the PID error and compute the PID command with nonuniform
     // time step size.
-    double const position_pid = joint_pid_controllers[i].computeCommand(
-      position_error, period);
-
-    // set model desired acceleration based on PID command
-    dof->setAcceleration(position_pid);
-  }
-
-  // compuse Inverse Dynamics and set hardware torque commands
-  skeleton_->computeInverseDynamics();
-
-  for (size_t i = 0; i < number_of_joints; ++i) {
-    dart::dynamics::DegreeOfFreedom *const dof
-      = controlled_skeleton_->getDof(i);
     double const effort_inversedynamics = dof->getForce();
+    double const effort_pid = joint_pid_controllers[i].computeCommand(
+      position_error, period);
+    double const effort_command = effort_pid; // TODO incorporate ID.
+
     hardware_interface::JointHandle &joint_handle
       = controlled_joint_handles_[i];
-    joint_handle.setCommand(effort_inversedynamics);
+    joint_handle.setCommand(effort_command);
   }
 }
 

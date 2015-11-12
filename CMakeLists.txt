@@ -53,17 +53,6 @@ target_link_libraries(${PROJECT_NAME}
   ${r3_LIBRARIES}
 )
 
-add_executable(test_inversedynamics
-  src/inversedynamics_test.cpp
-)
-target_link_libraries(test_inversedynamics
-  assimp
-  ${catkin_LIBRARIES}
-  ${Boost_LIBRARIES}
-  ${DART_LIBRARIES}
-  ${r3_LIBRARIES}
-)
-
 install(DIRECTORY include
   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
 )

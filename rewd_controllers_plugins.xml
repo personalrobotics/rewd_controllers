@@ -1,12 +1,16 @@
 <library path="lib/librewd_controllers">
 
-  <class name="rewd_controllers/JointGroupPositionController" type="rewd_controllers::JointGroupPositionController" base_class_type="controller_interface::ControllerBase">
+  <class name="rewd_controllers/JointGroupPositionController"
+         type="rewd_controllers::JointGroupPositionController"
+         base_class_type="controller_interface::ControllerBase">
     <description>
       The JointGroupPositionController tracks position commands. It expects a EffortJointInterface type of hardware interface.
     </description>
   </class>
 
-  <class name="rewd_controllers/GravityCompensationController" type="rewd_controllers::GravityCompensationController" base_class_type="controller_interface::ControllerBase">
+  <class name="rewd_controllers/GravityCompensationController"
+         type="rewd_controllers::GravityCompensationController"
+         base_class_type="controller_interface::ControllerBase">
     <description>
       The GravityCompensationController opposes gravity using inverse dynamics.
     </description>

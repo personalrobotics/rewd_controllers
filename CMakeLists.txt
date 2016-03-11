@@ -12,12 +12,12 @@ find_package(catkin REQUIRED COMPONENTS
 # TODO: filesystem shouldn't be required here.
 find_package(Boost REQUIRED COMPONENTS filesystem thread)
 find_package(DART REQUIRED COMPONENTS core)
-find_package(r3 REQUIRED)
+find_package(aikido REQUIRED)
 
 include_directories(SYSTEM
   ${Boost_INCLUDE_DIRS}
   ${DART_INCLUDE_DIRS}
-  ${r3_INCLUDE_DIRS}
+  ${aikido_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
 )
 include_directories(
@@ -35,7 +35,7 @@ catkin_package(
     realtime_tools
     urdf
   DEPENDS
-    r3
+    aikido
     DART
   INCLUDE_DIRS
     include
@@ -51,7 +51,7 @@ target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
   ${Boost_LIBRARIES}
   ${DART_LIBRARIES}
-  ${r3_LIBRARIES}
+  ${aikido_LIBRARIES}
 )
 
 install(DIRECTORY include

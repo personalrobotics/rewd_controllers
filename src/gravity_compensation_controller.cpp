@@ -5,7 +5,7 @@
 #include <pluginlib/class_list_macros.h>
 #include <dart/dynamics/dynamics.h>
 #include <dart/utils/urdf/DartLoader.h>
-#include <r3/util/CatkinResourceRetriever.h>
+#include <aikido/util/CatkinResourceRetriever.hpp>
 
 namespace rewd_controllers {
 
@@ -30,7 +30,7 @@ bool GravityCompensationController::init(
 
   // Load the URDF as a DART model.
   auto const resource_retriever
-    = std::make_shared<r3::util::CatkinResourceRetriever>();
+    = std::make_shared<aikido::util::CatkinResourceRetriever>();
   dart::common::Uri const base_uri;
 
   ROS_INFO("Loading DART model from URDF...");

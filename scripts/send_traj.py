@@ -9,7 +9,7 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 rospy.init_node("trajectory_test")
 
 
-client = ros_control_client_py.FollowJointTrajectoryClient("/rewd_trajectory_controller/follow_joint_trajectory")
+client = ros_control_client_py.FollowJointTrajectoryClient("/right_trajectory_controller/follow_joint_trajectory")
 
 raw_input("Press enter to execute trajectory...")
 

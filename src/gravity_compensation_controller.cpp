@@ -9,12 +9,15 @@
 
 namespace rewd_controllers {
 
+using EffortJointInterface = hardware_interface::EffortJointInterface;
+using JointStateInterface = hardware_interface::JointStateInterface;
+
 GravityCompensationController::GravityCompensationController() {}
 
 GravityCompensationController::~GravityCompensationController() {}
 
 bool GravityCompensationController::init(
-  hardware_interface::EffortJointInterface *robot, ros::NodeHandle &n)
+  hardware_interface::RobotHW *robot, ros::NodeHandle &n)
 {
   // Load the URDF XML from the parameter server.
   std::string robot_description_parameter;
@@ -68,13 +71,14 @@ bool GravityCompensationController::init(
 
   // Get all joint handles.
   ROS_INFO("Getting controlled JointHandles");
+  EffortJointInterface *ei = robot->get<EffortJointInterface>();
   controlled_joint_handles_.reserve(controlled_skeleton_->getNumDofs());
   for (dart::dynamics::DegreeOfFreedom const *const dof : controlled_skeleton_->getDofs()) {
     std::string const &dof_name = dof->getName();
     hardware_interface::JointHandle handle;
 
     try {
-      handle = robot->getHandle(dof_name);
+      handle = ei->getHandle(dof_name);
     } catch (hardware_interface::HardwareInterfaceException const &e) {
       ROS_ERROR("Failed getting JointHandle for controlled DOF '%s'.", dof_name.c_str());
       return false;
@@ -83,20 +87,21 @@ bool GravityCompensationController::init(
     controlled_joint_handles_.push_back(handle);
   }
 
-  ROS_INFO("Getting all JointHandles");
-  joint_handles_.reserve(skeleton_->getNumDofs());
+  ROS_INFO("Getting all JointStateHandles");
+  JointStateInterface *jsi = robot->get<JointStateInterface>();
+  joint_state_handles_.reserve(skeleton_->getNumDofs());
   for (dart::dynamics::DegreeOfFreedom const *const dof : skeleton_->getDofs()) {
     std::string const &dof_name = dof->getName();
-    hardware_interface::JointHandle handle;
+    hardware_interface::JointStateHandle handle;
 
     try {
-      handle = robot->getHandle(dof_name);
+      handle = jsi->getHandle(dof_name);
     } catch (hardware_interface::HardwareInterfaceException const &e) {
-      ROS_WARN("Failed getting JointHandle for DOF '%s'.", dof_name.c_str());
+      ROS_WARN("Failed getting JointStateHandle for DOF '%s'.", dof_name.c_str());
       continue;
     }
 
-    joint_handles_.push_back(handle);
+    joint_state_handles_.push_back(handle);
   }
 
   // Initialize logging
@@ -114,9 +119,7 @@ bool GravityCompensationController::init(
 void GravityCompensationController::update(
   const ros::Time& time, const ros::Duration& period)
 {
-  // joint_state_command = *(command_buffer.readFromRT());
-
-  for (hardware_interface::JointHandle &handle : joint_handles_) {
+  for (hardware_interface::JointStateHandle &handle : controlled_joint_handles_) {
     dart::dynamics::DegreeOfFreedom *const dof
       = skeleton_->getDof(handle.getName());
     if (!dof)
@@ -148,4 +151,3 @@ void GravityCompensationController::update(
 PLUGINLIB_EXPORT_CLASS(
   rewd_controllers::GravityCompensationController,
   controller_interface::ControllerBase)
-

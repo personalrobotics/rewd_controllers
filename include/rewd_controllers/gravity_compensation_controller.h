@@ -16,8 +16,9 @@
 
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/condition.hpp>
-#include <controller_interface/controller.h>
+#include <controller_interface/multi_interface_controller.h>
 #include <hardware_interface/joint_command_interface.h>
+#include <hardware_interface/joint_state_interface.h>
 #include <fstream>
 #include <ros/node_handle.h>
 #include <dart/dynamics/SmartPointer.h>
@@ -25,8 +26,10 @@
 
 namespace rewd_controllers {
 
-  class GravityCompensationController: public controller_interface::Controller<hardware_interface::EffortJointInterface> {
-  public:
+  class GravityCompensationController
+    : public controller_interface::MultiInterfaceController<hardware_interface::EffortJointInterface,
+                                                            hardware_interface::JointStateInterface> {
+public:
 
     GravityCompensationController();
     virtual ~GravityCompensationController();
@@ -44,7 +47,7 @@ namespace rewd_controllers {
      * \returns True if initialization was successful and the controller
      * is ready to be started.
      */
-    bool init(hardware_interface::EffortJointInterface *robot, ros::NodeHandle &n);
+    bool init(hardware_interface::RobotHW *robot, ros::NodeHandle &n);
 
     /*!
      * \brief Issues commands to the joint. Should be called at regular intervals
@@ -57,7 +60,7 @@ namespace rewd_controllers {
 
     // Model
     dart::dynamics::SkeletonPtr skeleton_;
-    std::vector<hardware_interface::JointHandle> joint_handles_;
+    std::vector<hardware_interface::JointStateHandle> joint_state_handles_;
 
     dart::dynamics::GroupPtr controlled_skeleton_;
     std::vector<hardware_interface::JointHandle> controlled_joint_handles_;

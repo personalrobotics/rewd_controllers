@@ -1,5 +1,4 @@
 #include <rewd_controllers/joint_group_position_controller.h>
-#include <rewd_controllers/RosMsgConverter.h>
 #include <angles/angles.h>
 #include <hardware_interface/hardware_interface.h>
 #include <pluginlib/class_list_macros.h>

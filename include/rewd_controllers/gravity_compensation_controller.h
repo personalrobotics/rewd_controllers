@@ -1,18 +1,5 @@
-// TODO license/acknowlegement
-
 #ifndef REWD_CONTROLLERS__GRAVITY_COMPENSATION_CONTROLLER_H
 #define REWD_CONTROLLERS__GRAVITY_COMPENSATION_CONTROLLER_H
-
-/**
-   @class rewd_controllers::GravityCompensationController
-   @brief Gravity Compensation Controller
-
-   This class compensates for gravity only using inverse dynamics
-
-   @section ROS ROS interface
-
-   @param type Must be "rewd_controllers::GravityCompensationController"
-*/
 
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/condition.hpp>

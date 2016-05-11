@@ -84,7 +84,7 @@ bool GravityCompensationController::init(
       ROS_ERROR_STREAM("Failed getting JointHandle for controlled DOF '"
                        << dof_name.c_str() << "'. "
                        << "Joint will be treated as if always in default "
-                       << "position, velocity, and accelleration.");
+                       << "position, velocity, and acceleration.");
       return false;
     }
 
@@ -101,7 +101,10 @@ bool GravityCompensationController::init(
     try {
       handle = jsi->getHandle(dof_name);
     } catch (hardware_interface::HardwareInterfaceException const &e) {
-      ROS_WARN("Failed getting JointStateHandle for DOF '%s'.", dof_name.c_str());
+      ROS_WARN_STREAM("Failed getting JointStateHandle for read-only DOF '"
+                       << dof_name.c_str() << "'. "
+                       << "Joint will be treated as if always in default "
+                       << "position, velocity, and acceleration.");
       continue;
     }
 

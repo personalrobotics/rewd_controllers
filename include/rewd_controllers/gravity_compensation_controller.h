@@ -55,9 +55,6 @@ public:
     void update(const ros::Time& time, const ros::Duration& period);
 
   private:
-    // Logging
-    std::ofstream logfile;
-
     // Model
     dart::dynamics::SkeletonPtr skeleton_;
     std::vector<hardware_interface::JointStateHandle> joint_state_handles_;

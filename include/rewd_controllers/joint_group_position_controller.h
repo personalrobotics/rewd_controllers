@@ -1,30 +1,5 @@
-// TODO license/acknowlegement
-
 #ifndef REWD_CONTROLLERS__JOINT_GROUP_POSITION_CONTROLLER_H
 #define REWD_CONTROLLERS__JOINT_GROUP_POSITION_CONTROLLER_H
-
-/**
-   @class rewd_controllers::JointGroupPositionController
-   @brief Joint Group Position Controller
-
-   This class controls positon using a pid loop.
-
-   @section ROS ROS interface
-
-   @param type Must be "rewd_controllers::JointGroupPositionController"
-   @param joint Name of the joint to control.
-   @param pid Contains the gains for the PID loop around position.  See: control_toolbox::Pid
-
-   Subscribes to:
-
-   - @b command (std_msgs::Float64) : The joint position to achieve.
-
-   Publishes:
-
-   - @b state (control_msgs::JointControllerState) : // TODO array of?
-     Current state of the controller, including pid error and gains.
-
-*/
 
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/condition.hpp>
@@ -86,14 +61,11 @@ namespace rewd_controllers {
     void update(const ros::Time& time, const ros::Duration& period);
 
   private:
-    // Logging
-    std::ofstream logfile;
-
     // Controller
-    std::vector<double> joint_state_command;
-    realtime_tools::RealtimeBuffer<std::vector<double> > command_buffer;
-    ros::Subscriber command_sub;
-    std::vector<control_toolbox::Pid> joint_pid_controllers;
+    std::vector<double> joint_state_command_;
+    realtime_tools::RealtimeBuffer<std::vector<double> > command_buffer_;
+    ros::Subscriber command_sub_;
+    std::vector<control_toolbox::Pid> joint_pid_controllers_;
 
     // Model
     dart::dynamics::SkeletonPtr skeleton_;
@@ -104,15 +76,7 @@ namespace rewd_controllers {
     std::unordered_map<std::string, size_t> controlled_joint_map_;
 
     // Housekeepting convenience
-    size_t number_of_joints;
-
-    /**
-     * \brief Check that the command is within the hard limits of the joint. Checks for joint
-     *        type first. Sets command to limit if out of bounds.
-     * \param command - the input to test
-     */
-    // void enforceJointLimits(double &command);
-
+    size_t number_of_joints_;
   };
 
 } // namespace

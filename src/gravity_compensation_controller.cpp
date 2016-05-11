@@ -27,7 +27,7 @@ bool GravityCompensationController::init(
   std::string robot_description;
   if (!n.getParam(robot_description_parameter, robot_description)) {
     ROS_ERROR("Failed loading URDF from '%s' parameter.",
-      robot_description_parameter.c_str());
+              robot_description_parameter.c_str());
     return false;
   }
 
@@ -41,7 +41,8 @@ bool GravityCompensationController::init(
   skeleton_ = urdf_loader.parseSkeletonString(
     robot_description, base_uri, resource_retriever);
   if (!skeleton_) {
-    ROS_ERROR("Failed loading URDF as a DART Skeleton.");
+    ROS_ERROR("Failed loading '%s' parameter URDF as a DART Skeleton.",
+              robot_description_parameter.c_str());
     return false;
   }
   ROS_INFO("Loading DART model from URDF...DONE");
@@ -80,7 +81,10 @@ bool GravityCompensationController::init(
     try {
       handle = ei->getHandle(dof_name);
     } catch (hardware_interface::HardwareInterfaceException const &e) {
-      ROS_ERROR("Failed getting JointHandle for controlled DOF '%s'.", dof_name.c_str());
+      ROS_ERROR_STREAM("Failed getting JointHandle for controlled DOF '"
+                       << dof_name.c_str() << "'. "
+                       << "Joint will be treated as if always in default "
+                       << "position, velocity, and accelleration.");
       return false;
     }
 
@@ -102,14 +106,6 @@ bool GravityCompensationController::init(
     }
 
     joint_state_handles_.push_back(handle);
-  }
-
-  // Initialize logging
-  ROS_INFO("Opening log file");
-  logfile.open("rewd_commands.log");
-  if (!logfile.is_open()) {
-    ROS_ERROR("Failed to open logfile");
-    return false;
   }
 
   ROS_INFO("GravityCompensationController initialized successfully");
@@ -141,8 +137,6 @@ void GravityCompensationController::update(
     hardware_interface::JointHandle &joint_handle
       = controlled_joint_handles_[i];
     joint_handle.setCommand(effort_inversedynamics);
-
-    logfile << "Joint [" << dof->getName() << "]: ID = " << effort_inversedynamics << "\n";
   }
 }
 

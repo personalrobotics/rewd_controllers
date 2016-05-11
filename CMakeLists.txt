@@ -12,7 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
 # TODO: filesystem shouldn't be required here.
 find_package(Boost REQUIRED COMPONENTS filesystem thread)
 find_package(DART REQUIRED COMPONENTS core)
-find_package(aikido REQUIRED)
+find_package(aikido REQUIRED COMPONENTS util)
 
 include_directories(SYSTEM
   ${Boost_INCLUDE_DIRS}

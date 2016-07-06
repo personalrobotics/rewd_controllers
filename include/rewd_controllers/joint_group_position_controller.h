@@ -15,6 +15,7 @@
 #include <sensor_msgs/JointState.h>
 #include <dart/dynamics/dynamics.hpp>
 #include <unordered_map>
+#include "helpers.hpp"
 
 namespace rewd_controllers {
 
@@ -61,17 +62,22 @@ namespace rewd_controllers {
     void update(const ros::Time& time, const ros::Duration& period);
 
   private:
+    JointAdapterFactory mAdapterFactory;
+    dart::dynamics::SkeletonPtr mSkeleton;
+    dart::dynamics::GroupPtr mControlledSkeleton;
+    std::unique_ptr<SkeletonJointStateUpdater> mSkeletonUpdater;
+    std::vector<std::unique_ptr<JointAdapter>> mAdapters;
+
+    ros::Subscriber mCommandSubscriber; 
+
     // Controller
     std::vector<double> joint_state_command_;
     realtime_tools::RealtimeBuffer<std::vector<double> > command_buffer_;
-    ros::Subscriber command_sub_;
     std::vector<control_toolbox::Pid> joint_pid_controllers_;
 
     // Model
-    dart::dynamics::SkeletonPtr skeleton_;
     std::vector<hardware_interface::JointStateHandle> joint_state_handles_;
 
-    dart::dynamics::GroupPtr controlled_skeleton_;
     std::vector<hardware_interface::JointHandle> controlled_joint_handles_;
     std::unordered_map<std::string, size_t> controlled_joint_map_;
 

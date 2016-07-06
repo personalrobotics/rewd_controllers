@@ -53,6 +53,7 @@ catkin_package(
 add_library("${PROJECT_NAME}" SHARED
   #src/joint_group_position_controller.cpp
   src/gravity_compensation_controller.cpp
+  src/helpers.cpp
 )
 target_link_libraries("${PROJECT_NAME}"
   ${DART_LIBRARIES}

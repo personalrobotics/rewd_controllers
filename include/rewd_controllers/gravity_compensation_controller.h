@@ -8,7 +8,7 @@
 #include <hardware_interface/joint_state_interface.h>
 #include <fstream>
 #include <ros/node_handle.h>
-#include <dart/dynamics/SmartPointer.h>
+#include <dart/dynamics/dynamics.hpp>
 #include <unordered_map>
 
 namespace rewd_controllers {

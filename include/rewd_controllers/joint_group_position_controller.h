@@ -13,7 +13,7 @@
 #include <realtime_tools/realtime_publisher.h>
 #include <ros/node_handle.h>
 #include <sensor_msgs/JointState.h>
-#include <dart/dynamics/SmartPointer.h>
+#include <dart/dynamics/dynamics.hpp>
 #include <unordered_map>
 
 namespace rewd_controllers {

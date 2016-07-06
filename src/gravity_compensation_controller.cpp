@@ -1,10 +1,8 @@
-// TODO license/acknowlegement
-
 #include <rewd_controllers/gravity_compensation_controller.h>
 #include <hardware_interface/hardware_interface.h>
 #include <pluginlib/class_list_macros.h>
-#include <dart/dynamics/dynamics.h>
-#include <dart/utils/urdf/DartLoader.h>
+#include <dart/dynamics/dynamics.hpp>
+#include <dart/utils/urdf/DartLoader.hpp>
 #include <aikido/util/CatkinResourceRetriever.hpp>
 
 namespace rewd_controllers {
@@ -34,7 +32,7 @@ bool GravityCompensationController::init(
   // Load the URDF as a DART model.
   auto const resource_retriever
     = std::make_shared<aikido::util::CatkinResourceRetriever>();
-  dart::common::Uri const base_uri;
+  const dart::common::Uri base_uri{};
 
   ROS_INFO("Loading DART model from URDF...");
   dart::utils::DartLoader urdf_loader;

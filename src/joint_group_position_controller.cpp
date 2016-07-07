@@ -1,32 +1,36 @@
-#include <rewd_controllers/joint_group_position_controller.h>
-#include <angles/angles.h>
-#include <hardware_interface/hardware_interface.h>
-#include <pluginlib/class_list_macros.h>
+#include <aikido/util/CatkinResourceRetriever.hpp>
 #include <dart/dynamics/dynamics.hpp>
 #include <dart/utils/urdf/DartLoader.hpp>
-#include <aikido/util/CatkinResourceRetriever.hpp>
+#include <pluginlib/class_list_macros.h>
+#include <rewd_controllers/joint_group_position_controller.h>
+//#include <angles/angles.h>
+//#include <hardware_interface/hardware_interface.h>
 
 namespace rewd_controllers {
 
-using EffortJointInterface = hardware_interface::EffortJointInterface;
-using JointStateInterface = hardware_interface::JointStateInterface;
-
+//=============================================================================
 JointGroupPositionController::JointGroupPositionController()
 {
-  // Static initialization code.
+  using hardware_interface::EffortJointInterface;
+  using hardware_interface::PositionJointInterface;
+
   mAdapterFactory.registerFactory<
-    PositinoJointInterface, JointEffortAdapter>("position");
+    PositionJointInterface, JointPositionAdapter>("position");
   mAdapterFactory.registerFactory<
     EffortJointInterface, JointEffortAdapter>("effort");
 }
 
+//=============================================================================
 JointGroupPositionController::~JointGroupPositionController()
 {
 }
 
+//=============================================================================
 bool JointGroupPositionController::init(
   hardware_interface::RobotHW *robot, ros::NodeHandle &n)
 {
+  using hardware_interface::JointStateInterface;
+
   // Build up the list of controlled DOFs.
   const auto jointParameters = loadJointsFromParameter(n, "joints", "effort");
   if (jointParameters.empty())
@@ -48,7 +52,7 @@ bool JointGroupPositionController::init(
   const auto jointStateInterface = robot->get<JointStateInterface>();
   if (!jointStateInterface)
   {
-    ROS_ERROR("Unable to get JointStateInterface from the RobotHW instance.");
+    ROS_ERROR("Unable to get JointStateInterface from RobotHW instance.");
     return false;
   }
 
@@ -56,63 +60,115 @@ bool JointGroupPositionController::init(
     new SkeletonJointStateUpdater(mSkeleton, jointStateInterface));
 
   // Create adaptors to provide a uniform interface to different types.
+  const ros::NodeHandle gainsNodeHandle{n, "gains"};
+  const auto numControlledDofs = mControlledSkeleton->getNumDofs();
   mAdapters.resize(mControlledSkeleton->getNumDofs());
 
-  for (size_t idof = 0; idof < mControlledSkeleton->getNumDofs(); ++idof)
+  for (size_t idof = 0; idof < numControlledDofs; ++idof)
   {
     const auto dof = mControlledSkeleton->getDof(idof);
     const auto param = jointParameters[idof];
-    mAdapters[idof] = mAdapterFactory.create(param.mType, robot);
-  }
 
-  // Initialize command struct vector sizes
-  ROS_INFO("Allocating setpoint buffer");
-  number_of_joints_ = controlled_skeleton_->getNumDofs();
-  joint_state_command_.resize(number_of_joints_);
-
-#if 0
-  // Load PID Controllers using gains set on parameter server
-  ROS_INFO("Initializing PID controllers");
-  joint_pid_controllers_.resize(number_of_joints_);
-  for (size_t i = 0; i < number_of_joints_; ++i) {
-    std::string const &dof_name = controlled_skeleton_->getDof(i)->getName();
-    ros::NodeHandle pid_nh(n, std::string("gains/") + dof_name);
-    if (!joint_pid_controllers_[i].init(pid_nh)) {
+    auto adapter = mAdapterFactory.create(param.mType, robot, dof);
+    if (!adapter)
       return false;
-    }
+
+    // Initialize the adapter using parameters stored on the parameter server.
+    ros::NodeHandle adapterNodeHandle{gainsNodeHandle, dof->getName()};
+    if (!adapter->initialize(adapterNodeHandle))
+      return false;
+
+    mAdapters[idof] = std::move(adapter);
   }
-#endif
+
+  // Initialize memory to hold the desired position to avoid allocations later.
+  mDesiredPosition.resize(numControlledDofs);
+  mDesiredPosition.setZero();
 
   // Start command subscriber
   mCommandSubscriber = n.subscribe(
     "command", 1, &JointGroupPositionController::setCommand, this);
 
-  ROS_INFO("JointGroupPositionController initialized successfully");
   return true;
 }
 
+//=============================================================================
 void JointGroupPositionController::starting(const ros::Time& time)
 {
-  for (size_t i = 0; i < number_of_joints_; ++i)
-  {
-    joint_state_command_[i] = controlled_joint_handles_[i].getPosition();
-    joint_pid_controllers_[i].reset();
-  }
+  // Initialize the setpoint to the current joint positions.
+  mSkeletonUpdater->update();
+  mDesiredPositionBuffer.initRT(mSkeleton->getPositions());
 
-  command_buffer_.initRT(joint_state_command_);
+  // Reset any internal state in the adapters (e.g. integral windup).
+  for (const auto& adapter : mAdapters)
+    adapter->reset();
 }
 
+//=============================================================================
 void JointGroupPositionController::update(
   const ros::Time& time, const ros::Duration& period)
 {
-  joint_state_command_ = *(command_buffer_.readFromRT());
+  mDesiredPosition = *mDesiredPositionBuffer.readFromRT();
 
-  // Update mSkeleton with the latest position and velocity measurements.
+  // Compute inverse dynamics torques and store them in the skeleton. These
+  // values may be queried by the adapters invoked below.
   mSkeletonUpdater->update();
   mSkeleton->computeInverseDynamics();
 
+  // Delegate to the adapter for each joint. This directly writes to the
+  // robot's hardware interface.
+  for (size_t idof = 0; idof < mAdapters.size(); ++idof)
+    mAdapters[idof]->update(time, period, mDesiredPosition[idof]);
+}
 
+//=============================================================================
+void JointGroupPositionController::setCommand(
+  const sensor_msgs::JointState& msg)
+{
+  const auto numControlledDofs = mAdapters.size();
 
+  if (msg.name.size() != numControlledDofs)
+  {
+    ROS_ERROR_STREAM("Received command with incorrect number of names:"
+      << " expected " << numControlledDofs << ", got " << msg.name.size());
+    return;
+  }
+  if (msg.position.size() != numControlledDofs)
+  {
+    ROS_ERROR_STREAM("Received command with incorrect number of positions:"
+      << " expected " << numControlledDofs << ", got " << msg.position.size());
+    return;
+  }
+  if (!msg.velocity.empty())
+  {
+    ROS_ERROR("Received command with velocities. Only position is supported.");
+    return;
+  }
+  if (!msg.effort.empty())
+  {
+    ROS_ERROR("Received command with velocities. Only position is supported.");
+    return;
+  }
+
+  Eigen::VectorXd desiredPosition(numControlledDofs);
+  for (size_t i = 0; i < numControlledDofs; ++i)
+  {
+    const auto dof = mSkeleton->getDof(msg.name[i]);
+    const auto dofIndex = mControlledSkeleton->getIndexOf(dof, false);
+    if (dofIndex == dart::dynamics::INVALID_INDEX)
+    {
+      ROS_ERROR_STREAM("There is DegreeOfFreedom named '" << dof->getName()
+        << "' under control.");
+      return;
+    }
+
+    desiredPosition[dofIndex] = msg.position[i];
+  }
+
+  mDesiredPositionBuffer.writeFromNonRT(desiredPosition);
+}
+
+#if 0
   // PID control of each joint
   for (size_t i = 0; i < number_of_joints_; ++i) {
     dart::dynamics::DegreeOfFreedom *const dof
@@ -163,40 +219,11 @@ void JointGroupPositionController::update(
       = controlled_joint_handles_[i];
     joint_handle.setCommand(effort_command);
   }
-}
-
-void JointGroupPositionController::setCommand(const sensor_msgs::JointState& msg) {
-  if (msg.name.size() != number_of_joints_
-      || msg.position.size() != number_of_joints_) {
-    ROS_ERROR("Number of joint names specified in JointState message [%d] does not match number of controlled joints [%d]", msg.name.size(), number_of_joints_);
-    return;
-  }
-
-  if (msg.position.size() != number_of_joints_) {
-    ROS_ERROR("Number of joint positions specified in JointState message [%d] does not match number of controlled joints [%d]", msg.position.size(), number_of_joints_);
-    return;
-  }
-
-  std::vector<double> position_command(controlled_skeleton_->getNumDofs());
-
-  for (size_t i = 0; i < number_of_joints_; ++i) {
-    std::string const &joint_name = msg.name[i];
-
-    auto const it = controlled_joint_map_.find(joint_name);
-    if (it == std::end(controlled_joint_map_)) {
-      ROS_ERROR("Unknown joint '%s' in message at index %d.",
-        joint_name.c_str(), i);
-      continue;
-    }
-
-    position_command[i] = msg.position[i];
-  }
-
-  command_buffer_.writeFromNonRT(position_command);
-}
+#endif
 
 } // namespace rewd_controllers
 
+//=============================================================================
 PLUGINLIB_EXPORT_CLASS(
   rewd_controllers::JointGroupPositionController,
   controller_interface::ControllerBase)

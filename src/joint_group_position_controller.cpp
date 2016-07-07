@@ -11,12 +11,14 @@ JointGroupPositionController::JointGroupPositionController()
 {
   using hardware_interface::EffortJointInterface;
   using hardware_interface::PositionJointInterface;
+  using hardware_interface::VelocityJointInterface;
 
   mAdapterFactory.registerFactory<
     PositionJointInterface, JointPositionAdapter>("position");
   mAdapterFactory.registerFactory<
+    VelocityJointInterface, JointVelocityAdapter>("velocity");
+  mAdapterFactory.registerFactory<
     EffortJointInterface, JointEffortAdapter>("effort");
-  // TODO: Also add a velocity wrapper.
 }
 
 //=============================================================================
@@ -96,7 +98,11 @@ void JointGroupPositionController::starting(const ros::Time& time)
 {
   // Initialize the setpoint to the current joint positions.
   mSkeletonUpdater->update();
-  mDesiredPositionBuffer.initRT(mSkeleton->getPositions());
+  mDesiredPosition = mControlledSkeleton->getPositions();
+  mDesiredPositionBuffer.initRT(mDesiredPosition);
+
+  ROS_INFO_STREAM("Initialized desired position to: "
+    << mDesiredPosition.transpose());
 
   // Reset any internal state in the adapters (e.g. integral windup).
   for (const auto& adapter : mAdapters)

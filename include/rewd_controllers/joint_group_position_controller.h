@@ -13,6 +13,8 @@ namespace rewd_controllers {
 
 class JointGroupPositionController
   : public controller_interface::MultiInterfaceController<
+      hardware_interface::PositionJointInterface,
+      hardware_interface::VelocityJointInterface,
       hardware_interface::EffortJointInterface,
       hardware_interface::JointStateInterface>
 {

@@ -52,6 +52,11 @@ std::vector<JointParameter> loadJointsFromParameter(
   static const std::vector<JointParameter> emptyResult;
 
   XmlRpcValue jointsXml;
+  if (!nodeHandle.getParam("joints", jointsXml))
+  {
+      ROS_ERROR_STREAM("Parameter '" << nodeHandle.getNamespace()
+        << "/joints' is required.");
+  }
 
   if (jointsXml.getType() != XmlRpcValue::TypeArray)
   {

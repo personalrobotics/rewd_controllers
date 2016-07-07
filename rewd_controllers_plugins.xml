@@ -1,13 +1,17 @@
 <library path="lib/librewd_controllers">
-
   <class name="rewd_controllers/JointGroupPositionController"
          type="rewd_controllers::JointGroupPositionController"
          base_class_type="controller_interface::ControllerBase">
     <description>
-      The JointGroupPositionController tracks position commands. It expects a EffortJointInterface type of hardware interface.
+      The JointGroupPositionController tracks position commands. It supports
+      position, velocity, and effort joint interfaces. Position- and velocity-
+      controlled joints track the desired position with PID. Effort-controlled
+      joints track the desired position with PID with a feed-forward term
+      computed via inverse dynamics.
     </description>
   </class>
 
+  <!--
   <class name="rewd_controllers/GravityCompensationController"
          type="rewd_controllers::GravityCompensationController"
          base_class_type="controller_interface::ControllerBase">
@@ -15,5 +19,5 @@
       The GravityCompensationController opposes gravity using inverse dynamics.
     </description>
   </class>
-
+  -->
 </library>

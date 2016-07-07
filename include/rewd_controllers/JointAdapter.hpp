@@ -47,6 +47,26 @@ private:
 };
 
 //=============================================================================
+class JointVelocityAdapter : public JointAdapter
+{
+public:
+  JointVelocityAdapter(hardware_interface::JointHandle velocityHandle,
+    dart::dynamics::DegreeOfFreedom* dof);
+
+  bool initialize(const ros::NodeHandle& nodeHandle) override;
+
+  void update(const ros::Time& time, const ros::Duration& period,
+    double desiredPosition) override;
+
+  void reset() override;
+
+private:
+  hardware_interface::JointHandle mVelocityHandle;
+  dart::dynamics::DegreeOfFreedom* mDof;
+  control_toolbox::Pid mPid;
+};
+
+//=============================================================================
 class JointEffortAdapter : public JointAdapter
 {
 public:

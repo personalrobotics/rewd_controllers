@@ -50,6 +50,48 @@ void JointPositionAdapter::reset()
 }
 
 //=============================================================================
+JointVelocityAdapter::JointVelocityAdapter(
+      hardware_interface::JointHandle effortHandle,
+      dart::dynamics::DegreeOfFreedom* dof)
+  : mVelocityHandle{effortHandle}
+  , mDof{dof}
+{
+}
+
+//=============================================================================
+bool JointVelocityAdapter::initialize(const ros::NodeHandle& nodeHandle)
+{
+  return mPid.init(nodeHandle);
+}
+
+//=============================================================================
+void JointVelocityAdapter::update(
+  const ros::Time& time, const ros::Duration& period, double desiredPosition)
+{
+  // TODO: Use Aikido to compute this error.
+  const auto actualPosition = mDof->getPosition();
+  double errorPosition;
+  if (mDof->isCyclic())
+  {
+    errorPosition = angles::shortest_angular_distance(
+      desiredPosition, actualPosition);
+  }
+  else
+  {
+    errorPosition = desiredPosition - actualPosition;
+  }
+
+  const auto velocity = mPid.computeCommand(errorPosition, period);
+  mVelocityHandle.setCommand(velocity);
+}
+
+//=============================================================================
+void JointVelocityAdapter::reset()
+{
+  mPid.reset();
+}
+
+//=============================================================================
 JointEffortAdapter::JointEffortAdapter(
       hardware_interface::JointHandle effortHandle,
       dart::dynamics::DegreeOfFreedom* dof)
@@ -88,6 +130,7 @@ void JointEffortAdapter::update(
 
   const auto effortPid = mPid.computeCommand(errorPosition, period);
   const auto effortTotal = effortInverseDynamics + effortPid;
+
   mEffortHandle.setCommand(effortTotal);
 }
 

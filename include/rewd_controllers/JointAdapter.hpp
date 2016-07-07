@@ -4,6 +4,7 @@
 #include <dart/dynamics/dynamics.hpp>
 #include <hardware_interface/joint_command_interface.h>
 #include <control_toolbox/pid.h>
+#include <realtime_tools/realtime_box.h>
 
 namespace rewd_controllers {
 
@@ -19,7 +20,7 @@ public:
   virtual bool initialize(const ros::NodeHandle& nodeHandle) = 0;
 
   virtual void update(const ros::Time& time, const ros::Duration& period,
-    double desiredPosition) = 0;
+    double desiredPosition, double desiredVelocity) = 0;
 
   virtual void reset() = 0;
 
@@ -37,7 +38,7 @@ public:
   bool initialize(const ros::NodeHandle& nodeHandle) override;
 
   void update(const ros::Time& time, const ros::Duration& period,
-    double desiredPosition) override;
+    double desiredPosition, double desiredVelocity) override;
 
   void reset() override;
 
@@ -56,7 +57,7 @@ public:
   bool initialize(const ros::NodeHandle& nodeHandle) override;
 
   void update(const ros::Time& time, const ros::Duration& period,
-    double desiredPosition) override;
+    double desiredPosition, double desiredVelocity) override;
 
   void reset() override;
 
@@ -76,7 +77,7 @@ public:
   bool initialize(const ros::NodeHandle& nodeHandle) override;
 
   void update(const ros::Time& time, const ros::Duration& period,
-    double desiredPosition) override;
+    double desiredPosition, double desiredVelocity) override;
 
   void reset() override;
 

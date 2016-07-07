@@ -9,6 +9,7 @@
   <author email="cliddick@cmu.edu">Clint Liddick</author>
   <buildtool_depend>catkin</buildtool_depend>
   <depend>aikido</depend>
+  <depend>actionlib</depend>
   <depend>angles</depend>
   <depend>boost</depend>
   <depend>dart</depend>
@@ -17,7 +18,6 @@
   <depend>control_toolbox</depend>
   <depend>realtime_tools</depend>
   <depend>urdf</depend>
-  <depend>forward_command_controller</depend>
   <depend>dynamic_reconfigure</depend>
   <export>
     <controller_interface plugin="${prefix}/rewd_controllers_plugins.xml"/>

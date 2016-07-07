@@ -37,7 +37,8 @@ bool JointPositionAdapter::initialize(const ros::NodeHandle& nodeHandle)
 
 //=============================================================================
 void JointPositionAdapter::update(
-  const ros::Time& time, const ros::Duration& period, double desiredPosition)
+  const ros::Time& time, const ros::Duration& period,
+  double desiredPosition, double desiredVelocity)
 {
   // Simple pass-through interface.
   mPositionHandle.setCommand(desiredPosition);
@@ -66,7 +67,8 @@ bool JointVelocityAdapter::initialize(const ros::NodeHandle& nodeHandle)
 
 //=============================================================================
 void JointVelocityAdapter::update(
-  const ros::Time& time, const ros::Duration& period, double desiredPosition)
+  const ros::Time& time, const ros::Duration& period,
+  double desiredPosition, double desiredVelocity)
 {
   // TODO: Use Aikido to compute this error.
   const auto actualPosition = mDof->getPosition();
@@ -81,7 +83,10 @@ void JointVelocityAdapter::update(
     errorPosition = desiredPosition - actualPosition;
   }
 
-  const auto velocity = mPid.computeCommand(errorPosition, period);
+  const auto errorVelocity = mDof->getVelocity() - desiredVelocity;
+  const auto velocity = mPid.computeCommand(
+    errorPosition, errorVelocity, period);
+
   mVelocityHandle.setCommand(velocity);
 }
 
@@ -108,14 +113,14 @@ bool JointEffortAdapter::initialize(const ros::NodeHandle& nodeHandle)
 
 //=============================================================================
 void JointEffortAdapter::update(
-  const ros::Time& time, const ros::Duration& period, double desiredPosition)
+  const ros::Time& time, const ros::Duration& period,
+  double desiredPosition, double desiredVelocity)
 {
   // This is the inverse dynamics torque computed by DART.
   const auto effortInverseDynamics = mDof->getForce();
 
   // Compute an error torque using PID.
   // TODO: Use Aikido to compute this error.
-  // TODO: Handle wrapping in the error calculation.
   const auto actualPosition = mDof->getPosition();
   double errorPosition;
   if (mDof->isCyclic())
@@ -128,7 +133,11 @@ void JointEffortAdapter::update(
     errorPosition = desiredPosition - actualPosition;
   }
 
-  const auto effortPid = mPid.computeCommand(errorPosition, period);
+  // TODO: Handle wrapping in this error calculation.
+  const auto errorVelocity = desiredVelocity - mDof->getVelocity();
+
+  const auto effortPid = mPid.computeCommand(
+    errorPosition, errorVelocity, period);
   const auto effortTotal = effortInverseDynamics + effortPid;
 
   mEffortHandle.setCommand(effortTotal);

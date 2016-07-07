@@ -11,13 +11,15 @@
     </description>
   </class>
 
-  <!--
-  <class name="rewd_controllers/GravityCompensationController"
-         type="rewd_controllers::GravityCompensationController"
+  <class name="rewd_controllers/JointTrajectoryController"
+         type="rewd_controllers::JointTrajectoryController"
          base_class_type="controller_interface::ControllerBase">
     <description>
-      The GravityCompensationController opposes gravity using inverse dynamics.
+        The JointTrajectoryController implements the FollowJointTrajectory
+        action for  position, velocity, and effort joint interfaces. Position-
+        and velocity-controlled joints track the desired position with PID.
+        Effort-controlled joints track the desired position with PID with a
+        feed-forward term computed via inverse dynamics.
     </description>
   </class>
-  -->
 </library>

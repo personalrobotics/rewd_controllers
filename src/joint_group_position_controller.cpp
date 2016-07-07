@@ -123,7 +123,7 @@ void JointGroupPositionController::update(
   // Delegate to the adapter for each joint. This directly writes to the
   // robot's hardware interface.
   for (size_t idof = 0; idof < mAdapters.size(); ++idof)
-    mAdapters[idof]->update(time, period, mDesiredPosition[idof]);
+    mAdapters[idof]->update(time, period, mDesiredPosition[idof], 0.);
 }
 
 //=============================================================================

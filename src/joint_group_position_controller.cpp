@@ -3,8 +3,6 @@
 #include <dart/utils/urdf/DartLoader.hpp>
 #include <pluginlib/class_list_macros.h>
 #include <rewd_controllers/joint_group_position_controller.h>
-//#include <angles/angles.h>
-//#include <hardware_interface/hardware_interface.h>
 
 namespace rewd_controllers {
 
@@ -18,6 +16,7 @@ JointGroupPositionController::JointGroupPositionController()
     PositionJointInterface, JointPositionAdapter>("position");
   mAdapterFactory.registerFactory<
     EffortJointInterface, JointEffortAdapter>("effort");
+  // TODO: Also add a velocity wrapper.
 }
 
 //=============================================================================
@@ -167,59 +166,6 @@ void JointGroupPositionController::setCommand(
 
   mDesiredPositionBuffer.writeFromNonRT(desiredPosition);
 }
-
-#if 0
-  // PID control of each joint
-  for (size_t i = 0; i < number_of_joints_; ++i) {
-    dart::dynamics::DegreeOfFreedom *const dof
-      = controlled_skeleton_->getDof(i);
-    dart::dynamics::Joint *const joint = dof->getJoint();
-
-    double const position_desired = joint_state_command_[i];
-    double const position_actual = dof->getPosition();
-
-    // TODO: Make sure joint is within limits if applicable
-    // enforceJointLimits(joint_urdf, command_position);
-
-    // Compute position error
-    double position_error;
-    if (&joint->getType() == &dart::dynamics::RevoluteJoint::getStaticType()) {
-      if (dof->isCyclic()) {
-        position_error = angles::shortest_angular_distance(
-          position_desired, position_actual);
-      } else {
-        position_error = position_desired - position_actual;
-       // TODO use this when add enforceJointLimits
-#if 0
-       angles::shortest_angular_distance_with_limits(current_position,
-                                                     command_position,
-                                                     joint_urdf->limits->lower,
-                                                     joint_urdf->limits->upper,
-                                                     error);
-#endif
-      }
-    } else if (&joint->getType() == &dart::dynamics::PrismaticJoint::getStaticType()) {
-      position_error = position_desired - position_actual;
-    } else {
-      position_error = 0.;
-      ROS_ERROR(
-        "DegreeOfFreedom '%s' is from joint '%s' with unknown type '%s'.",
-        dof->getName().c_str(), joint->getName().c_str(),
-        joint->getType().c_str());
-    }
-
-    // Set the PID error and compute the PID command with nonuniform
-    // time step size.
-    double const effort_inversedynamics = dof->getForce();
-    double const effort_pid = joint_pid_controllers_[i].computeCommand(
-      position_error, period);
-    double const effort_command = effort_pid; // TODO incorporate ID.
-
-    hardware_interface::JointHandle &joint_handle
-      = controlled_joint_handles_[i];
-    joint_handle.setCommand(effort_command);
-  }
-#endif
 
 } // namespace rewd_controllers
 

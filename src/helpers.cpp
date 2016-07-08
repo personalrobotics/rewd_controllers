@@ -136,10 +136,16 @@ dart::dynamics::MetaSkeletonPtr getControlledMetaSkeleton(
     dofs.emplace_back(dof);
   }
 
-  const auto controlledMetaSkeleton = Group::create(name, dofs, false, false);
+  const auto controlledMetaSkeleton = Group::create(name, dofs, false, true);
   if (!controlledMetaSkeleton)
   {
     ROS_ERROR_STREAM("Failed creating MetaSkeleton of controlled DOFs.");
+    return nullptr;
+  }
+
+  if (controlledMetaSkeleton->getNumDofs() != parameters.size())
+  {
+    ROS_ERROR_STREAM("Only single-DOF joints are supported.");
     return nullptr;
   }
 

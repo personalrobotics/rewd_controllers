@@ -44,6 +44,10 @@ bool JointTrajectoryController::init(
   if (jointParameters.empty())
     return false;
 
+  ROS_INFO_STREAM("Controlling " << jointParameters.size() << " joints:");
+  for (const auto& param : jointParameters)
+    ROS_INFO_STREAM("- " << param.mName << " (type: " << param.mType << ")");
+
   // Load the URDF as a Skeleton.
   mSkeleton = loadRobotFromParameter(n, "robot_description_parameter");
   if (!mSkeleton)
@@ -168,7 +172,7 @@ void JointTrajectoryController::update(
     // TODO: Check goal constraints.
 
     // Terminate the current trajectory.
-    if (time >= context->mStartTime)
+    if (timeFromStart >= context->mTrajectory->getDuration())
     {
       context->mGoalHandle.setSucceeded();
       mCurrentTrajectory.set(nullptr);
@@ -198,41 +202,56 @@ void JointTrajectoryController::update(
 }
 
 //=============================================================================
-bool checkVector(
-  const std::vector<double>& values, size_t expectedLength, bool isRequired)
+void checkVector(
+  const std::string& name, const std::vector<double>& values,
+  size_t expectedLength, bool isRequired, Eigen::VectorXd* output)
 {
-  return (values.empty() && !isRequired) || (values.size() != expectedLength);
+  if (values.empty())
+  {
+    if (isRequired)
+    {
+      std::stringstream message;
+      message << name << " are required.";
+      throw std::runtime_error(message.str());
+    }
+  }
+  else if (values.size() != expectedLength)
+  {
+    std::stringstream message;
+    message << "Expected " << name << " to be of length " << expectedLength
+      << ", got " << values.size() << ".";
+    throw std::runtime_error(message.str());
+  }
+
+  if (output)
+    *output = Eigen::Map<const Eigen::VectorXd>(values.data(), values.size());
 }
 
 //=============================================================================
-bool extractJointTrajectoryPoint(
-  const trajectory_msgs::JointTrajectoryPoint& waypoint, size_t numDofs,
+void extractJointTrajectoryPoint(
+  const trajectory_msgs::JointTrajectory& trajectory,
+  size_t index, size_t numDofs,
   Eigen::VectorXd* positions, bool positionsRequired,
   Eigen::VectorXd* velocities, bool velocitiesRequired,
   Eigen::VectorXd* accelerations, bool accelerationsRequired)
 {
-  using MapVectorXd = Eigen::Map<const Eigen::VectorXd>;
+  const auto& waypoint = trajectory.points[index];
 
-  if (!checkVector(waypoint.positions, numDofs, positionsRequired)
-   || !checkVector(waypoint.velocities, numDofs, velocitiesRequired)
-   || !checkVector(waypoint.accelerations, numDofs, accelerationsRequired))
+  try
   {
-    return false;
+    checkVector("positions", waypoint.positions, numDofs,
+      positionsRequired, positions);
+    checkVector("velocities", waypoint.velocities, numDofs,
+      velocitiesRequired, velocities);
+    checkVector("accelerations", waypoint.accelerations, numDofs,
+      accelerationsRequired, accelerations);
   }
-
-  if (positions)
-    *positions = MapVectorXd(
-        waypoint.positions.data(), waypoint.positions.size());
-
-  if (velocities)
-    *velocities = MapVectorXd(
-        waypoint.velocities.data(), waypoint.velocities.size());
-
-  if (accelerations)
-    *accelerations = MapVectorXd(
-        waypoint.accelerations.data(), waypoint.accelerations.size());
-
-  return true;
+  catch (const std::runtime_error& e)
+  {
+    std::stringstream message;
+    message << "Waypoint " << index << " is invalid: " << e.what();
+    throw std::runtime_error(message.str());
+  }
 }
 
 //=============================================================================
@@ -280,7 +299,7 @@ Eigen::MatrixXd fitPolynomial(
   return splineSegment.getCoefficients()[0];
 }
 
-std::unique_ptr<aikido::trajectory::Trajectory> convertJointTrajectory(
+std::unique_ptr<aikido::trajectory::Spline> convertJointTrajectory(
   const std::shared_ptr<MetaSkeletonStateSpace>& space,
   const trajectory_msgs::JointTrajectory& jointTrajectory)
 {
@@ -301,24 +320,19 @@ std::unique_ptr<aikido::trajectory::Trajectory> convertJointTrajectory(
     throw std::runtime_error{"Trajectory contains no waypoints."};
 
   // Extract the first waypoint to infer the dimensionality of the trajectory.
+  Eigen::VectorXd currPosition, currVelocity, currAcceleration;
+  extractJointTrajectoryPoint(jointTrajectory, 0, numControlledDofs,
+    &currPosition, true, &currVelocity, false, &currAcceleration, false);
+
   const auto& firstWaypoint = jointTrajectory.points.front();
   auto currTimeFromStart = firstWaypoint.time_from_start.toSec();
-
-  Eigen::VectorXd currPosition, currVelocity, currAcceleration;
-  if (!extractJointTrajectoryPoint(firstWaypoint, numControlledDofs,
-        &currPosition, true,
-        &currVelocity, false,
-        &currAcceleration, false))
-  {
-    throw std::runtime_error{"Waypoint 0 invalid."};
-  }
 
   const auto isVelocityRequired = (currVelocity.size() != 0);
   const auto isAccelerationRequired = (currAcceleration.size() != 0);
   if (isAccelerationRequired && !isVelocityRequired)
   {
     throw std::runtime_error{
-      "Velocity is required if acceleration is specified."};
+      "Velocity is required since acceleration is specified."};
   }
 
   int numCoefficients;
@@ -340,15 +354,9 @@ std::unique_ptr<aikido::trajectory::Trajectory> convertJointTrajectory(
     const auto nextTimeFromStart = nextWaypoint.time_from_start.toSec();
 
     Eigen::VectorXd nextPosition, nextVelocity, nextAcceleration;
-    if (!extractJointTrajectoryPoint(nextWaypoint, numControlledDofs,
-          &nextPosition, true,
-          &nextVelocity, isVelocityRequired,
-          &nextAcceleration, isAccelerationRequired))
-    {
-      std::stringstream message;
-      message << "Waypoint " << iwaypoint << " is invalid.";
-      throw std::runtime_error(message.str());
-    }
+    extractJointTrajectoryPoint(jointTrajectory, iwaypoint, numControlledDofs,
+      &nextPosition, true, &nextVelocity, isVelocityRequired,
+      &nextAcceleration, isAccelerationRequired);
 
     // Compute spline coefficients for this polynomial segment.
     const auto segmentDuration = nextTimeFromStart - currTimeFromStart;
@@ -375,9 +383,11 @@ std::unique_ptr<aikido::trajectory::Trajectory> convertJointTrajectory(
 void JointTrajectoryController::goalCallback(GoalHandle goalHandle)
 {
   const auto goal = goalHandle.getGoal();
+  ROS_INFO_STREAM("Received trajectory " << goalHandle.getGoalID().id
+    << " with " << goal->trajectory.points.size() << ".");
   
   // Convert the JointTrajectory message to a format that we can execute.
-  std::shared_ptr<aikido::trajectory::Trajectory> trajectory;
+  std::shared_ptr<aikido::trajectory::Spline> trajectory;
   try
   {
     trajectory = convertJointTrajectory(mControlledSpace, goal->trajectory);
@@ -390,16 +400,19 @@ void JointTrajectoryController::goalCallback(GoalHandle goalHandle)
     goalHandle.setRejected(result);
 
     ROS_ERROR_STREAM("Rejected trajectory: " << e.what());
-
     return;
   }
+
+  ROS_INFO_STREAM("Converted to Aikido trajectory with "
+    << trajectory->getNumSegments() << " segments and "
+    << trajectory->getNumDerivatives() << " derivatives.");
 
   // Infer the start time of the trajectory.
   const auto now = ros::Time::now();
   const auto specifiedStartTime = goal->trajectory.header.stamp;
 
   ros::Time startTime;
-  if (specifiedStartTime.isValid())
+  if (!specifiedStartTime.isZero())
   {
     startTime = specifiedStartTime;
   }
@@ -425,19 +438,21 @@ void JointTrajectoryController::goalCallback(GoalHandle goalHandle)
     return;
   }
 
+  ROS_INFO_STREAM("Trajectory will start at time " << startTime);
+
   // Preempt the existing trajectory, if one is running.
   std::shared_ptr<TrajectoryContext> existingContext;
   mCurrentTrajectory.get(existingContext);
 
-  if (existingContext);
+  if (existingContext)
   {
     auto& existingGoalHandle = existingContext->mGoalHandle;
+    ROS_WARN_STREAM("Preempted trajectory "
+      << existingGoalHandle.getGoalID().id << " with trajectory "
+      << goalHandle.getGoalID().id << ".");
 
     // TODO: Make this access thread safe.
     existingGoalHandle.setCanceled();
-
-    ROS_WARN_STREAM("Preempted trajectory " << existingGoalHandle.getGoalID()
-      << " with trajectory " << goalHandle.getGoalID() << ".");
   }
 
   // Start the new trajectory.
@@ -446,13 +461,13 @@ void JointTrajectoryController::goalCallback(GoalHandle goalHandle)
   newContext->mTrajectory = trajectory;
   newContext->mGoalHandle = goalHandle;
 
-  goalHandle.setAccepted();
-  mCurrentTrajectory.set(nullptr);
-
   ROS_INFO_STREAM(
-    "Started executing trajectory " << goalHandle.getGoalID()
+    "Started executing trajectory " << goalHandle.getGoalID().id
     << " with duration " << trajectory->getDuration()
     << " at time " << startTime << ".");
+
+  goalHandle.setAccepted();
+  mCurrentTrajectory.set(newContext);
 }
 
 //=============================================================================

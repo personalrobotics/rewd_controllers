@@ -155,27 +155,30 @@ void JointTrajectoryController::update(
 
   if (context)
   {
+    const auto& trajectory = context->mTrajectory;
     const auto timeFromStart = std::min(
-      (time - context->mStartTime).toSec(),
-      context->mTrajectory->getEndTime());
+      (time - context->mStartTime).toSec(), trajectory->getEndTime());
 
     // Evaluate the trajectory at the current time.
-    context->mTrajectory->evaluate(timeFromStart, mDesiredState);
+    trajectory->evaluate(timeFromStart, mDesiredState);
     mControlledSpace->convertStateToPositions(
       mDesiredState, mDesiredPosition);
-    context->mTrajectory->evaluateDerivative(
-      timeFromStart, 1, mDesiredVelocity);
-    context->mTrajectory->evaluateDerivative(
-      timeFromStart, 2, mDesiredAcceleration);
+    trajectory->evaluateDerivative(timeFromStart, 1, mDesiredVelocity);
+    trajectory->evaluateDerivative(timeFromStart, 2, mDesiredAcceleration);
 
     // TODO: Check path constraints.
     // TODO: Check goal constraints.
 
     // Terminate the current trajectory.
-    if (timeFromStart >= context->mTrajectory->getDuration())
+    if (timeFromStart >= trajectory->getDuration())
     {
       context->mGoalHandle.setSucceeded();
       mCurrentTrajectory.set(nullptr);
+
+      ROS_INFO_STREAM(
+        "Finished executing trajectory '"
+        << context->mGoalHandle.getGoalID().id
+        << "' at time " << time << ".");
     }
   }
 
@@ -350,19 +353,18 @@ std::unique_ptr<aikido::trajectory::Spline> convertJointTrajectory(
   const auto& waypoints = jointTrajectory.points;
   for (size_t iwaypoint = 1; iwaypoint < waypoints.size(); ++iwaypoint)
   {
-    const auto& nextWaypoint = waypoints[iwaypoint];
-    const auto nextTimeFromStart = nextWaypoint.time_from_start.toSec();
-
     Eigen::VectorXd nextPosition, nextVelocity, nextAcceleration;
     extractJointTrajectoryPoint(jointTrajectory, iwaypoint, numControlledDofs,
       &nextPosition, true, &nextVelocity, isVelocityRequired,
       &nextAcceleration, isAccelerationRequired);
 
     // Compute spline coefficients for this polynomial segment.
+    const auto& nextWaypoint = waypoints[iwaypoint];
+    const auto nextTimeFromStart = nextWaypoint.time_from_start.toSec();
     const auto segmentDuration = nextTimeFromStart - currTimeFromStart;
     const auto segmentCoefficients = fitPolynomial(
-      currTimeFromStart, currPosition, currVelocity, currAcceleration,
-      nextTimeFromStart, nextPosition, nextVelocity, nextAcceleration,
+      0., currPosition, currVelocity, currAcceleration,
+      segmentDuration, nextPosition, nextVelocity, nextAcceleration,
       numCoefficients);
 
     // Add a segment to the trajectory.
@@ -383,8 +385,8 @@ std::unique_ptr<aikido::trajectory::Spline> convertJointTrajectory(
 void JointTrajectoryController::goalCallback(GoalHandle goalHandle)
 {
   const auto goal = goalHandle.getGoal();
-  ROS_INFO_STREAM("Received trajectory " << goalHandle.getGoalID().id
-    << " with " << goal->trajectory.points.size() << ".");
+  ROS_INFO_STREAM("Received trajectory '" << goalHandle.getGoalID().id
+    << "' with " << goal->trajectory.points.size() << ".");
   
   // Convert the JointTrajectory message to a format that we can execute.
   std::shared_ptr<aikido::trajectory::Spline> trajectory;
@@ -447,9 +449,9 @@ void JointTrajectoryController::goalCallback(GoalHandle goalHandle)
   if (existingContext)
   {
     auto& existingGoalHandle = existingContext->mGoalHandle;
-    ROS_WARN_STREAM("Preempted trajectory "
-      << existingGoalHandle.getGoalID().id << " with trajectory "
-      << goalHandle.getGoalID().id << ".");
+    ROS_WARN_STREAM("Preempted trajectory '"
+      << existingGoalHandle.getGoalID().id << "' with trajectory '"
+      << goalHandle.getGoalID().id << "'.");
 
     // TODO: Make this access thread safe.
     existingGoalHandle.setCanceled();
@@ -462,8 +464,8 @@ void JointTrajectoryController::goalCallback(GoalHandle goalHandle)
   newContext->mGoalHandle = goalHandle;
 
   ROS_INFO_STREAM(
-    "Started executing trajectory " << goalHandle.getGoalID().id
-    << " with duration " << trajectory->getDuration()
+    "Started executing trajectory '" << goalHandle.getGoalID().id
+    << "' with duration " << trajectory->getDuration()
     << " at time " << startTime << ".");
 
   goalHandle.setAccepted();

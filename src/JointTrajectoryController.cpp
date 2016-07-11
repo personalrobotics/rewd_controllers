@@ -11,6 +11,15 @@
 using aikido::statespace::dart::MetaSkeletonStateSpace;
 
 namespace rewd_controllers {
+namespace {
+
+//=============================================================================
+std::vector<double> toVector(const Eigen::VectorXd& input)
+{
+  return std::vector<double>{input.data(), input.data() + input.size()};
+}
+
+} // namespace
 
 //=============================================================================
 JointTrajectoryController::JointTrajectoryController()
@@ -100,7 +109,7 @@ bool JointTrajectoryController::init(
   mDesiredPosition.resize(numControlledDofs);
   mDesiredVelocity.resize(numControlledDofs);
   mDesiredAcceleration.resize(numControlledDofs);
-  mNominalForce.resize(numControlledDofs);
+  mDesiredEffort.resize(numControlledDofs);
 
   // Start the action server. This must be last.
   mActionServer.reset(
@@ -109,6 +118,10 @@ bool JointTrajectoryController::init(
       boost::bind(&JointTrajectoryController::cancelCallback, this, _1),
       false});
   mActionServer->start();
+
+  mNonRealtimeTimer = n.createTimer(
+    ros::Duration(0.05), &JointTrajectoryController::nonRealtimeCallback,
+    this, false, true);
 
   return true;
 }
@@ -140,6 +153,7 @@ void JointTrajectoryController::starting(const ros::Time& time)
 //=============================================================================
 void JointTrajectoryController::stopping(const ros::Time& time)
 {
+  mNonRealtimeTimer.stop();
   mActionServer.reset();
 }
 
@@ -182,20 +196,26 @@ void JointTrajectoryController::update(
     }
   }
 
+  // Update the state of the Skeleton.
+  mSkeletonUpdater->update();
+  mActualPosition = mControlledSkeleton->getPositions();
+  mActualVelocity = mControlledSkeleton->getVelocities();
+  mActualEffort = mControlledSkeleton->getForces();
+
   // Compute inverse dynamics torques from the set point and store them in the
   // skeleton. These values may be queried by the adapters below.
-  mSkeletonUpdater->update();
   mControlledSkeleton->setPositions(mDesiredPosition);
   mControlledSkeleton->setVelocities(mDesiredVelocity);
   mControlledSkeleton->setAccelerations(mDesiredAcceleration);
 
   mSkeleton->computeInverseDynamics();
-  mNominalForce = mControlledSkeleton->getForces();
+  mDesiredEffort = mControlledSkeleton->getForces();
 
   // Restore the state of the Skeleton from JointState interfaces. These values
   // may be used by the adapters below.
-  mSkeletonUpdater->update();
-  mControlledSkeleton->setForces(mNominalForce);
+  mControlledSkeleton->setPositions(mActualPosition);
+  mControlledSkeleton->setVelocities(mActualVelocity);
+  mControlledSkeleton->setForces(mDesiredEffort);
 
   for (size_t idof = 0; idof < mAdapters.size(); ++idof)
   {
@@ -476,6 +496,42 @@ void JointTrajectoryController::goalCallback(GoalHandle goalHandle)
 void JointTrajectoryController::cancelCallback(GoalHandle goalHandle)
 {
   ROS_WARN("Canceling is not implemented.");
+}
+
+//=============================================================================
+void JointTrajectoryController::nonRealtimeCallback(
+  const ros::TimerEvent &event)
+{
+  std::shared_ptr<TrajectoryContext> context;
+  mCurrentTrajectory.get(context);
+
+  if (context)
+  {
+    const ros::Duration timeFromStart{
+      event.current_real - context->mStartTime};
+
+    Feedback feedback;
+    feedback.header.stamp = event.current_real; // TODO: Use control loop time.
+
+    for (const auto dof : mControlledSkeleton->getDofs())
+      feedback.joint_names.emplace_back(dof->getName());
+
+    feedback.desired.positions = toVector(mDesiredPosition);
+    feedback.desired.velocities = toVector(mDesiredVelocity);
+    feedback.desired.accelerations = toVector(mDesiredAcceleration);
+    feedback.desired.effort = toVector(mDesiredEffort);
+    feedback.desired.time_from_start = timeFromStart;
+    feedback.actual.positions = toVector(mActualPosition);
+    feedback.actual.velocities = toVector(mActualVelocity);
+    feedback.actual.effort = toVector(mActualEffort);
+    feedback.actual.time_from_start = timeFromStart;
+    feedback.error.positions = toVector(mDesiredPosition - mActualPosition);
+    feedback.error.velocities = toVector(mDesiredVelocity - mActualVelocity);
+    feedback.error.effort = toVector(mDesiredEffort - mActualEffort);
+    feedback.error.time_from_start = timeFromStart;
+
+    context->mGoalHandle.publishFeedback(feedback);
+  }
 }
 
 } // namespace rewd_controllers

@@ -25,6 +25,7 @@ public:
   using ActionServer = actionlib::ActionServer<Action>;
   using GoalHandle = ActionServer::GoalHandle;
 
+  using Feedback = control_msgs::FollowJointTrajectoryFeedback;
   using Result = control_msgs::FollowJointTrajectoryResult;
 
   JointTrajectoryController();
@@ -68,6 +69,7 @@ private:
 
   void goalCallback(GoalHandle goalHandle);
   void cancelCallback(GoalHandle goalHandle);
+  void nonRealtimeCallback(const ros::TimerEvent &event);
 
   JointAdapterFactory mAdapterFactory;
   dart::dynamics::SkeletonPtr mSkeleton;
@@ -79,9 +81,14 @@ private:
   Eigen::VectorXd mDesiredPosition;
   Eigen::VectorXd mDesiredVelocity;
   Eigen::VectorXd mDesiredAcceleration;
-  Eigen::VectorXd mNominalForce;
+  Eigen::VectorXd mDesiredEffort;
+  Eigen::VectorXd mActualPosition;
+  Eigen::VectorXd mActualVelocity;
+  Eigen::VectorXd mActualEffort;
 
   std::unique_ptr<ActionServer> mActionServer;
+  ros::Timer mNonRealtimeTimer;
+
   // It would be better to use std::atomic<std::shared_ptr<T>> here. However,
   // this is not fully implemented in GCC 4.8.4, shippe with Ubuntu 14.04.
   realtime_tools::RealtimeBox<

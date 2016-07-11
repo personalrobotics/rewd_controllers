@@ -16,6 +16,7 @@ dart::dynamics::SkeletonPtr loadRobotFromParameter(
   std::string parameterName;
   nodeHandle.param<std::string>(
     nameParameter, parameterName, "/robot_description");
+  ROS_INFO_STREAM("Reading URDF from parameter: " << parameterName);
 
   // Load the URDF from the parameter server.
   std::string robotDescription;

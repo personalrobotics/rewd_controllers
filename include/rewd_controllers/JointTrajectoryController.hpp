@@ -44,7 +44,7 @@ public:
     std::set<std::string>& claimed_resources) override
   {
     // TODO: Also claim resources.
-    return init(hw, root_nh);
+    return init(hw, controller_nh);
   }
 
   /** \brief The init function is called to initialize the controller from a

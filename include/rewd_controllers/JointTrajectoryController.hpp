@@ -5,7 +5,9 @@
 #include <ros/node_handle.h>
 #include <actionlib/server/action_server.h>
 #include <control_msgs/FollowJointTrajectoryAction.h>
-#include <controller_interface/multi_interface_controller.h>
+// temporarily disabled.
+//#include <controller_interface/multi_interface_controller.h>
+#include <controller_interface/controller_base.h>
 #include <realtime_tools/realtime_buffer.h>
 #include <realtime_tools/realtime_server_goal_handle.h>
 #include <dart/dynamics/dynamics.hpp>
@@ -13,12 +15,7 @@
 
 namespace rewd_controllers {
 
-class JointTrajectoryController
-  : public controller_interface::MultiInterfaceController<
-      hardware_interface::PositionJointInterface,
-      hardware_interface::VelocityJointInterface,
-      hardware_interface::EffortJointInterface,
-      hardware_interface::JointStateInterface>
+class JointTrajectoryController : public controller_interface::ControllerBase
 {
 public:
   using Action = control_msgs::FollowJointTrajectoryAction;
@@ -30,6 +27,25 @@ public:
 
   JointTrajectoryController();
   virtual ~JointTrajectoryController();
+
+  std::string getHardwareInterfaceType() const override
+  {
+    // We can only claim one type of hardware interface, so we declare that we
+    // claim EffortJointInterface. Depending upon the ROS parameter
+    // configuraton, we may also claim PositionJointInterface or
+    // VelocityJointInterface resources.
+    return "hardware_interface::EffortJointInterface";
+  }
+
+  bool initRequest(
+    hardware_interface::RobotHW* hw,
+    ros::NodeHandle& root_nh,
+    ros::NodeHandle &controller_nh,
+    std::set<std::string>& claimed_resources) override
+  {
+    // TODO: Also claim resources.
+    return init(hw, root_nh);
+  }
 
   /** \brief The init function is called to initialize the controller from a
    * non-realtime thread with a pointer to the hardware interface, itself,
@@ -44,7 +60,7 @@ public:
    * \returns True if initialization was successful and the controller
    * is ready to be started.
    */
-  bool init(hardware_interface::RobotHW* robot, ros::NodeHandle& n) override;
+  bool init(hardware_interface::RobotHW* robot, ros::NodeHandle& n);
 
   /** \brief This is called from within the realtime thread just before the
    * first call to \ref update

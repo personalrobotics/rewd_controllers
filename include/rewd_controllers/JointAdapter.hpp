@@ -19,8 +19,11 @@ public:
 
   virtual bool initialize(const ros::NodeHandle& nodeHandle) = 0;
 
-  virtual void update(const ros::Time& time, const ros::Duration& period,
-    double desiredPosition, double desiredVelocity) = 0;
+  virtual void update(
+    const ros::Time& time, const ros::Duration& period,
+    double actualPosition, double desiredPosition,
+    double actualVelocity, double desiredVelocity,
+    double nominalEffort) = 0;
 
   virtual void reset() = 0;
 
@@ -37,8 +40,11 @@ public:
 
   bool initialize(const ros::NodeHandle& nodeHandle) override;
 
-  void update(const ros::Time& time, const ros::Duration& period,
-    double desiredPosition, double desiredVelocity) override;
+  void update(
+    const ros::Time& time, const ros::Duration& period,
+    double actualPosition, double desiredPosition,
+    double actualVelocity, double desiredVelocity,
+    double nominalEffort) override;
 
   void reset() override;
 
@@ -56,8 +62,11 @@ public:
 
   bool initialize(const ros::NodeHandle& nodeHandle) override;
 
-  void update(const ros::Time& time, const ros::Duration& period,
-    double desiredPosition, double desiredVelocity) override;
+  void update(
+    const ros::Time& time, const ros::Duration& period,
+    double actualPosition, double desiredPosition,
+    double actualVelocity, double desiredVelocity,
+    double nominalEffort) override;
 
   void reset() override;
 
@@ -76,8 +85,11 @@ public:
 
   bool initialize(const ros::NodeHandle& nodeHandle) override;
 
-  void update(const ros::Time& time, const ros::Duration& period,
-    double desiredPosition, double desiredVelocity) override;
+  void update(
+    const ros::Time& time, const ros::Duration& period,
+    double actualPosition, double desiredPosition,
+    double actualVelocity, double desiredVelocity,
+    double nominalEffort) override;
 
   void reset() override;
 

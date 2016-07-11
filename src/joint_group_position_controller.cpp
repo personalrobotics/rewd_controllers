@@ -113,6 +113,8 @@ void JointGroupPositionController::starting(const ros::Time& time)
 void JointGroupPositionController::update(
   const ros::Time& time, const ros::Duration& period)
 {
+  const auto desiredVelocity = 0.;
+
   mDesiredPosition = *mDesiredPositionBuffer.readFromRT();
 
   // Compute inverse dynamics torques and store them in the skeleton. These
@@ -123,7 +125,12 @@ void JointGroupPositionController::update(
   // Delegate to the adapter for each joint. This directly writes to the
   // robot's hardware interface.
   for (size_t idof = 0; idof < mAdapters.size(); ++idof)
-    mAdapters[idof]->update(time, period, mDesiredPosition[idof], 0.);
+  {
+    mAdapters[idof]->update(time, period,
+      mControlledSkeleton->getPosition(idof), mDesiredPosition[idof],
+      mControlledSkeleton->getVelocity(idof), desiredVelocity,
+      mControlledSkeleton->getForce(idof));
+  }
 }
 
 //=============================================================================

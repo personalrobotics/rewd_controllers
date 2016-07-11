@@ -37,10 +37,11 @@ bool JointPositionAdapter::initialize(const ros::NodeHandle& nodeHandle)
 
 //=============================================================================
 void JointPositionAdapter::update(
-  const ros::Time& time, const ros::Duration& period,
-  double desiredPosition, double desiredVelocity)
+  const ros::Time& /*time*/, const ros::Duration& /*period*/,
+  double /*actualPosition*/, double desiredPosition,
+  double /*actualVelocity*/, double /*desiredVelocity*/,
+  double /*nominalEffort*/)
 {
-  // Simple pass-through interface.
   mPositionHandle.setCommand(desiredPosition);
 }
 
@@ -67,27 +68,17 @@ bool JointVelocityAdapter::initialize(const ros::NodeHandle& nodeHandle)
 
 //=============================================================================
 void JointVelocityAdapter::update(
-  const ros::Time& time, const ros::Duration& period,
-  double desiredPosition, double desiredVelocity)
+    const ros::Time& /*time*/, const ros::Duration& period,
+    double actualPosition, double desiredPosition,
+    double actualVelocity, double desiredVelocity,
+    double /*nominalEffort*/)
 {
-  // TODO: Use Aikido to compute this error.
-  const auto actualPosition = mDof->getPosition();
-  double errorPosition;
-  if (mDof->isCyclic())
-  {
-    errorPosition = angles::shortest_angular_distance(
-      desiredPosition, actualPosition);
-  }
-  else
-  {
-    errorPosition = desiredPosition - actualPosition;
-  }
-
-  const auto errorVelocity = mDof->getVelocity() - desiredVelocity;
-  const auto velocity = mPid.computeCommand(
-    errorPosition, errorVelocity, period);
-
-  mVelocityHandle.setCommand(velocity);
+  // TODO: Handle position wrapping on SO(2) joints.
+  const auto pidVelocity = mPid.computeCommand(
+    desiredPosition - actualPosition,
+    desiredVelocity - actualVelocity,
+    period);
+  mVelocityHandle.setCommand(desiredVelocity + pidVelocity);
 }
 
 //=============================================================================
@@ -113,34 +104,17 @@ bool JointEffortAdapter::initialize(const ros::NodeHandle& nodeHandle)
 
 //=============================================================================
 void JointEffortAdapter::update(
-  const ros::Time& time, const ros::Duration& period,
-  double desiredPosition, double desiredVelocity)
+    const ros::Time& /*time*/, const ros::Duration& period,
+    double actualPosition, double desiredPosition,
+    double actualVelocity, double desiredVelocity,
+    double nominalEffort)
 {
-  // This is the inverse dynamics torque computed by DART.
-  const auto effortInverseDynamics = mDof->getForce();
-
-  // Compute an error torque using PID.
-  // TODO: Use Aikido to compute this error.
-  const auto actualPosition = mDof->getPosition();
-  double errorPosition;
-  if (mDof->isCyclic())
-  {
-    errorPosition = angles::shortest_angular_distance(
-      desiredPosition, actualPosition);
-  }
-  else
-  {
-    errorPosition = desiredPosition - actualPosition;
-  }
-
-  // TODO: Handle wrapping in this error calculation.
-  const auto errorVelocity = desiredVelocity - mDof->getVelocity();
-
-  const auto effortPid = mPid.computeCommand(
-    errorPosition, errorVelocity, period);
-  const auto effortTotal = effortInverseDynamics + effortPid;
-
-  mEffortHandle.setCommand(effortTotal);
+  // TODO: Handle position wrapping on SO(2) joints.
+  const auto pidEffort = mPid.computeCommand(
+    desiredPosition - actualPosition,
+    desiredVelocity - actualVelocity,
+    period);
+  mEffortHandle.setCommand(nominalEffort + pidEffort);
 }
 
 //=============================================================================

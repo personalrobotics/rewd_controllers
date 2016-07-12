@@ -43,8 +43,19 @@ public:
     ros::NodeHandle &controller_nh,
     std::set<std::string>& claimed_resources) override
   {
+    if (state_ != CONSTRUCTED){
+      ROS_ERROR("Cannot initialize this controller was not constructed.");
+      return false;
+    }
+
     // TODO: Also claim resources.
-    return init(hw, controller_nh);
+    if (!init(hw, controller_nh))
+    {
+      ROS_ERROR("Failed initializing controller.");
+      return false;
+    }
+
+    state_ = INITIALIZED;
   }
 
   /** \brief The init function is called to initialize the controller from a

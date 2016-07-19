@@ -24,7 +24,7 @@ endif()
 find_package(aikido REQUIRED COMPONENTS util)
 include_directories(SYSTEM ${aikido_INCLUDE_DIRS})
 
-find_package(DART REQUIRED CONFIG)
+find_package(DART REQUIRED COMPONENTS utils utils-urdf CONFIG)
 include_directories(SYSTEM ${DART_INCLUDE_DIRS})
 
 #==============================================================================
@@ -51,7 +51,7 @@ catkin_package(
 # Targets
 #
 add_library("${PROJECT_NAME}" SHARED
-  #src/joint_group_position_controller.cpp
+  src/joint_group_position_controller.cpp
   src/gravity_compensation_controller.cpp
 )
 target_link_libraries("${PROJECT_NAME}"

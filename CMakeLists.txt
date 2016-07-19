@@ -24,7 +24,7 @@ endif()
 find_package(aikido REQUIRED COMPONENTS util)
 include_directories(SYSTEM ${aikido_INCLUDE_DIRS})
 
-find_package(DART REQUIRED COMPONENTS utils-urdf)
+find_package(DART REQUIRED COMPONENTS utils utils-urdf CONFIG)
 include_directories(SYSTEM ${DART_INCLUDE_DIRS})
 
 #==============================================================================

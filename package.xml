@@ -7,11 +7,11 @@
   <license>BSD</license>
   <url type="repository">https://github.com/personalrobotics/pr_ros_controllers</url>
   <author email="cliddick@cmu.edu">Clint Liddick</author>
+  <author email="mkoval@cs.cmu.edu">Michael Koval</author>
   <buildtool_depend>catkin</buildtool_depend>
   <depend>aikido</depend>
   <depend>actionlib</depend>
   <depend>angles</depend>
-  <depend>boost</depend>
   <depend>dart</depend>
   <depend>controller_interface</depend>
   <depend>control_msgs</depend>

@@ -21,7 +21,7 @@ if ("${controller_interface_VERSION}" VERSION_LESS 0.10.0)
   message(FATAL_ERROR "controller_interface package must be at least version 0.10.0, not packaged in Indigo. Please upgrade to Jade or build the ros_control packages from source.") 
 endif()
 
-find_package(aikido REQUIRED COMPONENTS control_ros statespace trajectory util)
+find_package(aikido REQUIRED COMPONENTS control control_ros statespace trajectory util)
 include_directories(SYSTEM ${aikido_INCLUDE_DIRS})
 
 find_package(DART REQUIRED CONFIG)

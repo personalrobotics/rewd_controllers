@@ -1,13 +1,14 @@
+#include <rewd_controllers/JointTrajectoryController.hpp>
+
+#include <functional>
 #include <aikido/control/ros/Conversions.hpp>
 #include <aikido/statespace/dart/MetaSkeletonStateSpace.hpp>
 #include <aikido/trajectory/Spline.hpp>
 #include <aikido/util/CatkinResourceRetriever.hpp>
 #include <aikido/util/Spline.hpp>
-#include <boost/make_shared.hpp>
 #include <dart/dynamics/dynamics.hpp>
 #include <dart/utils/urdf/DartLoader.hpp>
 #include <pluginlib/class_list_macros.h>
-#include <rewd_controllers/JointTrajectoryController.hpp>
 
 using aikido::statespace::dart::MetaSkeletonStateSpace;
 
@@ -86,7 +87,7 @@ bool JointTrajectoryController::init(
   // Create adaptors to provide a uniform interface to different types.
   const ros::NodeHandle gainsNodeHandle{n, "gains"};
   const auto numControlledDofs = mControlledSkeleton->getNumDofs();
-  mAdapters.resize(mControlledSkeleton->getNumDofs());
+  mAdapters.resize(numControlledDofs);
 
   for (size_t idof = 0; idof < numControlledDofs; ++idof)
   {
@@ -112,10 +113,11 @@ bool JointTrajectoryController::init(
   mDesiredEffort.resize(numControlledDofs);
 
   // Start the action server. This must be last.
+  using std::placeholders::_1;
   mActionServer.reset(
     new actionlib::ActionServer<Action>{n, "follow_joint_trajectory",
-      boost::bind(&JointTrajectoryController::goalCallback, this, _1),
-      boost::bind(&JointTrajectoryController::cancelCallback, this, _1),
+        std::bind(&JointTrajectoryController::goalCallback, this, _1),
+      std::bind(&JointTrajectoryController::cancelCallback, this, _1),
       false});
   mActionServer->start();
 

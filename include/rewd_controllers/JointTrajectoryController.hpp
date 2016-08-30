@@ -2,6 +2,8 @@
 #define REWD_CONTROLLERS_JOINTGROUPPOSITIONCONTROLLER_HPP_
 
 #include <memory>
+#include <aikido/trajectory.hpp>
+#include <aikido/statespace/dart/MetaSkeletonStateSpace.hpp>
 #include <ros/node_handle.h>
 #include <actionlib/server/action_server.h>
 #include <control_msgs/FollowJointTrajectoryAction.h>

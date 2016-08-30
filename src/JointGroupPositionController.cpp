@@ -1,8 +1,9 @@
+#include <rewd_controllers/JointGroupPositionController.hpp>
+
 #include <aikido/util/CatkinResourceRetriever.hpp>
 #include <dart/dynamics/dynamics.hpp>
 #include <dart/utils/urdf/DartLoader.hpp>
 #include <pluginlib/class_list_macros.h>
-#include <rewd_controllers/joint_group_position_controller.h>
 
 namespace rewd_controllers {
 

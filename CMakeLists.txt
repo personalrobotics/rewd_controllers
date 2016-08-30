@@ -50,8 +50,8 @@ catkin_package(
 # Targets
 #
 add_library("${PROJECT_NAME}" SHARED
-  src/joint_group_position_controller.cpp
-  src/gravity_compensation_controller.cpp
+  src/JointGroupPositionController.cpp
+  src/GravityCompensationController.cpp
   src/helpers.cpp
   src/JointAdapter.cpp
   src/JointAdapterFactory.cpp

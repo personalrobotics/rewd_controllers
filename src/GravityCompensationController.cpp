@@ -1,4 +1,4 @@
-#include <rewd_controllers/gravity_compensation_controller.h>
+#include <rewd_controllers/GravityCompensationController.hpp>
 
 #include <hardware_interface/hardware_interface.h>
 #include <pluginlib/class_list_macros.h>

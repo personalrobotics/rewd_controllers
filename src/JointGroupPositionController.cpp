@@ -1,13 +1,15 @@
+#include <rewd_controllers/JointGroupPositionController.hpp>
+
 #include <aikido/util/CatkinResourceRetriever.hpp>
 #include <dart/dynamics/dynamics.hpp>
 #include <dart/utils/urdf/DartLoader.hpp>
 #include <pluginlib/class_list_macros.h>
-#include <rewd_controllers/joint_group_position_controller.h>
 
 namespace rewd_controllers {
 
 //=============================================================================
 JointGroupPositionController::JointGroupPositionController()
+  : MultiInterfaceController(true)  // allow_optional_interfaces
 {
   using hardware_interface::EffortJointInterface;
   using hardware_interface::PositionJointInterface;
@@ -61,7 +63,6 @@ bool JointGroupPositionController::init(
     new SkeletonJointStateUpdater(mSkeleton, jointStateInterface));
 
   // Create adaptors to provide a uniform interface to different types.
-  const ros::NodeHandle gainsNodeHandle{n, "gains"};
   const auto numControlledDofs = mControlledSkeleton->getNumDofs();
   mAdapters.resize(mControlledSkeleton->getNumDofs());
 
@@ -74,10 +75,8 @@ bool JointGroupPositionController::init(
     if (!adapter)
       return false;
 
-    // Initialize the adapter using parameters stored on the parameter server.
-    ros::NodeHandle adapterNodeHandle{gainsNodeHandle, dof->getName()};
-    if (!adapter->initialize(adapterNodeHandle))
-      return false;
+    ros::NodeHandle adapterNodeHandle = createDefaultAdapterNodeHandle(n, dof);
+    if (!adapter->initialize(adapterNodeHandle)) return false;
 
     mAdapters[idof] = std::move(adapter);
   }

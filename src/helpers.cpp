@@ -219,4 +219,20 @@ void SkeletonJointStateUpdater::update()
   }
 }
 
+ros::NodeHandle createDefaultAdapterNodeHandle(
+    const ros::NodeHandle& parentNodeHandle,
+    const dart::dynamics::DegreeOfFreedom* dof)
+{
+  auto dofName = dof->getName();
+  while (dofName.at(0) == '/') {
+    // a leading slash creates a root level namespace
+    // ignoring the parent workspace, which is
+    // obviously not where we want to read parameters from
+    dofName.erase(0, 1);
+  }
+
+  const ros::NodeHandle gainsNodeHandle{parentNodeHandle, "gains"};
+  return ros::NodeHandle{gainsNodeHandle, dofName};
+}
+
 } // namespace rewd_controllers

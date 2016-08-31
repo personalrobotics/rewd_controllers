@@ -22,4 +22,14 @@
         feed-forward term computed via inverse dynamics.
     </description>
   </class>
+
+  <class name="rewd_controllers/GravityCompensationController"
+         type="rewd_controllers::GravityCompensationController"
+         base_class_type="controller_interface::ControllerBase">
+    <description>
+      The GravityCompensationController opposes gravity using inverse dynamics.
+      It only supports effort joint interfaces.
+    </description>
+  </class>
+
 </library>

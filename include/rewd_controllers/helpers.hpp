@@ -8,6 +8,7 @@
 #include <hardware_interface/joint_command_interface.h>
 #include <hardware_interface/joint_state_interface.h>
 #include <hardware_interface/robot_hw.h>
+#include <ros/node_handle.h>
 #include "JointAdapter.hpp"
 #include "JointAdapterFactory.hpp"
 
@@ -50,6 +51,10 @@ dart::dynamics::MetaSkeletonPtr getControlledMetaSkeleton(
   const dart::dynamics::SkeletonPtr& skeleton,
   const std::vector<JointParameter>& parameters,
   const std::string& name);
+
+ros::NodeHandle createDefaultAdapterNodeHandle(
+    const ros::NodeHandle& parentNodeHandle,
+    const dart::dynamics::DegreeOfFreedom* dof);
 
 } // namespace rewd_controllers
 

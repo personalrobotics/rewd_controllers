@@ -13,6 +13,8 @@ find_package(catkin REQUIRED COMPONENTS
   control_msgs
   control_toolbox
   controller_interface
+  hardware_interface
+  pr_hardware_interfaces
   realtime_tools
 )
 include_directories(SYSTEM ${catkin_INCLUDE_DIRS})
@@ -36,6 +38,8 @@ catkin_package(
     control_msgs
     control_toolbox
     controller_interface
+    hardware_interface
+    pr_hardware_interfaces
     realtime_tools
   DEPENDS
     aikido
@@ -55,6 +59,7 @@ add_library("${PROJECT_NAME}" SHARED
   src/helpers.cpp
   src/JointAdapter.cpp
   src/JointAdapterFactory.cpp
+  src/JointTrajectoryControllerBase.cpp
   src/JointTrajectoryController.cpp
 )
 target_link_libraries("${PROJECT_NAME}"

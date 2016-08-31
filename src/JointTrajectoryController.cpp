@@ -25,6 +25,7 @@ std::vector<double> toVector(const Eigen::VectorXd& input)
 
 //=============================================================================
 JointTrajectoryController::JointTrajectoryController()
+  : MultiInterfaceController(true)  // allow_optional_interfaces
 {
   using hardware_interface::EffortJointInterface;
   using hardware_interface::PositionJointInterface;
@@ -99,7 +100,12 @@ bool JointTrajectoryController::init(
       return false;
 
     // Initialize the adapter using parameters stored on the parameter server.
-    ros::NodeHandle adapterNodeHandle{gainsNodeHandle, dof->getName()};
+    auto dofName = dof->getName();
+    if (dofName.at(0) == '/')
+      dofName.erase(0, 1);  // a leading slash creates a root level namespace
+
+    // Initialize the adapter using parameters stored on the parameter server.
+    ros::NodeHandle adapterNodeHandle{gainsNodeHandle, dofName};
     if (!adapter->initialize(adapterNodeHandle))
       return false;
 

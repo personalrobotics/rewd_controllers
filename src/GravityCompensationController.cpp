@@ -9,7 +9,9 @@
 namespace rewd_controllers
 {
 //=============================================================================
-GravityCompensationController::GravityCompensationController() {}
+GravityCompensationController::GravityCompensationController()
+  : MultiInterfaceController(true)  // allow_optional_interfaces
+{}
 
 //=============================================================================
 GravityCompensationController::~GravityCompensationController() {}

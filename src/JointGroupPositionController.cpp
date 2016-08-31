@@ -9,6 +9,7 @@ namespace rewd_controllers {
 
 //=============================================================================
 JointGroupPositionController::JointGroupPositionController()
+  : MultiInterfaceController(true)  // allow_optional_interfaces
 {
   using hardware_interface::EffortJointInterface;
   using hardware_interface::PositionJointInterface;
@@ -76,7 +77,11 @@ bool JointGroupPositionController::init(
       return false;
 
     // Initialize the adapter using parameters stored on the parameter server.
-    ros::NodeHandle adapterNodeHandle{gainsNodeHandle, dof->getName()};
+    auto dofName = dof->getName();
+    if (dofName.at(0) == '/')
+      dofName.erase(0, 1);  // a leading slash creates a root level namespace
+
+    ros::NodeHandle adapterNodeHandle{gainsNodeHandle, dofName};
     if (!adapter->initialize(adapterNodeHandle))
       return false;
 

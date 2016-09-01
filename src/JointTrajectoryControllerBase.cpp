@@ -81,7 +81,6 @@ bool JointTrajectoryControllerBase::initController(
       new SkeletonJointStateUpdater{mSkeleton, jointStateInterface});
 
   // Create adaptors to provide a uniform interface to different types.
-  const ros::NodeHandle gainsNodeHandle{n, "gains"};
   const auto numControlledDofs = mControlledSkeleton->getNumDofs();
   mAdapters.resize(numControlledDofs);
 
@@ -93,12 +92,7 @@ bool JointTrajectoryControllerBase::initController(
     if (!adapter) return false;
 
     // Initialize the adapter using parameters stored on the parameter server.
-    auto dofName = dof->getName();
-    if (dofName.at(0) == '/')
-      dofName.erase(0, 1);  // a leading slash creates a root level namespace
-
-    // Initialize the adapter using parameters stored on the parameter server.
-    ros::NodeHandle adapterNodeHandle{gainsNodeHandle, dofName};
+    ros::NodeHandle adapterNodeHandle = createDefaultAdapterNodeHandle(n, dof);
     if (!adapter->initialize(adapterNodeHandle)) return false;
 
     mAdapters[idof] = std::move(adapter);

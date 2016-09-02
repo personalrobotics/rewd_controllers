@@ -5,6 +5,7 @@
 #include <actionlib/server/action_server.h>
 #include <aikido/statespace/dart/MetaSkeletonStateSpace.hpp>
 #include <aikido/trajectory.hpp>
+#include <boost/atomic.hpp>
 #include <control_msgs/FollowJointTrajectoryAction.h>
 #include <dart/dynamics/dynamics.hpp>
 #include <realtime_tools/realtime_buffer.h>
@@ -12,11 +13,16 @@
 #include <rewd_controllers/helpers.hpp>
 #include <ros/node_handle.h>
 
-namespace rewd_controllers {
+// Ensure atomic boolean operations are always lock-free (defined to 2)
+#if BOOST_ATOMIC_BOOL_LOCK_FREE != 2
+#error "Boolean atomics not lock-free on this system."
+#endif
 
+namespace rewd_controllers
+{
 class JointTrajectoryControllerBase
 {
-public:
+protected:
   using Action = control_msgs::FollowJointTrajectoryAction;
   using ActionServer = actionlib::ActionServer<Action>;
   using GoalHandle = ActionServer::GoalHandle;
@@ -56,8 +62,15 @@ public:
   void updateStep(const ros::Time& time, const ros::Duration& period);
 
 private:
-  struct TrajectoryContext
-  {
+  /** \brief Contains all data needed to execute the currently
+   * requested trajectory. Shared between real time and non-real
+   * time threads.
+   *
+   * This structure must be used AS A WHOLE, and reassigned
+   * in its entirety. Assigning to individual components
+   * is UNSAFE.
+   */
+  struct TrajectoryContext {
     ros::Time mStartTime;
     std::shared_ptr<aikido::trajectory::Trajectory> mTrajectory;
     GoalHandle mGoalHandle;
@@ -65,12 +78,14 @@ private:
 
   void goalCallback(GoalHandle goalHandle);
   void cancelCallback(GoalHandle goalHandle);
-  void nonRealtimeCallback(const ros::TimerEvent &event);
+  void nonRealtimeCallback(const ros::TimerEvent& event);
+  void publishFeedback(const ros::Time& currentTime);
 
   JointAdapterFactory mAdapterFactory;
   dart::dynamics::SkeletonPtr mSkeleton;
   dart::dynamics::MetaSkeletonPtr mControlledSkeleton;
-  std::shared_ptr<aikido::statespace::dart::MetaSkeletonStateSpace> mControlledSpace;
+  std::shared_ptr<aikido::statespace::dart::MetaSkeletonStateSpace>
+      mControlledSpace;
 
   std::unique_ptr<SkeletonJointStateUpdater> mSkeletonUpdater;
   std::vector<std::unique_ptr<JointAdapter>> mAdapters;
@@ -86,11 +101,17 @@ private:
   ros::Timer mNonRealtimeTimer;
 
   // It would be better to use std::atomic<std::shared_ptr<T>> here. However,
-  // this is not fully implemented in GCC 4.8.4, shippe with Ubuntu 14.04.
-  realtime_tools::RealtimeBox<
-    std::shared_ptr<TrajectoryContext>> mCurrentTrajectory;
+  // this is not fully implemented in GCC 4.8.4, shipped with Ubuntu 14.04.
+  realtime_tools::RealtimeBox<std::shared_ptr<TrajectoryContext>>
+      mCurrentTrajectory;
+  realtime_tools::RealtimeBox<std::shared_ptr<TrajectoryContext>>
+      mNextTrajectory;
+
+  // Signals to/from real-time thread
+  boost::atomic_bool mTrajectoryFinished;
+  boost::atomic_bool mCancelTrajectory;
 };
 
-} // namespace rewd_controllers
+}  // namespace rewd_controllers
 
-#endif // ifndef REWD_CONTROLLERS_JOINTTRAJECTORYCONTROLLERBASE_HPP_
+#endif  // ifndef REWD_CONTROLLERS_JOINTTRAJECTORYCONTROLLERBASE_HPP_

@@ -27,6 +27,8 @@ std::vector<double> toVector(const Eigen::VectorXd& input)
 
 //=============================================================================
 JointTrajectoryControllerBase::JointTrajectoryControllerBase()
+    : mTrajectoryFinished(true)
+    , mCancelTrajectory(false)
 {
   using hardware_interface::EffortJointInterface;
   using hardware_interface::PositionJointInterface;
@@ -141,6 +143,9 @@ void JointTrajectoryControllerBase::startController(const ros::Time& time)
   for (const auto& adapter : mAdapters) adapter->reset();
 
   ROS_INFO("Reset joint adapters.");
+
+  mTrajectoryFinished.store(true);
+  mCancelTrajectory.store(false);
 }
 
 //=============================================================================
@@ -157,10 +162,11 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
   // TODO: Make this a member variable to avoid dynamic allocation.
   auto mDesiredState = mControlledSpace->createState();
 
+  bool trajFinished = mTrajectoryFinished.load();
   std::shared_ptr<TrajectoryContext> context;
   mCurrentTrajectory.get(context);
 
-  if (context) {
+  if (!trajFinished && context) {
     const auto& trajectory = context->mTrajectory;
     const auto timeFromStart = std::min((time - context->mStartTime).toSec(),
                                         trajectory->getEndTime());
@@ -176,11 +182,18 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
 
     // Terminate the current trajectory.
     if (timeFromStart >= trajectory->getDuration()) {
-      // TODO: This should not happen in the realtime thread.
-      context->mGoalHandle.setSucceeded();
-      mCurrentTrajectory.set(nullptr);
+      mTrajectoryFinished.store(true);
+      // // TODO: This should not happen in the realtime thread.
+      // context->mGoalHandle.setSucceeded();
+      // // TODO: data race [BUG]
+      // mCurrentTrajectory.set(nullptr);
 
       ROS_INFO_STREAM("Finished executing trajectory '"
+                      << context->mGoalHandle.getGoalID().id << "' at time "
+                      << time << ".");
+    } else if (mCancelTrajectory.load()) {
+      mTrajectoryFinished.store(true);
+      ROS_INFO_STREAM("Cancelled executing trajectory '"
                       << context->mGoalHandle.getGoalID().id << "' at time "
                       << time << ".");
     }
@@ -219,7 +232,7 @@ void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle)
   const auto goal = goalHandle.getGoal();
   ROS_INFO_STREAM("Received trajectory '"
                   << goalHandle.getGoalID().id << "' with "
-                  << goal->trajectory.points.size() << ".");
+                  << goal->trajectory.points.size() << " waypoints.");
 
   // Convert the JointTrajectory message to a format that we can execute.
   std::shared_ptr<aikido::trajectory::Spline> trajectory;
@@ -274,7 +287,8 @@ void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle)
   std::shared_ptr<TrajectoryContext> existingContext;
   mCurrentTrajectory.get(existingContext);
 
-  if (existingContext) {
+  bool trajFinished = mTrajectoryFinished.load();
+  if (!trajFinished && existingContext) {
     auto& existingGoalHandle = existingContext->mGoalHandle;
     ROS_WARN_STREAM("Preempted trajectory '"
                     << existingGoalHandle.getGoalID().id
@@ -282,7 +296,9 @@ void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle)
                     << "'.");
 
     // TODO: Make this access thread safe.
+    // TODO clint ok?
     existingGoalHandle.setCanceled();
+    mCancelTrajectory.store(true);
   }
 
   // Start the new trajectory.
@@ -297,27 +313,73 @@ void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle)
                   << ".");
 
   goalHandle.setAccepted();
-  mCurrentTrajectory.set(newContext);
+  mNextTrajectory.set(newContext);
 }
 
 //=============================================================================
 void JointTrajectoryControllerBase::cancelCallback(GoalHandle goalHandle)
 {
-  ROS_WARN("Canceling is not implemented.");
+  bool trajFinished = mTrajectoryFinished.load();
+  bool trajCancelling = mCancelTrajectory.load();
+
+  if (!trajFinished && !trajCancelling) {
+    std::shared_ptr<TrajectoryContext> existingContext;
+    mCurrentTrajectory.get(existingContext);
+
+    mCancelTrajectory.store(true);
+    ROS_INFO_STREAM("Cancelling currently executing trajectory '"
+                    << existingContext->mGoalHandle.getGoalID().id << "'.");
+  }
 }
 
 //=============================================================================
 void JointTrajectoryControllerBase::nonRealtimeCallback(
     const ros::TimerEvent& event)
 {
+  // TODO
+  bool trajFinished = mTrajectoryFinished.load();
+  bool trajCancelling = mCancelTrajectory.load();
+
+
+  // check if finished cancelling
+  if (trajFinished && trajCancelling) {
+    mCancelTrajectory.store(false);
+  }
+
+  // check if trajectory completed
+  if (trajFinished && !trajCancelling) {
+    std::shared_ptr<TrajectoryContext> context;
+    mCurrentTrajectory.get(context);
+    if (context) {
+      context->mGoalHandle.setSucceeded();
+    }
+  }
+
+  // check if should start new trajectory
+  std::shared_ptr<TrajectoryContext> newTrajectory;
+  mNextTrajectory.get(newTrajectory);
+  if (trajFinished && newTrajectory) {
+    mCurrentTrajectory.set(newTrajectory);
+    mNextTrajectory.set(nullptr);
+    mTrajectoryFinished.store(false);
+  }
+
+  // publish feedback on current trajectory
+  publishFeedback(event.current_real);
+}
+
+//=============================================================================
+void JointTrajectoryControllerBase::publishFeedback(
+    const ros::Time& currentTime)
+{
   std::shared_ptr<TrajectoryContext> context;
   mCurrentTrajectory.get(context);
 
   if (context) {
-    const ros::Duration timeFromStart{event.current_real - context->mStartTime};
+    const ros::Duration timeFromStart{currentTime - context->mStartTime};
 
     Feedback feedback;
-    feedback.header.stamp = event.current_real;  // TODO: Use control loop time.
+    feedback.header.stamp = currentTime;  // TODO: Use control loop time.
 
     for (const auto dof : mControlledSkeleton->getDofs())
       feedback.joint_names.emplace_back(dof->getName());

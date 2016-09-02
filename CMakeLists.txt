@@ -26,6 +26,9 @@ endif()
 find_package(aikido REQUIRED COMPONENTS control control_ros statespace trajectory util)
 include_directories(SYSTEM ${aikido_INCLUDE_DIRS})
 
+find_package(Boost REQUIRED COMPONENTS atomic)
+include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
+
 find_package(DART REQUIRED CONFIG)
 include_directories(SYSTEM ${DART_INCLUDE_DIRS})
 

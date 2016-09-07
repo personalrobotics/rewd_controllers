@@ -1,6 +1,8 @@
 #include <rewd_controllers/JointTrajectoryControllerBase.hpp>
 
+#include <algorithm>
 #include <functional>
+
 #include <aikido/control/ros/Conversions.hpp>
 #include <aikido/statespace/dart/MetaSkeletonStateSpace.hpp>
 #include <aikido/trajectory/Spline.hpp>
@@ -27,8 +29,6 @@ std::vector<double> toVector(const Eigen::VectorXd& input)
 
 //=============================================================================
 JointTrajectoryControllerBase::JointTrajectoryControllerBase()
-    : mTrajectoryFinished(true)
-    , mCancelTrajectory(false)
 {
   using hardware_interface::EffortJointInterface;
   using hardware_interface::PositionJointInterface;
@@ -49,6 +49,14 @@ JointTrajectoryControllerBase::~JointTrajectoryControllerBase() {}
 bool JointTrajectoryControllerBase::initController(
     hardware_interface::RobotHW* robot, ros::NodeHandle& n)
 {
+  mNodeHandle.reset(new ros::NodeHandle{n});
+  if (!mCancelCurrentTrajectory.is_lock_free()) {
+    ROS_ERROR_STREAM(
+        "Boolean atomics not lock-free on this system. Cannot guarantee "
+        "realtime safety.");
+    return false;
+  }
+
   using aikido::statespace::dart::MetaSkeletonStateSpace;
   using hardware_interface::JointStateInterface;
 
@@ -132,27 +140,33 @@ void JointTrajectoryControllerBase::startController(const ros::Time& time)
   mDesiredVelocity.setZero();
   mDesiredAcceleration.setZero();
 
-  ROS_INFO_STREAM(
+  ROS_DEBUG_STREAM(
       "Initialized desired position: " << mDesiredPosition.transpose());
-  ROS_INFO_STREAM(
+  ROS_DEBUG_STREAM(
       "Initialized desired velocity: " << mDesiredVelocity.transpose());
-  ROS_INFO_STREAM(
+  ROS_DEBUG_STREAM(
       "Initialized desired acceleration: " << mDesiredAcceleration.transpose());
 
   // Reset any internal state in the adapters (e.g. integral windup).
   for (const auto& adapter : mAdapters) adapter->reset();
 
-  ROS_INFO("Reset joint adapters.");
+  ROS_DEBUG("Reset joint adapters.");
 
-  mTrajectoryFinished.store(true);
-  mCancelTrajectory.store(false);
+  // Just dump all the previous pending requests. It's too dangerous to go
+  // through and abort all of them in the realtime thread.
+  mNewTrajectoryRequests.clear();
+  mCancelRequests.clear();
+
+  mCurrentTrajectory.set(nullptr);
+  mCancelCurrentTrajectory.store(false);
+
+  mNonRealtimeTimer.start();
 }
 
 //=============================================================================
 void JointTrajectoryControllerBase::stopController(const ros::Time& time)
 {
   mNonRealtimeTimer.stop();
-  mActionServer.reset();
 }
 
 //=============================================================================
@@ -162,11 +176,10 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
   // TODO: Make this a member variable to avoid dynamic allocation.
   auto mDesiredState = mControlledSpace->createState();
 
-  bool trajFinished = mTrajectoryFinished.load();
   std::shared_ptr<TrajectoryContext> context;
   mCurrentTrajectory.get(context);
 
-  if (!trajFinished && context) {
+  if (context && !context->mCompleted.load()) {
     const auto& trajectory = context->mTrajectory;
     const auto timeFromStart = std::min((time - context->mStartTime).toSec(),
                                         trajectory->getEndTime());
@@ -182,20 +195,11 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
 
     // Terminate the current trajectory.
     if (timeFromStart >= trajectory->getDuration()) {
-      mTrajectoryFinished.store(true);
-      // // TODO: This should not happen in the realtime thread.
-      // context->mGoalHandle.setSucceeded();
-      // // TODO: data race [BUG]
-      // mCurrentTrajectory.set(nullptr);
-
-      ROS_INFO_STREAM("Finished executing trajectory '"
-                      << context->mGoalHandle.getGoalID().id << "' at time "
-                      << time << ".");
-    } else if (mCancelTrajectory.load()) {
-      mTrajectoryFinished.store(true);
-      ROS_INFO_STREAM("Cancelled executing trajectory '"
-                      << context->mGoalHandle.getGoalID().id << "' at time "
-                      << time << ".");
+      context->mCompleted.store(true);
+    } else if (mCancelCurrentTrajectory.load()) {
+      // TODO: if there is no other work that needs done here, we can get rid of
+      // the cancel atomic_bool
+      context->mCompleted.store(true);
     }
   }
 
@@ -262,7 +266,7 @@ void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle)
     startTime = specifiedStartTime;
   } else {
     startTime = now;
-    ROS_WARN(
+    ROS_INFO(
         "Trajectory does not have an explicit start time, so"
         " we assume that it will start immediately.");
   }
@@ -283,89 +287,143 @@ void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle)
 
   ROS_INFO_STREAM("Trajectory will start at time " << startTime);
 
-  // Preempt the existing trajectory, if one is running.
-  std::shared_ptr<TrajectoryContext> existingContext;
-  mCurrentTrajectory.get(existingContext);
-
-  bool trajFinished = mTrajectoryFinished.load();
-  if (!trajFinished && existingContext) {
-    auto& existingGoalHandle = existingContext->mGoalHandle;
-    ROS_WARN_STREAM("Preempted trajectory '"
-                    << existingGoalHandle.getGoalID().id
-                    << "' with trajectory '" << goalHandle.getGoalID().id
-                    << "'.");
-
-    // TODO: Make this access thread safe.
-    // TODO clint ok?
-    existingGoalHandle.setCanceled();
-    mCancelTrajectory.store(true);
-  }
-
-  // Start the new trajectory.
+  // Setup the new trajectory.
   const auto newContext = std::make_shared<TrajectoryContext>();
   newContext->mStartTime = startTime;
   newContext->mTrajectory = trajectory;
   newContext->mGoalHandle = goalHandle;
 
-  ROS_INFO_STREAM("Started executing trajectory '"
-                  << goalHandle.getGoalID().id << "' with duration "
-                  << trajectory->getDuration() << " at time " << startTime
-                  << ".");
-
-  goalHandle.setAccepted();
-  mNextTrajectory.set(newContext);
+  newContext->mGoalHandle.setAccepted();
+  {  // enter critical section
+    std::lock_guard<std::mutex> newTrajectoryLock{mNewTrajectoryRequestsMutex};
+    mNewTrajectoryRequests.push_back(newContext);
+  }  // exit critical section
 }
 
 //=============================================================================
 void JointTrajectoryControllerBase::cancelCallback(GoalHandle goalHandle)
 {
-  bool trajFinished = mTrajectoryFinished.load();
-  bool trajCancelling = mCancelTrajectory.load();
+  ROS_INFO_STREAM("Requesting cancelation of trajectory '"
+                  << goalHandle.getGoalID().id << "'.");
 
-  if (!trajFinished && !trajCancelling) {
-    std::shared_ptr<TrajectoryContext> existingContext;
-    mCurrentTrajectory.get(existingContext);
-
-    mCancelTrajectory.store(true);
-    ROS_INFO_STREAM("Cancelling currently executing trajectory '"
-                    << existingContext->mGoalHandle.getGoalID().id << "'.");
-  }
+  std::lock_guard<std::mutex> cancelTrajectoryLock{mCancelRequestsMutex};
+  mCancelRequests.push_back(goalHandle);
 }
 
 //=============================================================================
 void JointTrajectoryControllerBase::nonRealtimeCallback(
     const ros::TimerEvent& event)
 {
-  // TODO
-  bool trajFinished = mTrajectoryFinished.load();
-  bool trajCancelling = mCancelTrajectory.load();
+  TrajectoryContextPtr latestTrajRequest;
 
+  {  // enter critical section
+    std::lock(mNewTrajectoryRequestsMutex, mCancelRequestsMutex);
+    std::lock_guard<std::mutex> newTrajectoryLock{mNewTrajectoryRequestsMutex,
+                                                  std::adopt_lock};
+    std::lock_guard<std::mutex> cancelRequestsLock{mCancelRequestsMutex,
+                                                   std::adopt_lock};
 
-  // check if finished cancelling
-  if (trajFinished && trajCancelling) {
-    mCancelTrajectory.store(false);
+    // process and delete pending cancel requests
+    using std::placeholders::_1;
+    mCancelRequests.erase(std::remove_if(
+        mCancelRequests.begin(), mCancelRequests.end(),
+        std::bind(&JointTrajectoryControllerBase::processCancelRequest, this,
+                  _1)));
+
+    // find latest new trajectory requested and cancel other unstarted
+    // trajectories
+    // TODO: allow queue of trajectories to execute?
+    if (!mNewTrajectoryRequests.empty()) {
+      latestTrajRequest = mNewTrajectoryRequests.back();
+      mNewTrajectoryRequests.pop_back();
+    }
+    for (auto newTraj : mNewTrajectoryRequests) {
+      ROS_INFO_STREAM("Canceling trajectory '"
+                      << newTraj->mGoalHandle.getGoalID().id << "'.");
+      newTraj->mGoalHandle.setCanceled();
+    }
+  }  // exit critical section
+
+  // set next trajectory
+  if (latestTrajRequest) {
+    if (mNextTrajectory) {
+      ROS_INFO_STREAM("Canceling trajectory '"
+                      << mNextTrajectory->mGoalHandle.getGoalID().id << "'.");
+      mNextTrajectory->mGoalHandle.setCanceled();
+    }
+    mNextTrajectory = latestTrajRequest;
   }
 
-  // check if trajectory completed
-  if (trajFinished && !trajCancelling) {
-    std::shared_ptr<TrajectoryContext> context;
-    mCurrentTrajectory.get(context);
-    if (context) {
-      context->mGoalHandle.setSucceeded();
+  TrajectoryContextPtr currentTraj;
+  mCurrentTrajectory.get(currentTraj);
+  if (currentTraj) {
+    // if completed...
+    if (currentTraj->mCompleted.load()) {
+      // if completed due to cancelation inform caller
+      if (mCancelCurrentTrajectory.load()) {
+        ROS_INFO_STREAM("Canceled trajectory '"
+                        << currentTraj->mGoalHandle.getGoalID().id << "'.");
+        currentTraj->mGoalHandle.setCanceled();
+      }
+      // if completed due to finishing trajectory set success and reset
+      else {
+        ROS_INFO_STREAM("Trajectory '"
+                        << currentTraj->mGoalHandle.getGoalID().id
+                        << "' completed successfully.");
+        currentTraj->mGoalHandle.setSucceeded();
+      }
+
+      // reset trajectory upon completion
+      mCancelCurrentTrajectory.store(false);
+      mCurrentTrajectory.set(
+          mNextTrajectory);  // either sets to nullptr or next
+                             // trajectory if available
+      mNextTrajectory.reset();
+    }
+    // if current trajectory not complete wait for controller to complete cancel
+    else if (mNextTrajectory) {
+      ROS_INFO_STREAM("Preempting trajectory '"
+                      << currentTraj->mGoalHandle.getGoalID().id << "' with '"
+                      << mNextTrajectory->mGoalHandle.getGoalID().id << "'.");
+      mCancelCurrentTrajectory.store(true);
     }
   }
-
-  // check if should start new trajectory
-  std::shared_ptr<TrajectoryContext> newTrajectory;
-  mNextTrajectory.get(newTrajectory);
-  if (trajFinished && newTrajectory) {
-    mCurrentTrajectory.set(newTrajectory);
-    mNextTrajectory.set(nullptr);
-    mTrajectoryFinished.store(false);
+  // if no active trajectory directly start next trajectory
+  else {
+    mCancelCurrentTrajectory.store(false);
+    mCurrentTrajectory.set(mNextTrajectory);  // either sets to nullptr or next
+                                              // trajectory if available
+    mNextTrajectory.reset();
   }
 
-  // publish feedback on current trajectory
   publishFeedback(event.current_real);
+}
+
+//=============================================================================
+bool JointTrajectoryControllerBase::processCancelRequest(GoalHandle& ghToCancel)
+{
+  std::string ghIdToCancel = ghToCancel.getGoalID().id;
+  // check if should cancel active trajectory
+  TrajectoryContextPtr existingTraj;
+  mCurrentTrajectory.get(existingTraj);
+  if (existingTraj
+      && ghIdToCancel == existingTraj->mGoalHandle.getGoalID().id) {
+    mCancelCurrentTrajectory.store(true);
+    return true;
+  } else {
+    // otherwise cancel pending trajectories
+    for (auto itr = mNewTrajectoryRequests.begin();
+         itr != mNewTrajectoryRequests.end(); ++itr) {
+      if (ghIdToCancel == (*itr)->mGoalHandle.getGoalID().id) {
+        (*itr)->mGoalHandle.setCanceled();
+        ROS_INFO_STREAM("Canceled trajectory '" << ghIdToCancel << "'.");
+        mNewTrajectoryRequests.erase(itr);
+        return true;
+      }
+    }
+    // didn't find request to cancel
+    return false;
+  }
 }
 
 //=============================================================================

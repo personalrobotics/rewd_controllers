@@ -1,17 +1,18 @@
 #ifndef REWD_CONTROLLERS_JOINTTRAJECTORYCONTROLLER_HPP_
 #define REWD_CONTROLLERS_JOINTTRAJECTORYCONTROLLER_HPP_
 
-#include <controller_interface/multi_interface_controller.h>
+#include <rewd_controllers/MultiInterfaceController.hpp>
 #include <rewd_controllers/JointTrajectoryControllerBase.hpp>
 
 namespace rewd_controllers
 {
 class JointTrajectoryController
-    : public controller_interface::
-          MultiInterfaceController<hardware_interface::PositionJointInterface,
-                                   hardware_interface::VelocityJointInterface,
-                                   hardware_interface::EffortJointInterface,
-                                   hardware_interface::JointStateInterface>,
+    : public MultiInterfaceController<hardware_interface::
+                                          PositionJointInterface,
+                                      hardware_interface::
+                                          VelocityJointInterface,
+                                      hardware_interface::EffortJointInterface,
+                                      hardware_interface::JointStateInterface>,
       public JointTrajectoryControllerBase
 {
 public:

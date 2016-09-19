@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <stdexcept>
 
 #include <aikido/control/ros/Conversions.hpp>
 #include <aikido/statespace/dart/MetaSkeletonStateSpace.hpp>
@@ -72,6 +73,17 @@ bool JointTrajectoryControllerBase::initController(
   mSkeleton = loadRobotFromParameter(n, "robot_description_parameter");
   if (!mSkeleton) return false;
 
+  // Check for zero-mass bodies that will be used incorrectly in calculations
+  bool hasZeroMassBody = false;
+  for (auto body : mSkeleton->getBodyNodes()) {
+    if (body->getMass() <= 0.0) {
+      ROS_ERROR_STREAM("Robot link '" << body->getName() << "' has mass = "
+                       << body->getMass());
+      hasZeroMassBody = true;
+    }
+  }
+  if (hasZeroMassBody) return false;  // TODO is this actually a problem?
+
   // Extract the subset of the Skeleton that is being controlled.
   mControlledSkeleton =
       getControlledMetaSkeleton(mSkeleton, jointParameters, "Controlled");
@@ -101,6 +113,7 @@ bool JointTrajectoryControllerBase::initController(
     auto adapter = mAdapterFactory.create(param.mType, robot, dof);
     if (!adapter) return false;
 
+
     // Initialize the adapter using parameters stored on the parameter server.
     ros::NodeHandle adapterNodeHandle = createDefaultAdapterNodeHandle(n, dof);
     if (!adapter->initialize(adapterNodeHandle)) return false;
@@ -125,7 +138,7 @@ bool JointTrajectoryControllerBase::initController(
 
   mNonRealtimeTimer = n.createTimer(
       ros::Duration(0.02), &JointTrajectoryControllerBase::nonRealtimeCallback,
-      this, false, true);
+      this, false, false);
 
   return true;
 }
@@ -224,9 +237,10 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
   mControlledSkeleton->setVelocities(mActualVelocity);
 
   for (size_t idof = 0; idof < mAdapters.size(); ++idof) {
-    mAdapters[idof]->update(time, period, mActualPosition[idof],
-                            mDesiredPosition[idof], mActualVelocity[idof],
-                            mDesiredVelocity[idof], mDesiredEffort[idof]);
+    mAdapters[idof]->update(time, period,
+                            mActualPosition[idof], mDesiredPosition[idof],
+                            mActualVelocity[idof], mDesiredVelocity[idof],
+                            mDesiredEffort[idof]);
   }
 }
 
@@ -324,35 +338,22 @@ void JointTrajectoryControllerBase::nonRealtimeCallback(
                                                    std::adopt_lock};
 
     // process and delete pending cancel requests
-    using std::placeholders::_1;
-    mCancelRequests.erase(std::remove_if(
-        mCancelRequests.begin(), mCancelRequests.end(),
-        std::bind(&JointTrajectoryControllerBase::processCancelRequest, this,
-                  _1)));
+    for (auto cancelItr = mCancelRequests.begin();
+         cancelItr != mCancelRequests.end();) {
+      if (processCancelRequest(*cancelItr)) {
+        cancelItr = mCancelRequests.erase(cancelItr);
+      } else {
+        ++cancelItr;
+      }
+    }
 
     // find latest new trajectory requested and cancel other unstarted
     // trajectories
-    // TODO: allow queue of trajectories to execute?
-    if (!mNewTrajectoryRequests.empty()) {
-      latestTrajRequest = mNewTrajectoryRequests.back();
-      mNewTrajectoryRequests.pop_back();
-    }
-    for (auto newTraj : mNewTrajectoryRequests) {
-      ROS_INFO_STREAM("Canceling trajectory '"
-                      << newTraj->mGoalHandle.getGoalID().id << "'.");
-      newTraj->mGoalHandle.setCanceled();
+    if (!mNextTrajectory && !mNewTrajectoryRequests.empty()) {
+      mNextTrajectory = mNewTrajectoryRequests.front();
+      mNewTrajectoryRequests.pop_front();
     }
   }  // exit critical section
-
-  // set next trajectory
-  if (latestTrajRequest) {
-    if (mNextTrajectory) {
-      ROS_INFO_STREAM("Canceling trajectory '"
-                      << mNextTrajectory->mGoalHandle.getGoalID().id << "'.");
-      mNextTrajectory->mGoalHandle.setCanceled();
-    }
-    mNextTrajectory = latestTrajRequest;
-  }
 
   TrajectoryContextPtr currentTraj;
   mCurrentTrajectory.get(currentTraj);
@@ -379,13 +380,6 @@ void JointTrajectoryControllerBase::nonRealtimeCallback(
           mNextTrajectory);  // either sets to nullptr or next
                              // trajectory if available
       mNextTrajectory.reset();
-    }
-    // if current trajectory not complete wait for controller to complete cancel
-    else if (mNextTrajectory) {
-      ROS_INFO_STREAM("Preempting trajectory '"
-                      << currentTraj->mGoalHandle.getGoalID().id << "' with '"
-                      << mNextTrajectory->mGoalHandle.getGoalID().id << "'.");
-      mCancelCurrentTrajectory.store(true);
     }
   }
   // if no active trajectory directly start next trajectory

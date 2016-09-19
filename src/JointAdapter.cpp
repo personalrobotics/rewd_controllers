@@ -1,5 +1,8 @@
-#include <angles/angles.h>
 #include <rewd_controllers/JointAdapter.hpp>
+
+#include <angles/angles.h>
+#include <cmath>
+#include <stdexcept>
 
 namespace rewd_controllers {
 
@@ -78,6 +81,12 @@ void JointVelocityAdapter::update(
     desiredPosition - actualPosition,
     desiredVelocity - actualVelocity,
     period);
+
+  if (std::isnan(desiredVelocity))
+    throw std::range_error("desiredVelocity is NaN");
+  if (std::isnan(pidVelocity))
+    throw std::range_error("calculated pidVelocity is NaN");
+
   mVelocityHandle.setCommand(desiredVelocity + pidVelocity);
 }
 
@@ -114,6 +123,11 @@ void JointEffortAdapter::update(
     desiredPosition - actualPosition,
     desiredVelocity - actualVelocity,
     period);
+  if (std::isnan(nominalEffort))
+    throw std::range_error("nominalEffort is NaN");
+  if (std::isnan(pidEffort))
+    throw std::range_error("calculated pidEffort is NaN");
+
   mEffortHandle.setCommand(nominalEffort + pidEffort);
 }
 

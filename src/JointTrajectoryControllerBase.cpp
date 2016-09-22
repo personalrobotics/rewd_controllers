@@ -77,8 +77,8 @@ bool JointTrajectoryControllerBase::initController(
   bool hasZeroMassBody = false;
   for (auto body : mSkeleton->getBodyNodes()) {
     if (body->getMass() <= 0.0) {
-      ROS_ERROR_STREAM("Robot link '" << body->getName() << "' has mass = "
-                       << body->getMass());
+      ROS_ERROR_STREAM("Robot link '" << body->getName()
+                                      << "' has mass = " << body->getMass());
       hasZeroMassBody = true;
     }
   }
@@ -112,7 +112,6 @@ bool JointTrajectoryControllerBase::initController(
 
     auto adapter = mAdapterFactory.create(param.mType, robot, dof);
     if (!adapter) return false;
-
 
     // Initialize the adapter using parameters stored on the parameter server.
     ros::NodeHandle adapterNodeHandle = createDefaultAdapterNodeHandle(n, dof);
@@ -209,7 +208,7 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
     // Terminate the current trajectory.
     if (timeFromStart >= trajectory->getDuration()) {
       context->mCompleted.store(true);
-    } else if (mCancelCurrentTrajectory.load()) {
+    } else if (shouldStopExecution() || mCancelCurrentTrajectory.load()) {
       // TODO: if there is no other work that needs done here, we can get rid of
       // the cancel atomic_bool
       context->mCompleted.store(true);
@@ -237,10 +236,9 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
   mControlledSkeleton->setVelocities(mActualVelocity);
 
   for (size_t idof = 0; idof < mAdapters.size(); ++idof) {
-    mAdapters[idof]->update(time, period,
-                            mActualPosition[idof], mDesiredPosition[idof],
-                            mActualVelocity[idof], mDesiredVelocity[idof],
-                            mDesiredEffort[idof]);
+    mAdapters[idof]->update(time, period, mActualPosition[idof],
+                            mDesiredPosition[idof], mActualVelocity[idof],
+                            mDesiredVelocity[idof], mDesiredEffort[idof]);
   }
 }
 
@@ -251,6 +249,14 @@ void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle)
   ROS_INFO_STREAM("Received trajectory '"
                   << goalHandle.getGoalID().id << "' with "
                   << goal->trajectory.points.size() << " waypoints.");
+
+  if (!shouldAcceptRequests()) {
+    Result result;
+    result.error_code = Result::INVALID_GOAL;
+    result.error_string = "Controller not running.";
+    goalHandle.setRejected(result);
+    return;
+  }
 
   // Convert the JointTrajectory message to a format that we can execute.
   std::shared_ptr<aikido::trajectory::Spline> trajectory;
@@ -319,9 +325,16 @@ void JointTrajectoryControllerBase::cancelCallback(GoalHandle goalHandle)
 {
   ROS_INFO_STREAM("Requesting cancelation of trajectory '"
                   << goalHandle.getGoalID().id << "'.");
-
-  std::lock_guard<std::mutex> cancelTrajectoryLock{mCancelRequestsMutex};
-  mCancelRequests.push_back(goalHandle);
+  if (!shouldAcceptRequests()) {
+    Result result;
+    result.error_code = Result::INVALID_GOAL;
+    result.error_string = "Controller not running.";
+    goalHandle.setRejected(result);
+  } else {
+    goalHandle.setAccepted();
+    std::lock_guard<std::mutex> cancelTrajectoryLock{mCancelRequestsMutex};
+    mCancelRequests.push_back(goalHandle);
+  }
 }
 
 //=============================================================================
@@ -454,4 +467,6 @@ void JointTrajectoryControllerBase::publishFeedback(
   }
 }
 
+//=============================================================================
+bool shouldStopExecution() { return false; }
 }  // namespace rewd_controllers

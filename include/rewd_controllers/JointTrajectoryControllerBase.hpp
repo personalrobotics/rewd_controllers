@@ -53,12 +53,27 @@ protected:
    * \param time The current time
    */
   void startController(const ros::Time& time);
+
+  /** \brief This is called from within the realtime thread just after the
+   * last call to \ref update
+   *
+   * \param time The current time
+   */
   void stopController(const ros::Time& time);
 
   /**
    * \brief Issues commands to the joint. Should be called at regular intervals
    */
   void updateStep(const ros::Time& time, const ros::Duration& period);
+
+  /** \brief Whether the controller should accept new service requests. */
+  virtual bool shouldAcceptRequests() = 0;
+
+  /**
+   * \brief Called every update step in the real-time thread to let
+   * subclassing controllers specify an early termination condition.
+   */
+  virtual bool shouldStopExecution();
 
 private:
   /** \brief Contains all data needed to execute the currently

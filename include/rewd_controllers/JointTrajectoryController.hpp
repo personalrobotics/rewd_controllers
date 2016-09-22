@@ -1,12 +1,13 @@
 #ifndef REWD_CONTROLLERS_JOINTTRAJECTORYCONTROLLER_HPP_
 #define REWD_CONTROLLERS_JOINTTRAJECTORYCONTROLLER_HPP_
 
+#include <hardware_interface/joint_command_interface.h>
 #include <rewd_controllers/MultiInterfaceController.hpp>
 #include <rewd_controllers/JointTrajectoryControllerBase.hpp>
 
 namespace rewd_controllers
 {
-class JointTrajectoryController
+class JointTrajectoryController final
     : public MultiInterfaceController<hardware_interface::
                                           PositionJointInterface,
                                       hardware_interface::
@@ -46,6 +47,14 @@ public:
    * \brief Issues commands to the joint. Should be called at regular intervals
    */
   void update(const ros::Time& time, const ros::Duration& period) override;
+
+protected:
+  /** \brief The JointTrajectoryControllerBase should accept new trajectories
+   * and cancel requests when this controller is started.
+   *
+   * \returns true when isRunning() is true;
+   */
+  bool shouldAcceptRequests() override;
 };
 
 }  // namespace rewd_controllers

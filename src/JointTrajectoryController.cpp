@@ -38,6 +38,10 @@ void JointTrajectoryController::update(const ros::Time& time,
 {
   updateStep(time, period);
 }
+
+//=============================================================================
+bool JointTrajectoryController::shouldAcceptRequests() { return isRunning(); }
+
 }  // namespace rewd_controllers
 
 //=============================================================================

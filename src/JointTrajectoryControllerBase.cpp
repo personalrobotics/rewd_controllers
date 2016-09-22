@@ -468,5 +468,5 @@ void JointTrajectoryControllerBase::publishFeedback(
 }
 
 //=============================================================================
-bool shouldStopExecution() { return false; }
+bool JointTrajectoryControllerBase::shouldStopExecution() { return false; }
 }  // namespace rewd_controllers

@@ -346,27 +346,32 @@ protected:
    * robot_hw,
    * false otherwise.
    */
+  template <class T1, class... Ts>
   static bool hasRequiredInterfaces(hardware_interface::RobotHW* robot_hw)
   {
-    std::vector<hardware_interface::HardwareInterface*> hws{
-        robot_hw->get<T1>(), (robot_hw->get<Ts>())...};
-    bool hasAll = true;
-    for (auto hw : hws) {
-      if (!hw) {
-        auto hw_type =
-            hardware_interface::internal::demangleSymbol(typeid(*hw).name());
-        ROS_ERROR_STREAM(
-            "This controller requires a hardware interface of type '"
-            << hw_type << "', "
-            << "but is not exposed by the robot. Available interfaces in "
-               "robot:\n"
-            << internal::enumerateElements(robot_hw->getNames(), "\n", "- '",
-                                           "'"));  // delimiter, prefix, suffux
-        hasAll = false;
-      }
+    auto hw = robot_hw->get<T1>(); //, (robot_hw->get<Ts>())...};
+    if (!hw) {
+      auto hw_type =
+        hardware_interface::internal::demangledTypeName(typeid(*hw).name());
+      ROS_ERROR_STREAM(
+        "This controller requires a hardware interface of type '"
+        << hw_type << "', "
+        << "but is not exposed by the robot. Available interfaces in "
+        "robot:\n"
+        << internal::enumerateElements(robot_hw->getNames(), "\n", "- '",
+                                       "'"));  // delimiter, prefix, suffux
+      return false;
+    } else {
+      return hasRequiredInterfaces<Ts...>(robot_hw);
     }
-    return hasAll;
   }
+  
+  template<>
+  static bool hasRequiredInterfaces(hardware_interface::RobotHW* robot_hw)
+  {
+    return true;
+  }
+
 
   /**
    * \brief Clear claims from all hardware interfaces requested by this

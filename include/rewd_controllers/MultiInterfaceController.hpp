@@ -25,10 +25,7 @@
 // POSSIBILITY OF SUCH DAMAGE.
 //////////////////////////////////////////////////////////////////////////////
 
-/**
- * \author Adolfo Rodríguez Tsouroukdissian
- * \author Clint Liddick
- */
+/** \author Adolfo Rodríguez Tsouroukdissian */
 
 #ifndef REWD_CONTROLLERS_MULTI_INTERFACE_CONTROLLER_H
 #define REWD_CONTROLLERS_MULTI_INTERFACE_CONTROLLER_H
@@ -44,40 +41,35 @@
 
 namespace rewd_controllers
 {
+using ControllerBase = controller_interface::ControllerBase;
+
 /** \cond HIDDEN_SYMBOLS */
 namespace internal
 {
-template <class... Ts>
-bool hasInterface(hardware_interface::RobotHW* robot_hw);
+
 template <class T>
 bool hasInterface(hardware_interface::RobotHW* robot_hw);
 
-template <class... Ts>
+template <class T>
 void clearClaims(hardware_interface::RobotHW* robot_hw);
 
-template <class... Ts>
-void extractInterfaceResources(hardware_interface::RobotHW* robot_hw_in,
-                               hardware_interface::RobotHW* robot_hw_out);
 template <class T>
 void extractInterfaceResources(hardware_interface::RobotHW* robot_hw_in,
                                hardware_interface::RobotHW* robot_hw_out);
 
-template <class... Ts>
-void populateClaimedResources(
-    hardware_interface::RobotHW* robot_hw,
-    controller_interface::ControllerBase::ClaimedResources& claimed_resources);
 template <class T>
-void populateClaimedResources(
-    hardware_interface::RobotHW* robot_hw,
-    controller_interface::ControllerBase::ClaimedResources& claimed_resources);
+void populateClaimedResources(hardware_interface::RobotHW*      robot_hw,
+                              ControllerBase::ClaimedResources& claimed_resources);
 
 template <class T>
-std::string enumerateElements(const T& val, const std::string& delimiter = ", ",
+std::string enumerateElements(const T& val,
+                              const std::string& delimiter = ", ",
                               const std::string& prefix = "",
                               const std::string& suffix = "");
 
-}  // namespace
-   /** \endcond */
+} // namespace
+/** \endcond */
+
 
 /**
  * \brief %Controller able to claim resources from multiple hardware interfaces.
@@ -93,26 +85,23 @@ std::string enumerateElements(const T& val, const std::string& delimiter = ", ",
  * (non-exclusive) resource handling policy.
  *
  * By default, all specified hardware interfaces are required, and their
- * existence will be enforced by \ref initRequest. It is possible to make
- *hardware
+ * existence will be enforced by \ref initRequest. It is possible to make hardware
  * interfaces optional by means of the \c allow_optional_interfaces
- * \ref MultiInterfaceController::MultiInterfaceController "constructor"
- *parameter.
+ * \ref MultiInterfaceController::MultiInterfaceController "constructor" parameter.
  * This allows to write controllers where some interfaces are mandatory, and
- * others, if present, improve controller performance, but whose absence does
- *not
+ * others, if present, improve controller performance, but whose absence does not
  * prevent the controller from running.
  *
  * The following is an example of a controller claiming resources from velocity-
  * and effort-controlled joints.
  *
  * \code
- * #include <controller_interface/multi_interface_controller.h>
+ * #include <rewd_controllers/multi_interface_controller.h>
  * #include <hardware_interface/joint_command_interface.h>
  *
- * using namespace hardware_interface;
+ * using namespace hardawre_interface;
  * class VelEffController : public
- *       controller_interface::MultiInterfaceController<VelocityJointInterface,
+ *       rewd_controllers::MultiInterfaceController<VelocityJointInterface,
  *                                                      EffortJointInterface>
  * {
  * public:
@@ -125,8 +114,8 @@ std::string enumerateElements(const T& val, const std::string& delimiter = ", ",
  *     // hardware interfaces
  *
  *     // v and e below are guarranteed to be valid
- *     VelocityJointInterface* v = robot_hw->get<VelocityJointInterface>();
- *     EffortJointInterface*   e = robot_hw->get<EffortJointInterface>();
+ *     VelocityJointInterface* v = robot_hw->get<VelocityJointInterface>;
+ *     EffortJointInterface*   e = robot_hw->get<EffortJointInterface>;
  *
  *     // Fetch resources from interfaces, perform rest of initialization
  *     //...
@@ -146,38 +135,34 @@ std::string enumerateElements(const T& val, const std::string& delimiter = ", ",
  *
  * \code
  * class VelEffController : public
- *       controller_interface::MultiInterfaceController<VelocityJointInterface,
+ *       rewd_controllers::MultiInterfaceController<VelocityJointInterface,
  *                                                      EffortJointInterface>
  * {
  * public:
  *   // Note true flag passed to parent class, allowing requested hardware
  *   // interfaces to be optional
  *   VelEffController()
- *    : controller_interface::MultiInterfaceController<VelocityJointInterface,
- *                                                     EffortJointInterface>
- *(true)
+ *    : rewd_controllers::MultiInterfaceController<VelocityJointInterface,
+ *                                                     EffortJointInterface> (true)
  *   {}
  *
  *   bool init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle &n)
  *   {
  *     // robot_hw pointer contains at most the two interfaces requested by the
- *     // controller. It may have none, only one or both, depending on whether
- *the
+ *     // controller. It may have none, only one or both, depending on whether the
  *     // robot exposes them
  *
  *     // v is a required interface
- *     VelocityJointInterface* v = robot_hw->get<VelocityJointInterface>();
+ *     VelocityJointInterface* v = robot_hw->get<VelocityJointInterface>;
  *     if (!v)
  *     {
  *       return false;
  *     }
  *
- *     // e is an optional interface. If present, additional features are
- *enabled.
- *     // Controller can still function if interface or some of its resources
- *are
+ *     // e is an optional interface. If present, additional features are enabled.
+ *     // Controller can still function if interface or some of its resources are
  *     // absent
- *     EffortJointInterface* e = robot_hw->get<EffortJointInterface>();
+ *     EffortJointInterface* e = robot_hw->get<EffortJointInterface>;
  *
  *     // Fetch resources from interfaces, perform rest of initialization
  *     //...
@@ -191,15 +176,23 @@ std::string enumerateElements(const T& val, const std::string& delimiter = ", ",
  * \tparam T1 Hardware interface type.
  * This parameter is \e required.
  *
- * \tparam Ts Additional hardware interface types.
- * These parameters are \e optional. Leave unspecified if controller only claims
+ * \tparam T2 Hardware interface type.
+ * This parameter is \e optional. Leave unspecified if controller only claims
  * resources from a \e single hardware interface.
  *
- * \pre When specified, template parameters \c T1 and all \c Ts must be different
+ * \tparam T3 Hardware interface type.
+ * This parameter is \e optional. Leave unspecified if controller only claims
+ * resources from \e two hardware interfaces.
+ *
+ * \tparam T4 Hardware interface type.
+ * This parameter is \e optional. Leave unspecified if controller only claims
+ * resources from \e three hardware interfaces.
+ *
+ * \pre When specified, template parameters \c T1 to \c T4 must be different
  * types.
  */
-template <class... Ts>
-class MultiInterfaceController : public controller_interface::ControllerBase
+template <class T1, class T2 = void, class T3 = void, class T4 = void, class T5 = void, class T6 = void>
+class MultiInterfaceController: public ControllerBase
 {
 public:
   /**
@@ -208,10 +201,8 @@ public:
    * If set to false (the default), all requested interfaces are required.
    */
   MultiInterfaceController(bool allow_optional_interfaces = false)
-      : allow_optional_interfaces_(allow_optional_interfaces)
-  {
-    state_ = CONSTRUCTED;
-  }
+    : allow_optional_interfaces_(allow_optional_interfaces)
+  {state_ = CONSTRUCTED;}
 
   virtual ~MultiInterfaceController() {}
 
@@ -225,8 +216,7 @@ public:
    * non real-time initialization is performed, such as setup of ROS interfaces
    * and resource pre-allocation.
    *
-   * \param robot_hw Robot hardware abstraction containing a subset of the
-   *entire
+   * \param robot_hw Robot hardware abstraction containing a subset of the entire
    * robot. If \ref MultiInterfaceController::MultiInterfaceController
    * "MultiInterfaceController" was called with \c allow_optional_interfaces set
    * to \c false (the default), this parameter contains all the interfaces
@@ -236,8 +226,7 @@ public:
    * on whether the robot exposes them. Please refer to the code examples in the
    * \ref MultiInterfaceController "class description".
    *
-   * \param controller_nh A NodeHandle in the namespace from which the
-   *controller
+   * \param controller_nh A NodeHandle in the namespace from which the controller
    * should read its configuration, and where it should set up its ROS
    * interface.
    *
@@ -245,10 +234,8 @@ public:
    * is ready to be started.
    */
   virtual bool init(hardware_interface::RobotHW* /*robot_hw*/,
-                    ros::NodeHandle& /*controller_nh*/)
-  {
-    return true;
-  }
+                    ros::NodeHandle&             /*controller_nh*/)
+  {return true;}
 
   /**
    * \brief Custom controller initialization logic.
@@ -257,8 +244,7 @@ public:
    * non real-time initialization is performed, such as setup of ROS interfaces
    * and resource pre-allocation.
    *
-   * \param robot_hw Robot hardware abstraction containing a subset of the
-   *entire
+   * \param robot_hw Robot hardware abstraction containing a subset of the entire
    * robot. If \ref MultiInterfaceController::MultiInterfaceController
    * "MultiInterfaceController" was called with \c allow_optional_interfaces set
    * to \c false (the default), this parameter contains all the interfaces
@@ -268,10 +254,8 @@ public:
    * on whether the robot exposes them. Please refer to the code examples in the
    * \ref MultiInterfaceController "class description".
    *
-   * \param root_nh A NodeHandle in the root of the controller manager
-   *namespace.
-   * This is where the ROS interfaces are setup (publishers, subscribers,
-   *services).
+   * \param root_nh A NodeHandle in the root of the controller manager namespace.
+   * This is where the ROS interfaces are setup (publishers, subscribers, services).
    *
    * \param controller_nh A NodeHandle in the namespace of the controller.
    * This is where the controller-specific configuration resides.
@@ -280,11 +264,9 @@ public:
    * is ready to be started.
    */
   virtual bool init(hardware_interface::RobotHW* /*robot_hw*/,
-                    ros::NodeHandle& /*root_nh*/,
-                    ros::NodeHandle& /*controller_nh*/)
-  {
-    return true;
-  }
+                    ros::NodeHandle&             /*root_nh*/,
+                    ros::NodeHandle&             /*controller_nh*/)
+  {return true;}
 
 protected:
   /**
@@ -297,10 +279,8 @@ protected:
    *
    * \param robot_hw The robot hardware abstraction.
    *
-   * \param root_nh A NodeHandle in the root of the controller manager
-   *namespace.
-   * This is where the ROS interfaces are setup (publishers, subscribers,
-   *services).
+   * \param root_nh A NodeHandle in the root of the controller manager namespace.
+   * This is where the ROS interfaces are setup (publishers, subscribers, services).
    *
    * \param controller_nh A NodeHandle in the namespace of the controller.
    * This is where the controller-specific configuration resides.
@@ -312,33 +292,27 @@ protected:
    * is ready to be started.
    */
   virtual bool initRequest(hardware_interface::RobotHW* robot_hw,
-                           ros::NodeHandle& root_nh,
-                           ros::NodeHandle& controller_nh,
-                           ClaimedResources& claimed_resources)
+                           ros::NodeHandle&             root_nh,
+                           ros::NodeHandle&             controller_nh,
+                           ClaimedResources&            claimed_resources)
   {
     // check if construction finished cleanly
-    if (state_ != CONSTRUCTED) {
-      ROS_ERROR(
-          "Cannot initialize this controller because it failed to be "
-          "constructed");
+    if (state_ != CONSTRUCTED){
+      ROS_ERROR("Cannot initialize this controller because it failed to be constructed");
       return false;
     }
 
     // check for required hardware interfaces
-    if (!allow_optional_interfaces_ && !hasRequiredInterfaces(robot_hw)) {
-      return false;
-    }
+    if (!allow_optional_interfaces_ && !hasRequiredInterfaces(robot_hw)) {return false;}
 
-    // populate robot hardware abstraction containing only controller hardware
-    // interfaces (subset of robot)
+    // populate robot hardware abstraction containing only controller hardware interfaces (subset of robot)
     hardware_interface::RobotHW* robot_hw_ctrl_p = &robot_hw_ctrl_;
     extractInterfaceResources(robot_hw, robot_hw_ctrl_p);
 
     // custom controller initialization
-    clearClaims(
-        robot_hw_ctrl_p);  // claims will be populated on controller init
-    if (!init(robot_hw_ctrl_p, controller_nh)
-        || !init(robot_hw_ctrl_p, root_nh, controller_nh)) {
+    clearClaims(robot_hw_ctrl_p); // claims will be populated on controller init
+    if (!init(robot_hw_ctrl_p, controller_nh) || !init(robot_hw_ctrl_p, root_nh, controller_nh))
+    {
       ROS_ERROR("Failed to initialize the controller");
       return false;
     }
@@ -347,10 +321,8 @@ protected:
     claimed_resources.clear();
     populateClaimedResources(robot_hw_ctrl_p, claimed_resources);
     clearClaims(robot_hw_ctrl_p);
-    // NOTE: Above, claims are cleared since we only want to know what they are
-    // and report them back
-    // as an output parameter. Actual resource claiming by the controller is
-    // done when the controller
+    // NOTE: Above, claims are cleared since we only want to know what they are and report them back
+    // as an output parameter. Actual resource claiming by the controller is done when the controller
     // is start()ed
 
     // initialization successful
@@ -361,27 +333,36 @@ protected:
   /*\}*/
 
   /**
-   * \brief Check if robot hardware abstraction contains all required
-   * interfaces.
+   * \brief Check if robot hardware abstraction contains all required interfaces.
    * \param robot_hw Robot hardware abstraction.
-   * \return true if all required hardware interfaces are exposed by \c
-   * robot_hw,
+   * \return true if all required hardware interfaces are exposed by \c robot_hw,
    * false otherwise.
    */
   static bool hasRequiredInterfaces(hardware_interface::RobotHW* robot_hw)
   {
-    return internal::hasInterface<Ts...>(robot_hw);
+    using internal::hasInterface;
+    return hasInterface<T1>(robot_hw) &&
+           hasInterface<T2>(robot_hw) &&
+           hasInterface<T3>(robot_hw) &&
+           hasInterface<T4>(robot_hw);
+           hasInterface<T5>(robot_hw);
+           hasInterface<T6>(robot_hw);
   }
 
   /**
-   * \brief Clear claims from all hardware interfaces requested by this
-   * controller.
+   * \brief Clear claims from all hardware interfaces requested by this controller.
    * \param robot_hw Robot hardware abstraction containing the interfaces whose
    * claims will be cleared.
    */
   static void clearClaims(hardware_interface::RobotHW* robot_hw)
   {
-    internal::clearClaims<Ts...>(robot_hw);
+    using internal::clearClaims;
+    clearClaims<T1>(robot_hw);
+    clearClaims<T2>(robot_hw);
+    clearClaims<T3>(robot_hw);
+    clearClaims<T4>(robot_hw);
+    clearClaims<T5>(robot_hw);
+    clearClaims<T6>(robot_hw);
   }
 
   /**
@@ -392,147 +373,135 @@ protected:
    * \param[out] robot_hw_out Robot hardware abstraction containing \e only the
    * interfaces requested by this controller.
    */
-  static void extractInterfaceResources(
-      hardware_interface::RobotHW* robot_hw_in,
-      hardware_interface::RobotHW* robot_hw_out)
+  static void extractInterfaceResources(hardware_interface::RobotHW* robot_hw_in,
+                                        hardware_interface::RobotHW* robot_hw_out)
   {
-    internal::extractInterfaceResources<Ts...>(robot_hw_in, robot_hw_out);
+    using internal::extractInterfaceResources;
+    extractInterfaceResources<T1>(robot_hw_in, robot_hw_out);
+    extractInterfaceResources<T2>(robot_hw_in, robot_hw_out);
+    extractInterfaceResources<T3>(robot_hw_in, robot_hw_out);
+    extractInterfaceResources<T4>(robot_hw_in, robot_hw_out);
+    extractInterfaceResources<T5>(robot_hw_in, robot_hw_out);
+    extractInterfaceResources<T6>(robot_hw_in, robot_hw_out);
   }
 
   /**
    * \brief Extract all hardware interfaces requested by this controller from
-   *  \c robot_hw and claim them.
-   * \param robot_hw Robot hardware abstraction containing the interfaces
+   *  \c robot_hw_in, and add them also to \c robot_hw_out.
+   * \param[in] robot_hw_in Robot hardware abstraction containing the interfaces
    * requested by this controller, and potentially others.
-   * \param claimed_resources The resources claimed by this controller.
+   * \param[out] claimed_resources The resources claimed by this controller.
    * They can belong to multiple hardware interfaces.
    */
   static void populateClaimedResources(hardware_interface::RobotHW* robot_hw,
-                                       ClaimedResources& claimed_resources)
+                                       ClaimedResources&            claimed_resources)
   {
-    internal::populateClaimedResources<Ts...>(robot_hw, claimed_resources);
+    using internal::populateClaimedResources;
+    populateClaimedResources<T1>(robot_hw, claimed_resources);
+    populateClaimedResources<T2>(robot_hw, claimed_resources);
+    populateClaimedResources<T3>(robot_hw, claimed_resources);
+    populateClaimedResources<T4>(robot_hw, claimed_resources);
+    populateClaimedResources<T5>(robot_hw, claimed_resources);
+    populateClaimedResources<T6>(robot_hw, claimed_resources);
   }
 
-  /** Robot hardware abstraction containing only the subset of interfaces
-   * requested by the controller. */
+  /** Robot hardware abstraction containing only the subset of interfaces requested by the controller. */
   hardware_interface::RobotHW robot_hw_ctrl_;
 
-  /** Flag to indicate if hardware interfaces are considered optional (i.e.
-   * non-required). */
+  /** Flag to indicate if hardware interfaces are considered optional (i.e. non-required). */
   bool allow_optional_interfaces_;
 
 private:
   MultiInterfaceController(const MultiInterfaceController& c);
-  MultiInterfaceController& operator=(const MultiInterfaceController& c);
+  MultiInterfaceController& operator =(const MultiInterfaceController& c);
 };
+
 
 namespace internal
 {
-template <class T, class... Ts>
-inline bool hasInterface(hardware_interface::RobotHW* robot_hw)
-{
-  return hasInterface<T>(robot_hw) && hasInterface<Ts...>(robot_hw);
-}
 
 template <class T>
 inline bool hasInterface(hardware_interface::RobotHW* robot_hw)
 {
   T* hw = robot_hw->get<T>();
-  if (!hw) {
-    const std::string hw_name =
-        hardware_interface::internal::demangledTypeName<T>();
-    ROS_ERROR_STREAM(
-        "This controller requires a hardware interface of type '"
-        << hw_name << "', "
-        << "but is not exposed by the robot. Available interfaces in robot:\n"
-        << enumerateElements(robot_hw->getNames(), "\n", "- '",
-                             "'"));  // delimiter, prefix, suffux
+  if (!hw)
+  {
+    const std::string hw_name = hardware_interface::internal::demangledTypeName<T>();
+    ROS_ERROR_STREAM("This controller requires a hardware interface of type '" << hw_name << "', " <<
+                     "but is not exposed by the robot. Available interfaces in robot:\n" <<
+                     enumerateElements(robot_hw->getNames(), "\n", "- '", "'")); // delimiter, prefix, suffux
     return false;
-  } else {
-    return true;
   }
+  return true;
 }
 
-template <class... Ts>
+// Specialization for unused template parameters defaulting to void
+template <>
+inline bool hasInterface<void>(hardware_interface::RobotHW* /*robot_hw*/) {return true;}
+
+template <class T>
 void clearClaims(hardware_interface::RobotHW* robot_hw)
 {
-  std::vector<hardware_interface::HardwareInterface*> hws{
-      robot_hw->get<Ts>()...};
-  for (auto hw : hws) {
-    if (hw) {
-      hw->clearClaims();
-    }
-  }
+  T* hw = robot_hw->get<T>();
+  if (hw) {hw->clearClaims();}
 }
 
-template <class T, class... Ts>
+// Specialization for unused template parameters defaulting to void
+template <>
+inline void clearClaims<void>(hardware_interface::RobotHW* /*robot_hw*/) {}
+
+template <class T>
 inline void extractInterfaceResources(hardware_interface::RobotHW* robot_hw_in,
                                       hardware_interface::RobotHW* robot_hw_out)
 {
-  extractInterfaceResources<T>(robot_hw_in, robot_hw_out);
-  extractInterfaceResources<Ts...>(robot_hw_in, robot_hw_out);
-}
-
-template <class T>
-inline void extractInterfaceResources(
-    hardware_interface::RobotHW* robot_hw_in,
-    hardware_interface::RobotHW* robot_hw_out)
-{
   T* hw = robot_hw_in->get<T>();
-  if (hw) {
-    robot_hw_out->registerInterface(hw);
-  }
+  if (hw) {robot_hw_out->registerInterface(hw);}
 }
 
-template <class T, class... Ts>
-inline void populateClaimedResources(
-    hardware_interface::RobotHW* robot_hw,
-    controller_interface::ControllerBase::ClaimedResources& claimed_resources)
-{
-  populateClaimedResources<T>(robot_hw, claimed_resources);
-  populateClaimedResources<Ts...>(robot_hw, claimed_resources);
-}
+// Specialization for unused template parameters defaulting to void
+template <>
+inline void extractInterfaceResources<void>(hardware_interface::RobotHW* /*robot_hw_in*/,
+                                            hardware_interface::RobotHW* /*robot_hw_out*/) {}
 
 template <class T>
-inline void populateClaimedResources(
-    hardware_interface::RobotHW* robot_hw,
-    controller_interface::ControllerBase::
-        ClaimedResources& claimed_resources)
+inline void populateClaimedResources(hardware_interface::RobotHW*      robot_hw,
+                                     ControllerBase::ClaimedResources& claimed_resources)
 {
   T* hw = robot_hw->get<T>();
-  if (hw) {
+  if (hw)
+  {
     hardware_interface::InterfaceResources iface_res;
-    iface_res.hardware_interface =
-        hardware_interface::internal::demangledTypeName<T>();
+    iface_res.hardware_interface = hardware_interface::internal::demangledTypeName<T>();
     iface_res.resources = hw->getClaims();
     claimed_resources.push_back(iface_res);
   }
 }
 
+// Specialization for unused template parameters defaulting to void
+template <>
+inline void populateClaimedResources<void>(hardware_interface::RobotHW*      /*robot_hw*/,
+                                           ControllerBase::ClaimedResources& /*claimed_resources*/) {}
+
 template <class T>
-inline std::string enumerateElements(const T& val, const std::string& delimiter,
+inline std::string enumerateElements(const T&           val,
+                                     const std::string& delimiter,
                                      const std::string& prefix,
                                      const std::string& suffix)
 {
   std::string ret;
-  if (val.empty()) {
-    return ret;
-  }
+  if (val.empty()) {return ret;}
 
-  const std::string sdp = suffix + delimiter + prefix;
+  const std::string sdp = suffix+delimiter+prefix;
   std::stringstream ss;
   ss << prefix;
-  std::copy(val.begin(), val.end(),
-            std::ostream_iterator<typename T::value_type>(ss, sdp.c_str()));
+  std::copy(val.begin(), val.end(), std::ostream_iterator<typename T::value_type>(ss, sdp.c_str()));
   ret = ss.str();
-  if (!ret.empty()) {
-    ret.erase(ret.size() - delimiter.size() - prefix.size());
-  }
+  if (!ret.empty()) {ret.erase(ret.size() - delimiter.size() - prefix.size());}
   return ret;
 }
 
-}  // namespace
+} // namespace
 
-}  // namespace
+} // namespace
 
 #endif

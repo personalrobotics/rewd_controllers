@@ -49,6 +49,8 @@ namespace internal
 {
 template <class... Ts>
 bool hasInterface(hardware_interface::RobotHW* robot_hw);
+template <class T>
+bool hasInterface(hardware_interface::RobotHW* robot_hw);
 
 template <class... Ts>
 void clearClaims(hardware_interface::RobotHW* robot_hw);
@@ -56,8 +58,15 @@ void clearClaims(hardware_interface::RobotHW* robot_hw);
 template <class... Ts>
 void extractInterfaceResources(hardware_interface::RobotHW* robot_hw_in,
                                hardware_interface::RobotHW* robot_hw_out);
+template <class T>
+void extractInterfaceResources(hardware_interface::RobotHW* robot_hw_in,
+                               hardware_interface::RobotHW* robot_hw_out);
 
 template <class... Ts>
+void populateClaimedResources(
+    hardware_interface::RobotHW* robot_hw,
+    controller_interface::ControllerBase::ClaimedResources& claimed_resources);
+template <class T>
 void populateClaimedResources(
     hardware_interface::RobotHW* robot_hw,
     controller_interface::ControllerBase::ClaimedResources& claimed_resources);
@@ -189,7 +198,7 @@ std::string enumerateElements(const T& val, const std::string& delimiter = ", ",
  * \pre When specified, template parameters \c T1 and all \c Ts must be different
  * types.
  */
-template <class T1, class... Ts>
+template <class... Ts>
 class MultiInterfaceController : public controller_interface::ControllerBase
 {
 public:
@@ -361,7 +370,7 @@ protected:
    */
   static bool hasRequiredInterfaces(hardware_interface::RobotHW* robot_hw)
   {
-    return internal::hasInterface<T1, Ts...>(robot_hw);
+    return internal::hasInterface<Ts...>(robot_hw);
   }
 
   /**
@@ -372,7 +381,7 @@ protected:
    */
   static void clearClaims(hardware_interface::RobotHW* robot_hw)
   {
-    internal::clearClaims<T1, Ts...>(robot_hw);
+    internal::clearClaims<Ts...>(robot_hw);
   }
 
   /**
@@ -387,7 +396,7 @@ protected:
       hardware_interface::RobotHW* robot_hw_in,
       hardware_interface::RobotHW* robot_hw_out)
   {
-    internal::extractInterfaceResources<T1, Ts...>(robot_hw_in, robot_hw_out);
+    internal::extractInterfaceResources<Ts...>(robot_hw_in, robot_hw_out);
   }
 
   /**
@@ -401,7 +410,7 @@ protected:
   static void populateClaimedResources(hardware_interface::RobotHW* robot_hw,
                                        ClaimedResources& claimed_resources)
   {
-    internal::populateClaimedResources<T1, Ts...>(robot_hw, claimed_resources);
+    internal::populateClaimedResources<Ts...>(robot_hw, claimed_resources);
   }
 
   /** Robot hardware abstraction containing only the subset of interfaces
@@ -422,6 +431,12 @@ namespace internal
 template <class T, class... Ts>
 inline bool hasInterface(hardware_interface::RobotHW* robot_hw)
 {
+  return hasInterface<T>(robot_hw) && hasInterface<Ts...>(robot_hw);
+}
+
+template <class T>
+inline bool hasInterface(hardware_interface::RobotHW* robot_hw)
+{
   T* hw = robot_hw->get<T>();
   if (!hw) {
     const std::string hw_name =
@@ -433,15 +448,9 @@ inline bool hasInterface(hardware_interface::RobotHW* robot_hw)
         << enumerateElements(robot_hw->getNames(), "\n", "- '",
                              "'"));  // delimiter, prefix, suffux
     return false;
+  } else {
+    return true;
   }
-  return hasInterface<Ts...>(robot_hw);
-}
-
-// Specialization for unused template parameters defaulting to void
-template <>
-inline bool hasInterface(hardware_interface::RobotHW* /*robot_hw*/)
-{
-  return true;
 }
 
 template <class... Ts>
@@ -460,25 +469,35 @@ template <class T, class... Ts>
 inline void extractInterfaceResources(hardware_interface::RobotHW* robot_hw_in,
                                       hardware_interface::RobotHW* robot_hw_out)
 {
+  extractInterfaceResources<T>(robot_hw_in, robot_hw_out);
+  extractInterfaceResources<Ts...>(robot_hw_in, robot_hw_out);
+}
+
+template <class T>
+inline void extractInterfaceResources(
+    hardware_interface::RobotHW* robot_hw_in,
+    hardware_interface::RobotHW* robot_hw_out)
+{
   T* hw = robot_hw_in->get<T>();
   if (hw) {
     robot_hw_out->registerInterface(hw);
   }
-  extractInterfaceResources<Ts...>(robot_hw_in, robot_hw_out);
-}
-
-// Specialization for unused template parameters defaulting to void
-template <>
-inline void extractInterfaceResources(
-    hardware_interface::RobotHW* /*robot_hw_in*/,
-    hardware_interface::RobotHW* /*robot_hw_out*/)
-{
 }
 
 template <class T, class... Ts>
 inline void populateClaimedResources(
     hardware_interface::RobotHW* robot_hw,
     controller_interface::ControllerBase::ClaimedResources& claimed_resources)
+{
+  populateClaimedResources<T>(robot_hw, claimed_resources);
+  populateClaimedResources<Ts...>(robot_hw, claimed_resources);
+}
+
+template <class T>
+inline void populateClaimedResources(
+    hardware_interface::RobotHW* robot_hw,
+    controller_interface::ControllerBase::
+        ClaimedResources& claimed_resources)
 {
   T* hw = robot_hw->get<T>();
   if (hw) {
@@ -488,16 +507,6 @@ inline void populateClaimedResources(
     iface_res.resources = hw->getClaims();
     claimed_resources.push_back(iface_res);
   }
-  populateClaimedResources<Ts...>(robot_hw, claimed_resources);
-}
-
-// Specialization for unused template parameters defaulting to void
-template <>
-inline void populateClaimedResources(
-    hardware_interface::RobotHW* /*robot_hw*/,
-    controller_interface::ControllerBase::
-        ClaimedResources& /*claimed_resources*/)
-{
 }
 
 template <class T>

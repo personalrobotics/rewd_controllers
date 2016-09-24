@@ -30,10 +30,16 @@ bool MoveUntilTouchController::init(hardware_interface::RobotHW* robot,
     return false;
   }
 
-  // load name of force/torque sensor from paramter
-  std::string ft_name;
-  if (!nh.getParam("forcetorque_name", ft_name)) {
-    ROS_ERROR("Failed to load 'forcetorque_name' parameter.");
+  // load name of force/torque sensor handle from paramter
+  std::string ft_wrench_name;
+  if (!nh.getParam("forcetorque_wrench_name", ft_wrench_name)) {
+    ROS_ERROR("Failed to load 'forcetorque_wrench_name' parameter.");
+    return false;
+  }
+  // load name of force/torque tare handle from paramter
+  std::string ft_tare_name;
+  if (!nh.getParam("forcetorque_tare_name", ft_tare_name)) {
+    ROS_ERROR("Failed to load 'forcetorque_tare_name' parameter.");
     return false;
   }
 
@@ -63,10 +69,10 @@ bool MoveUntilTouchController::init(hardware_interface::RobotHW* robot,
     return false;
   }
   try {
-    mForceTorqueHandle = ft_interface->getHandle(ft_name);
-    ROS_INFO_STREAM("Reading force/torque data from '" << ft_name << "'.");
+    mForceTorqueHandle = ft_interface->getHandle(ft_wrench_name);
+    ROS_INFO_STREAM("Reading force/torque data from '" << ft_wrench_name << "'.");
   } catch (const hardware_interface::HardwareInterfaceException& e) {
-    ROS_ERROR_STREAM("Unable to get 'ForceTorqueSensorHandle' for '" << ft_name
+    ROS_ERROR_STREAM("Unable to get 'ForceTorqueSensorHandle' for '" << ft_wrench_name
                                                                      << "'.");
     return false;
   }
@@ -78,10 +84,10 @@ bool MoveUntilTouchController::init(hardware_interface::RobotHW* robot,
     return false;
   }
   try {
-    mTareHandle = tare_interface->getHandle(ft_name);
-    ROS_INFO_STREAM("Triggering tares on '" << ft_name << "'.");
+    mTareHandle = tare_interface->getHandle(ft_tare_name);
+    ROS_INFO_STREAM("Triggering tares on '" << ft_tare_name << "'.");
   } catch (const hardware_interface::HardwareInterfaceException& e) {
-    ROS_ERROR_STREAM("Unable to get 'TriggerHandle' for '" << ft_name << "'.");
+    ROS_ERROR_STREAM("Unable to get 'TriggerHandle' for '" << ft_tare_name << "'.");
     return false;
   }
 
@@ -151,10 +157,8 @@ bool MoveUntilTouchController::shouldStopExecution()
   double forceThreshold = mForceThreshold.load();
   double torqueThreshold = mTorqueThreshold.load();
 
-  bool forceThresholdExceeded =
-      forceThreshold == 0.0 ? false : force.norm() >= forceThreshold;
-  bool torqueThresholdExceeded =
-      torqueThreshold == 0.0 ? false : torque.norm() >= torqueThreshold;
+  bool forceThresholdExceeded = force.norm() >= forceThreshold;
+  bool torqueThresholdExceeded = torque.norm() >= torqueThreshold;
 
   return forceThresholdExceeded || torqueThresholdExceeded;
 }
@@ -200,9 +204,10 @@ void MoveUntilTouchController::setForceTorqueThreshold(FTThresholdGoalHandle gh)
   if (!result.success) {
     gh.setRejected(result);
   } else {
+    gh.setAccepted();
     mForceThreshold.store(goal->force_threshold);
     mTorqueThreshold.store(goal->torque_threshold);
-    gh.setAccepted();
+    gh.setSucceeded(result);
   }
 }
 }  // namespace rewd_controllers

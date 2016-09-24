@@ -211,6 +211,8 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
     } else if (shouldStopExecution() || mCancelCurrentTrajectory.load()) {
       // TODO: if there is no other work that needs done here, we can get rid of
       // the cancel atomic_bool
+      mDesiredVelocity.fill(0.0);
+      mDesiredAcceleration.fill(0.0);
       context->mCompleted.store(true);
     }
   }

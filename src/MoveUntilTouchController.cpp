@@ -70,10 +70,11 @@ bool MoveUntilTouchController::init(hardware_interface::RobotHW* robot,
   }
   try {
     mForceTorqueHandle = ft_interface->getHandle(ft_wrench_name);
-    ROS_INFO_STREAM("Reading force/torque data from '" << ft_wrench_name << "'.");
+    ROS_INFO_STREAM("Reading force/torque data from '" << ft_wrench_name
+                                                       << "'.");
   } catch (const hardware_interface::HardwareInterfaceException& e) {
-    ROS_ERROR_STREAM("Unable to get 'ForceTorqueSensorHandle' for '" << ft_wrench_name
-                                                                     << "'.");
+    ROS_ERROR_STREAM("Unable to get 'ForceTorqueSensorHandle' for '"
+                     << ft_wrench_name << "'.");
     return false;
   }
 
@@ -87,7 +88,8 @@ bool MoveUntilTouchController::init(hardware_interface::RobotHW* robot,
     mTareHandle = tare_interface->getHandle(ft_tare_name);
     ROS_INFO_STREAM("Triggering tares on '" << ft_tare_name << "'.");
   } catch (const hardware_interface::HardwareInterfaceException& e) {
-    ROS_ERROR_STREAM("Unable to get 'TriggerHandle' for '" << ft_tare_name << "'.");
+    ROS_ERROR_STREAM("Unable to get 'TriggerHandle' for '" << ft_tare_name
+                                                           << "'.");
     return false;
   }
 

@@ -1,35 +1,22 @@
-#ifndef REWD_CONTROLLERS_JOINTGROUPPOSITIONCONTROLLER_HPP_
-#define REWD_CONTROLLERS_JOINTGROUPPOSITIONCONTROLLER_HPP_
+#ifndef REWD_CONTROLLERS_JOINTTRAJECTORYCONTROLLER_HPP_
+#define REWD_CONTROLLERS_JOINTTRAJECTORYCONTROLLER_HPP_
 
-#include <memory>
-#include <aikido/trajectory.hpp>
-#include <aikido/statespace/dart/MetaSkeletonStateSpace.hpp>
-#include <ros/node_handle.h>
-#include <actionlib/server/action_server.h>
-#include <control_msgs/FollowJointTrajectoryAction.h>
-#include <controller_interface/multi_interface_controller.h>
-#include <realtime_tools/realtime_buffer.h>
-#include <realtime_tools/realtime_server_goal_handle.h>
-#include <dart/dynamics/dynamics.hpp>
-#include "helpers.hpp"
+#include <hardware_interface/joint_command_interface.h>
+#include <rewd_controllers/MultiInterfaceController.hpp>
+#include <rewd_controllers/JointTrajectoryControllerBase.hpp>
 
-namespace rewd_controllers {
-
-class JointTrajectoryController
-  : public controller_interface::MultiInterfaceController<
-      hardware_interface::PositionJointInterface,
-      hardware_interface::VelocityJointInterface,
-      hardware_interface::EffortJointInterface,
-      hardware_interface::JointStateInterface>
+namespace rewd_controllers
+{
+class JointTrajectoryController final
+    : public MultiInterfaceController<hardware_interface::
+                                          PositionJointInterface,
+                                      hardware_interface::
+                                          VelocityJointInterface,
+                                      hardware_interface::EffortJointInterface,
+                                      hardware_interface::JointStateInterface>,
+      public JointTrajectoryControllerBase
 {
 public:
-  using Action = control_msgs::FollowJointTrajectoryAction;
-  using ActionServer = actionlib::ActionServer<Action>;
-  using GoalHandle = ActionServer::GoalHandle;
-
-  using Feedback = control_msgs::FollowJointTrajectoryFeedback;
-  using Result = control_msgs::FollowJointTrajectoryResult;
-
   JointTrajectoryController();
   virtual ~JointTrajectoryController();
 
@@ -61,42 +48,15 @@ public:
    */
   void update(const ros::Time& time, const ros::Duration& period) override;
 
-private:
-  struct TrajectoryContext
-  {
-    ros::Time mStartTime;
-    std::shared_ptr<aikido::trajectory::Trajectory> mTrajectory;
-    GoalHandle mGoalHandle;
-  };
-
-  void goalCallback(GoalHandle goalHandle);
-  void cancelCallback(GoalHandle goalHandle);
-  void nonRealtimeCallback(const ros::TimerEvent &event);
-
-  JointAdapterFactory mAdapterFactory;
-  dart::dynamics::SkeletonPtr mSkeleton;
-  dart::dynamics::MetaSkeletonPtr mControlledSkeleton;
-  std::shared_ptr<aikido::statespace::dart::MetaSkeletonStateSpace> mControlledSpace;
-
-  std::unique_ptr<SkeletonJointStateUpdater> mSkeletonUpdater;
-  std::vector<std::unique_ptr<JointAdapter>> mAdapters;
-  Eigen::VectorXd mDesiredPosition;
-  Eigen::VectorXd mDesiredVelocity;
-  Eigen::VectorXd mDesiredAcceleration;
-  Eigen::VectorXd mDesiredEffort;
-  Eigen::VectorXd mActualPosition;
-  Eigen::VectorXd mActualVelocity;
-  Eigen::VectorXd mActualEffort;
-
-  std::unique_ptr<ActionServer> mActionServer;
-  ros::Timer mNonRealtimeTimer;
-
-  // It would be better to use std::atomic<std::shared_ptr<T>> here. However,
-  // this is not fully implemented in GCC 4.8.4, shippe with Ubuntu 14.04.
-  realtime_tools::RealtimeBox<
-    std::shared_ptr<TrajectoryContext>> mCurrentTrajectory;
+protected:
+  /** \brief The JointTrajectoryControllerBase should accept new trajectories
+   * and cancel requests when this controller is started.
+   *
+   * \returns true when isRunning() is true;
+   */
+  bool shouldAcceptRequests() override;
 };
 
-} // namespace rewd_controllers
+}  // namespace rewd_controllers
 
-#endif // ifndef REWD_CONTROLLERS_JOINTGROUPPOSITIONCONTROLLER_HPP_
+#endif  // REWD_CONTROLLERS_JOINTTRAJECTORYCONTROLLER_HPP_

@@ -9,19 +9,22 @@ include_directories("include")
 # Dependencies
 #
 find_package(catkin REQUIRED COMPONENTS
+  actionlib
   control_msgs
   control_toolbox
   controller_interface
+  hardware_interface
+  pr_control_msgs
+  pr_hardware_interfaces
   realtime_tools
-  urdf
 )
 include_directories(SYSTEM ${catkin_INCLUDE_DIRS})
 
 if ("${controller_interface_VERSION}" VERSION_LESS 0.10.0)
-  message(FATAL_ERROR "controller_interface package must be at least version 0.10.0, not packaged in Indigo. Please upgrade to Jade or build the ros_control packages from source.") 
+  message(FATAL_ERROR "controller_interface package must be at least version 0.10.0, not packaged in Indigo. Please upgrade to Jade or Kinetic or build the ros_control packages from source.") 
 endif()
 
-find_package(aikido REQUIRED COMPONENTS util)
+find_package(aikido REQUIRED COMPONENTS control control_ros statespace trajectory util)
 include_directories(SYSTEM ${aikido_INCLUDE_DIRS})
 
 find_package(DART REQUIRED COMPONENTS utils utils-urdf CONFIG)
@@ -32,12 +35,14 @@ include_directories(SYSTEM ${DART_INCLUDE_DIRS})
 #
 catkin_package(
   CATKIN_DEPENDS
+    actionlib
     control_msgs
     control_toolbox
     controller_interface
-    forward_command_controller
+    hardware_interface
+    pr_control_msgs
+    pr_hardware_interfaces
     realtime_tools
-    urdf
   DEPENDS
     aikido
     DART
@@ -51,8 +56,14 @@ catkin_package(
 # Targets
 #
 add_library("${PROJECT_NAME}" SHARED
-  src/joint_group_position_controller.cpp
-  src/gravity_compensation_controller.cpp
+  src/JointGroupPositionController.cpp
+  src/GravityCompensationController.cpp
+  src/helpers.cpp
+  src/JointAdapter.cpp
+  src/JointAdapterFactory.cpp
+  src/JointTrajectoryControllerBase.cpp
+  src/JointTrajectoryController.cpp
+  src/MoveUntilTouchController.cpp
 )
 target_link_libraries("${PROJECT_NAME}"
   ${DART_LIBRARIES}

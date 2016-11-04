@@ -19,6 +19,7 @@ you are using ROS `indigo`, you will need to build a newer version of
 rom source.
 
 Add the following package to your workspace and re-build it:
+
     console
         - git:
         local-name: ros_control
@@ -33,6 +34,7 @@ with the controller manager over ROS*.
 
 Additionally, you should update `ros_controllers` if you plan to use any of the
 controllers distributed with `ros_control` (e.g. `JointStateController`):
+
     console
         - git:
         local-name: ros_controllers

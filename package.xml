@@ -22,6 +22,7 @@
   <depend>realtime_tools</depend>
   <depend>urdf</depend>
   <depend>dynamic_reconfigure</depend>
+  <doc_depend>doxygen</doc_depend>
   <export>
     <controller_interface plugin="${prefix}/rewd_controllers_plugins.xml"/>
   </export>

@@ -20,7 +20,6 @@ rom source.
 
 Add the following package to your workspace and re-build it:
 
-    console
         - git:
         local-name: ros_control
         uri: https://github.com/ros-controls/ros_control.git
@@ -35,7 +34,6 @@ with the controller manager over ROS*.
 Additionally, you should update `ros_controllers` if you plan to use any of the
 controllers distributed with `ros_control` (e.g. `JointStateController`):
 
-    console
         - git:
         local-name: ros_controllers
         uri: https://github.com/ros-controls/ros_controllers.git

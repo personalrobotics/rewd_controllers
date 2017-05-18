@@ -263,7 +263,7 @@ void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle)
   // Convert the JointTrajectory message to a format that we can execute.
   std::shared_ptr<aikido::trajectory::Spline> trajectory;
   try {
-    trajectory = aikido::control::ros::convertJointTrajectory(mControlledSpace,
+    trajectory = aikido::control::ros::toSplineJointTrajectory(mControlledSpace,
                                                               goal->trajectory);
   } catch (const std::runtime_error& e) {
     Result result;

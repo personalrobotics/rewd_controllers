@@ -46,8 +46,8 @@ rewd_controllers is developed by the
 [Personal Robotics Lab](https://personalrobotics.ri.cmu.edu/) in the
 [Robotics Institute](http://ri.cmu.edu/) at
 [Carnegie Mellon University](http://www.cmu.edu/). The controllers were
-written by [Clint Liddick](https://github.com/ClintLiddick))
-with some contributions from [Michael Koval](https://github.com/mkoval)).
+written by [Clint Liddick](https://github.com/ClintLiddick)
+with some contributions from [Michael Koval](https://github.com/mkoval).
 
 [MultiInterfaceController]: https://github.com/ros-controls/ros_control/pull/204
 [controller_interface_version]: https://github.com/ros-controls/ros_control/blob/0.10.0/controller_interface/CHANGELOG.rst#0100-2015-11-20

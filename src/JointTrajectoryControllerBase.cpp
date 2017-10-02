@@ -7,8 +7,7 @@
 #include <aikido/control/ros/Conversions.hpp>
 #include <aikido/statespace/dart/MetaSkeletonStateSpace.hpp>
 #include <aikido/trajectory/Spline.hpp>
-#include <aikido/util/CatkinResourceRetriever.hpp>
-#include <aikido/util/Spline.hpp>
+#include <aikido/common/Spline.hpp>
 #include <dart/dynamics/dynamics.hpp>
 #include <dart/utils/urdf/DartLoader.hpp>
 #include <hardware_interface/joint_command_interface.h>

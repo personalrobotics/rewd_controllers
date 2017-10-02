@@ -1,4 +1,4 @@
-#include <aikido/util/CatkinResourceRetriever.hpp>
+#include <aikido/io/CatkinResourceRetriever.hpp>
 #include <dart/utils/urdf/urdf.hpp>
 #include <rewd_controllers/helpers.hpp>
 
@@ -8,7 +8,7 @@ namespace rewd_controllers {
 dart::dynamics::SkeletonPtr loadRobotFromParameter(
   ros::NodeHandle& nodeHandle, const std::string& nameParameter)
 {
-  using aikido::util::CatkinResourceRetriever;
+  using aikido::io::CatkinResourceRetriever;
 
   static const dart::common::Uri emptyUri{};
 

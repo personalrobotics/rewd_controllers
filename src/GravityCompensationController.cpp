@@ -4,7 +4,6 @@
 #include <pluginlib/class_list_macros.h>
 #include <dart/dynamics/dynamics.hpp>
 #include <dart/utils/urdf/DartLoader.hpp>
-#include <aikido/util/CatkinResourceRetriever.hpp>
 
 namespace rewd_controllers
 {

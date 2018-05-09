@@ -89,7 +89,7 @@ bool JointTrajectoryControllerBase::initController(
   if (!mControlledSkeleton) return false;
 
   mControlledSpace =
-      std::make_shared<MetaSkeletonStateSpace>(mControlledSkeleton);
+      std::make_shared<MetaSkeletonStateSpace>(mControlledSkeleton.get());
 
   // the full skeleton.
   const auto jointStateInterface = robot->get<JointStateInterface>();

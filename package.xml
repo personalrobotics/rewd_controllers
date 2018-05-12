@@ -12,13 +12,12 @@
   <depend>aikido</depend>
   <depend>actionlib</depend>
   <depend>angles</depend>
-  <depend>dart</depend>
+  <depend>dartsim</depend>
   <depend>controller_interface</depend>
   <depend>control_msgs</depend>
   <depend>control_toolbox</depend>
   <depend>hardware_interface</depend>
   <depend>pr_control_msgs</depend>
-  <depend>pr_hardware_interfaces</depend>
   <depend>realtime_tools</depend>
   <depend>urdf</depend>
   <depend>dynamic_reconfigure</depend>

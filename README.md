@@ -1,4 +1,4 @@
-# rewd_controllers
+# rewd_controllers [![Build Status](https://travis-ci.com/personalrobotics/rewd_controllers.svg?branch=master)](https://travis-ci.com/personalrobotics/rewd_controllers)
 
 Inverse dynamics controllers to accompany ros_control.
 

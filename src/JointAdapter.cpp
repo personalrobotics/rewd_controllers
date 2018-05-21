@@ -128,6 +128,7 @@ void JointEffortAdapter::update(
   if (std::isnan(pidEffort))
     throw std::range_error("calculated pidEffort is NaN");
 
+  ROS_INFO_STREAM("updating effort adapter: " << (nominalEffort + pidEffort));
   mEffortHandle.setCommand(nominalEffort + pidEffort);
 }
 

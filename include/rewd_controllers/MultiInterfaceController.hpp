@@ -473,6 +473,7 @@ inline void populateClaimedResources(hardware_interface::RobotHW*      robot_hw,
     hardware_interface::InterfaceResources iface_res;
     iface_res.hardware_interface = hardware_interface::internal::demangledTypeName<T>();
     iface_res.resources = hw->getClaims();
+    ROS_INFO_STREAM(iface_res.hardware_interface << "   " << hw->getClaims().size());
     claimed_resources.push_back(iface_res);
   }
 }

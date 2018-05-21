@@ -60,8 +60,19 @@ bool JointTrajectoryControllerBase::initController(
   using aikido::statespace::dart::MetaSkeletonStateSpace;
   using hardware_interface::JointStateInterface;
 
+  // load the control type from paramter (position, velocity, effort)
+  std::string control_type;
+  if (!n.getParam("control_type", control_type)) {
+    ROS_ERROR("Failed to load 'control_type' parameter.");
+    return false;
+  }
+  if (control_type != "position" && control_type != "velocity" && control_type != "effort") {
+    ROS_ERROR_STREAM("Invalid 'control_type' parameter. Must be 'position', 'velocity', or 'effort', but is " << control_type);
+    return false;
+  }
+
   // Build up the list of controlled DOFs.
-  const auto jointParameters = loadJointsFromParameter(n, "joints", "effort");
+  const auto jointParameters = loadJointsFromParameter(n, "joints", control_type);
   if (jointParameters.empty()) return false;
 
   ROS_INFO_STREAM("Controlling " << jointParameters.size() << " joints:");

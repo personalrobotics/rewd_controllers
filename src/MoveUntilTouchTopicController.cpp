@@ -132,7 +132,7 @@ void MoveUntilTouchTopicController::update(const ros::Time& time,
 bool MoveUntilTouchTopicController::shouldAcceptRequests() { return isRunning(); }
 
 //=============================================================================
-bool MoveUntilTouchTopicController::shouldStopExecution()
+bool MoveUntilTouchTopicController::shouldStopExecution(std::string& reason)
 {
   // inelegent to just terminate any running trajectory,
   // but we must guarantee taring completes before starting
@@ -150,10 +150,12 @@ bool MoveUntilTouchTopicController::shouldStopExecution()
   forceTorqueDataMutex.unlock();
 
   if (forceThresholdExceeded) {
-    ROS_WARN(("force threshold exceeded!   " + std::to_string(forceThreshold) + "  |  " + std::to_string(mForce.x()) + " " + std::to_string(mForce.y()) + " " + std::to_string(mForce.z())).c_str());
+    reason = "Force Threshold exceeded!";
+    ROS_WARN(("Force Threshold exceeded!   " + std::to_string(forceThreshold) + "  |  " + std::to_string(mForce.x()) + " " + std::to_string(mForce.y()) + " " + std::to_string(mForce.z())).c_str());
   }
   if (torqueThresholdExceeded) {
-    ROS_WARN("torque threshold exceeded!");
+    reason = "Torque Threshold exceeded!";
+    ROS_WARN(("Torque threshold exceeded!   " + std::to_string(torqueThreshold) + "  |  " + std::to_string(mTorque.x()) + " " + std::to_string(mTorque.y()) + " " + std::to_string(mTorque.z())).c_str());
   }
 
   return forceThresholdExceeded || torqueThresholdExceeded;

@@ -73,7 +73,7 @@ protected:
    * \brief Called every update step in the real-time thread to let
    * subclassing controllers specify an early termination condition.
    */
-  virtual bool shouldStopExecution();
+  virtual bool shouldStopExecution(std::string& reason);
 
 private:
   /** \brief Contains all data needed to execute the currently
@@ -151,6 +151,8 @@ private:
   // 14.04.
   realtime_tools::RealtimeBox<TrajectoryContextPtr> mCurrentTrajectory;
   std::atomic_bool mCancelCurrentTrajectory;
+  std::atomic_bool mAbortedCurrentTrajectory;
+  std::string mAbortReason;
 
   TrajectoryContextPtr mNextTrajectory;
 };

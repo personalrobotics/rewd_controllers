@@ -215,15 +215,23 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
     // TODO: Check path constraints.
     // TODO: Check goal constraints.
 
+    std::string stopReason;
+    bool shouldStopExec = shouldStopExecution(stopReason);
+
     // Terminate the current trajectory.
     if (timeFromStart >= trajectory->getDuration()) {
       context->mCompleted.store(true);
-    } else if (shouldStopExecution() || mCancelCurrentTrajectory.load()) {
+    } else if (shouldStopExec || mCancelCurrentTrajectory.load()) {
       // TODO: if there is no other work that needs done here, we can get rid of
       // the cancel atomic_bool
       mDesiredVelocity.fill(0.0);
       mDesiredAcceleration.fill(0.0);
       context->mCompleted.store(true);
+
+      if (shouldStopExec) {
+        mAbortedCurrentTrajectory.store(true);
+        mAbortReason = stopReason;
+      }
     }
   }
 
@@ -391,6 +399,12 @@ void JointTrajectoryControllerBase::nonRealtimeCallback(
                         << currentTraj->mGoalHandle.getGoalID().id << "'.");
         currentTraj->mGoalHandle.setCanceled();
       }
+      // if completed due to being aborted
+      else if (mAbortedCurrentTrajectory.load()) {
+        ROS_INFO_STREAM("Aborted trajectory '"
+                        << currentTraj->mGoalHandle.getGoalID().id << "'. Reason: " << mAbortReason);
+        currentTraj->mGoalHandle.setAborted(Result(), mAbortReason);
+      }
       // if completed due to finishing trajectory set success and reset
       else {
         ROS_INFO_STREAM("Trajectory '"
@@ -480,5 +494,5 @@ void JointTrajectoryControllerBase::publishFeedback(
 }
 
 //=============================================================================
-bool JointTrajectoryControllerBase::shouldStopExecution() { return false; }
+bool JointTrajectoryControllerBase::shouldStopExecution(std::string& reason) { return false; }
 }  // namespace rewd_controllers

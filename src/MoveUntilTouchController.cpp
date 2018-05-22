@@ -120,7 +120,7 @@ void MoveUntilTouchController::update(const ros::Time& time,
 bool MoveUntilTouchController::shouldAcceptRequests() { return isRunning(); }
 
 //=============================================================================
-bool MoveUntilTouchController::shouldStopExecution()
+bool MoveUntilTouchController::shouldStopExecution(std::string& reason)
 {
   // inelegent to just terminate any running trajectory,
   // but we must guarantee taring completes before starting
@@ -135,6 +135,8 @@ bool MoveUntilTouchController::shouldStopExecution()
   bool forceThresholdExceeded = mForce.norm() >= forceThreshold;
   bool torqueThresholdExceeded = mTorque.norm() >= torqueThreshold;
   forceTorqueDataMutex.unlock();
+
+  reason = "Force or Torque Threshold exceeded!";
 
   return forceThresholdExceeded || torqueThresholdExceeded;
 }

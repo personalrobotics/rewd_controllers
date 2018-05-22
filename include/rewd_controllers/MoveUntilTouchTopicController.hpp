@@ -70,7 +70,7 @@ protected:
    * \returns True if current wrench exceeds force/torque threshold. If a
    * threshold is set to `0.0` (the default), it is ignored.
    */
-  bool shouldStopExecution() override;
+  bool shouldStopExecution(std::string& reason) override;
 
 private:
   using SetFTThresholdAction = pr_control_msgs::SetForceTorqueThresholdAction;

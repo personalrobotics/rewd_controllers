@@ -151,7 +151,7 @@ private:
   // 14.04.
   realtime_tools::RealtimeBox<TrajectoryContextPtr> mCurrentTrajectory;
   std::atomic_bool mCancelCurrentTrajectory;
-  std::atomic_bool mAbortedCurrentTrajectory;
+  std::atomic_bool mAbortCurrentTrajectory;
   std::string mAbortReason;
 
   TrajectoryContextPtr mNextTrajectory;

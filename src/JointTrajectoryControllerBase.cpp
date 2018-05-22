@@ -162,6 +162,8 @@ void JointTrajectoryControllerBase::startController(const ros::Time& time)
   mDesiredVelocity.setZero();
   mDesiredAcceleration.setZero();
 
+  mAbortCurrentTrajectory.store(false);
+
   ROS_DEBUG_STREAM(
       "Initialized desired position: " << mDesiredPosition.transpose());
   ROS_DEBUG_STREAM(
@@ -229,7 +231,7 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
       context->mCompleted.store(true);
 
       if (shouldStopExec) {
-        mAbortedCurrentTrajectory.store(true);
+        mAbortCurrentTrajectory.store(true);
         mAbortReason = stopReason;
       }
     }
@@ -400,7 +402,7 @@ void JointTrajectoryControllerBase::nonRealtimeCallback(
         currentTraj->mGoalHandle.setCanceled();
       }
       // if completed due to being aborted
-      else if (mAbortedCurrentTrajectory.load()) {
+      else if (mAbortCurrentTrajectory.load()) {
         ROS_INFO_STREAM("Aborted trajectory '"
                         << currentTraj->mGoalHandle.getGoalID().id << "'. Reason: " << mAbortReason);
         currentTraj->mGoalHandle.setAborted(Result(), mAbortReason);
@@ -415,6 +417,7 @@ void JointTrajectoryControllerBase::nonRealtimeCallback(
 
       // reset trajectory upon completion
       mCancelCurrentTrajectory.store(false);
+      mAbortCurrentTrajectory.store(false);
       mCurrentTrajectory.set(
           mNextTrajectory);  // either sets to nullptr or next
                              // trajectory if available

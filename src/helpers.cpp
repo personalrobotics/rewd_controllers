@@ -122,12 +122,15 @@ std::unordered_map<std::string, double> loadGoalConstraintsFromParameter(
 
     double goalConstraint;
     if (nodeHandle.getParam("constraints/" + jointName + "/goal", goalConstraint)) {
-      ROS_WARN("found");
       goalConstraints[jointName] = goalConstraint;
-    } else {
-      ROS_WARN("not found");
     }
   }
+  if (goalConstraints.size() == 0) {
+    ROS_WARN("No goal constraint arguments specified. Define parameters like this: /constraint/jointname/goal: 0.1");
+  } else {
+    ROS_INFO_STREAM("Goal constraints loaded for " << goalConstraints.size() << " joints.");
+  }
+  return goalConstraints;
 }
 
 //=============================================================================

@@ -111,6 +111,25 @@ std::vector<JointParameter> loadJointsFromParameter(
   return output;
 }
 
+std::unordered_map<std::string, double> loadGoalConstraintsFromParameter(
+      ros::NodeHandle& nodeHandle,
+      const std::vector<JointParameter>& jointParameters)
+{
+  std::unordered_map<std::string, double> goalConstraints;
+
+  for (auto& jointParam : jointParameters) {
+    std::string jointName = jointParam.mName;
+
+    double goalConstraint;
+    if (nodeHandle.getParam("constraints/" + jointName + "/goal", goalConstraint)) {
+      ROS_WARN("found");
+      goalConstraints[jointName] = goalConstraint;
+    } else {
+      ROS_WARN("not found");
+    }
+  }
+}
+
 //=============================================================================
 dart::dynamics::MetaSkeletonPtr getControlledMetaSkeleton(
   const dart::dynamics::SkeletonPtr& skeleton,

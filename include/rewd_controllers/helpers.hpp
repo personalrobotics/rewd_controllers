@@ -47,6 +47,10 @@ std::vector<JointParameter> loadJointsFromParameter(
   ros::NodeHandle& nodeHandle, const std::string& jointsParameter,
   const std::string& defaultType);
 
+std::unordered_map<std::string, double> loadGoalConstraintsFromParameter(
+  ros::NodeHandle& nodeHandle,
+  const std::vector<JointParameter>& jointParameters);
+
 dart::dynamics::MetaSkeletonPtr getControlledMetaSkeleton(
   const dart::dynamics::SkeletonPtr& skeleton,
   const std::vector<JointParameter>& parameters,

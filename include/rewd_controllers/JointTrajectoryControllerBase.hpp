@@ -6,6 +6,7 @@
 #include <memory>
 #include <mutex>
 #include <vector>
+#include <unordered_map>
 
 #include <actionlib/server/action_server.h>
 #include <aikido/statespace/dart/MetaSkeletonStateSpace.hpp>
@@ -153,6 +154,8 @@ private:
   std::atomic_bool mCancelCurrentTrajectory;
 
   TrajectoryContextPtr mNextTrajectory;
+
+  std::unordered_map<std::string, double> mGoalConstraints;
 };
 
 }  // namespace rewd_controllers

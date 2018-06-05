@@ -55,6 +55,12 @@ void JointPositionAdapter::reset()
 }
 
 //=============================================================================
+void JointPositionAdapter::stop(double actualPosition)
+{
+  mPositionHandle.setCommand(actualPosition);
+}
+
+//=============================================================================
 JointVelocityAdapter::JointVelocityAdapter(
       hardware_interface::JointHandle effortHandle,
       dart::dynamics::DegreeOfFreedom* dof)
@@ -97,6 +103,12 @@ void JointVelocityAdapter::reset()
 }
 
 //=============================================================================
+void JointVelocityAdapter::stop(double actualPosition)
+{
+  mVelocityHandle.setCommand(0);
+}
+
+//=============================================================================
 JointEffortAdapter::JointEffortAdapter(
       hardware_interface::JointHandle effortHandle,
       dart::dynamics::DegreeOfFreedom* dof)
@@ -136,6 +148,12 @@ void JointEffortAdapter::update(
 void JointEffortAdapter::reset()
 {
   mPid.reset();
+}
+
+//=============================================================================
+void JointEffortAdapter::stop(double actualPosition)
+{
+  mEffortHandle.setCommand(0);
 }
 
 } // namespace rewd_controllers

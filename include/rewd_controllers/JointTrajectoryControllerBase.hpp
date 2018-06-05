@@ -129,6 +129,7 @@ private:
   std::shared_ptr<aikido::statespace::dart::MetaSkeletonStateSpace>
       mControlledSpace;
 
+  bool started = false;
   std::unique_ptr<SkeletonJointStateUpdater> mSkeletonUpdater;
   std::vector<std::unique_ptr<JointAdapter>> mAdapters;
   Eigen::VectorXd mDesiredPosition;

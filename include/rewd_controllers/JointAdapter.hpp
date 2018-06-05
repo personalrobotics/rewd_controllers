@@ -27,6 +27,8 @@ public:
 
   virtual void reset() = 0;
 
+  virtual void stop(double actualPosition) = 0;
+
 protected:
   double mDesiredPosition;
 };
@@ -47,6 +49,8 @@ public:
     double nominalEffort) override;
 
   void reset() override;
+
+  void stop(double actualPosition);
 
 private:
   hardware_interface::JointHandle mPositionHandle;
@@ -70,6 +74,8 @@ public:
 
   void reset() override;
 
+  void stop(double actualPosition);
+
 private:
   hardware_interface::JointHandle mVelocityHandle;
   dart::dynamics::DegreeOfFreedom* mDof;
@@ -92,6 +98,8 @@ public:
     double nominalEffort) override;
 
   void reset() override;
+
+  void stop(double actualPosition);
 
 private:
   hardware_interface::JointHandle mEffortHandle;

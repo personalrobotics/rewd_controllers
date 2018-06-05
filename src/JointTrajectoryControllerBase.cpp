@@ -190,7 +190,6 @@ void JointTrajectoryControllerBase::startController(const ros::Time& time)
   mCancelCurrentTrajectory.store(false);
 
   mNonRealtimeTimer.start();
-  started = true;
 }
 
 //=============================================================================
@@ -264,19 +263,6 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
     }
   }
 
-  if (started) {
-  std::vector<double> doubles = toVector(mDesiredVelocity);
-    std::string velocitiesString;
-    for (int i=0; i<doubles.size(); i++) {
-      velocitiesString = velocitiesString + std::to_string(doubles[i]) + ";  ";
-    }
-    if (!context || !context->mCompleted.load()) {
-      ROS_INFO_STREAM("Trajectory running: " << velocitiesString);
-    } else {
-      ROS_INFO_STREAM("Trajectory done: " << velocitiesString);
-    }
-  }
-
   // Compute inverse dynamics torques from the set point and store them in the
   // skeleton. These values may be queried by the adapters below.
   mControlledSkeleton->setPositions(mDesiredPosition);
@@ -296,7 +282,6 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
                             mDesiredPosition[idof], mActualVelocity[idof],
                             mDesiredVelocity[idof], mDesiredEffort[idof]);
   }
-  ROS_INFO("updated adapters");
 }
 
 //=============================================================================

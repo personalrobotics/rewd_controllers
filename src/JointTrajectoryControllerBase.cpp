@@ -33,8 +33,6 @@ JointTrajectoryControllerBase::JointTrajectoryControllerBase()
   using hardware_interface::EffortJointInterface;
   using hardware_interface::PositionJointInterface;
   using hardware_interface::VelocityJointInterface;
-  mDesiredVelocity.resize(6);
-  mDesiredVelocity.setZero();
 
   mAdapterFactory.registerFactory<PositionJointInterface, JointPositionAdapter>(
       "position");

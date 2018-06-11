@@ -214,7 +214,7 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
 
     // Check goal constraints.
     bool goalConstraintsSatisfied = true;
-    for (auto pair : mGoalConstraints) {
+    for (const auto& pair : mGoalConstraints) {
       auto dof = mSkeleton->getDof(pair.first);
       if (dof) {
         std::size_t index = dof->getIndexInSkeleton();

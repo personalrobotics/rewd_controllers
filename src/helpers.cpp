@@ -6,7 +6,7 @@ namespace rewd_controllers {
 
 //=============================================================================
 dart::dynamics::SkeletonPtr loadRobotFromParameter(
-  ros::NodeHandle& nodeHandle, const std::string& nameParameter)
+  ros::NodeHandle nodeHandle, const std::string& nameParameter)
 {
   using aikido::io::CatkinResourceRetriever;
 
@@ -43,7 +43,7 @@ dart::dynamics::SkeletonPtr loadRobotFromParameter(
 
 //=============================================================================
 std::vector<JointParameter> loadJointsFromParameter(
-  ros::NodeHandle& nodeHandle,
+  ros::NodeHandle nodeHandle,
   const std::string& jointsParameter,
   const std::string& defaultType)
 {
@@ -112,7 +112,7 @@ std::vector<JointParameter> loadJointsFromParameter(
 }
 
 std::unordered_map<std::string, double> loadGoalConstraintsFromParameter(
-      ros::NodeHandle& nodeHandle,
+      ros::NodeHandle nodeHandle,
       const std::vector<JointParameter>& jointParameters)
 {
   std::unordered_map<std::string, double> goalConstraints;

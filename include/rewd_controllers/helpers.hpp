@@ -41,14 +41,14 @@ private:
 
 //=============================================================================
 dart::dynamics::SkeletonPtr loadRobotFromParameter(
-  ros::NodeHandle nodeHandle, const std::string& nameParameter);
+  const ros::NodeHandle& nodeHandle, const std::string& nameParameter);
 
 std::vector<JointParameter> loadJointsFromParameter(
-  ros::NodeHandle nodeHandle, const std::string& jointsParameter,
+  const ros::NodeHandle& nodeHandle, const std::string& jointsParameter,
   const std::string& defaultType);
 
 std::unordered_map<std::string, double> loadGoalConstraintsFromParameter(
-  ros::NodeHandle nodeHandle,
+  const ros::NodeHandle& nodeHandle,
   const std::vector<JointParameter>& jointParameters);
 
 dart::dynamics::MetaSkeletonPtr getControlledMetaSkeleton(

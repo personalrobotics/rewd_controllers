@@ -200,6 +200,7 @@ void MoveUntilTouchTopicController::setForceTorqueThreshold(FTThresholdGoalHandl
   }
 
   if (!result.success) {
+    ROS_WARN_STREAM("MoveUntilTouchTopicController: " << result.message);
     gh.setRejected(result);
   } else {
     gh.setAccepted();

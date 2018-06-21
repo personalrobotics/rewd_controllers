@@ -214,13 +214,15 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
 
     // Check goal constraints.
     bool goalConstraintsSatisfied = true;
-    for (const auto& pair : mGoalConstraints) {
-      auto dof = mSkeleton->getDof(pair.first);
-      if (dof) {
-        std::size_t index = dof->getIndexInSkeleton();
-        if (std::abs(mDesiredPosition[index] - mActualPosition[index]) > pair.second) {
-          goalConstraintsSatisfied = false;
-          break;
+    for (const auto& dof : mControlledSkeleton->getDofs()) {
+      for (const auto& pair : mGoalConstraints) {
+        if (pair.first == dof->getName()) {
+          std::size_t index = dof->getIndexInSkeleton();
+          if (std::abs(mDesiredPosition[index] - mActualPosition[index]) > pair.second) {
+            goalConstraintsSatisfied = false;
+            break;
+          }
+          continue;
         }
       }
     }

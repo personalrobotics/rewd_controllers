@@ -20,6 +20,38 @@
 
 namespace rewd_controllers
 {
+
+/// The JointTrajectoryControllerBase uses a bunch of ros parameters as configuration
+/// See this full example configuration in yaml format:
+/// 
+/// rewd_trajectory_controller:
+///   type: rewd_controllers/JointTrajectoryController
+///   joints: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+///   constraints:
+///     stopped_velocity_tolerance: 1.0
+///     joint_1:
+///       goal: 0.02
+///     joint_2:
+///       goal: 0.02
+///     joint_3:
+///       goal: 0.02
+///     joint_4:
+///       goal: 0.02
+///     joint_5:
+///       goal: 0.02
+///     joint_6:
+///       goal: 0.02
+///   gains: # Required because we're controlling a velocity interface
+///     joint_1: {p: 3,  d: 0, i: 0, i_clamp: 1}
+///     joint_2: {p: 3,  d: 0, i: 0, i_clamp: 1}
+///     joint_3: {p: 3,  d: 0, i: 0, i_clamp: 1}
+///     joint_4: {p: 3,  d: 0, i: 0, i_clamp: 1}
+///     joint_5: {p: 3,  d: 0, i: 0, i_clamp: 1}
+///     joint_6: {p: 3,  d: 0, i: 0, i_clamp: 1}
+///   control_type: velocity
+///
+/// Other than the configurations in this example, the JointTrajectoryControllerBase
+/// also gets the robot description from ros parameters.
 class JointTrajectoryControllerBase
 {
 protected:

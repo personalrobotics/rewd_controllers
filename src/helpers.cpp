@@ -117,7 +117,7 @@ std::unordered_map<std::string, double> loadGoalConstraintsFromParameter(
 {
   std::unordered_map<std::string, double> goalConstraints;
 
-  for (auto& jointParam : jointParameters) {
+  for (const auto& jointParam : jointParameters) {
     std::string jointName = jointParam.mName;
 
     double goalConstraint;

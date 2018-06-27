@@ -136,7 +136,7 @@ void MoveUntilTouchController::update(const ros::Time& time,
 bool MoveUntilTouchController::shouldAcceptRequests() { return isRunning(); }
 
 //=============================================================================
-bool MoveUntilTouchController::shouldStopExecution()
+bool MoveUntilTouchController::shouldStopExecution(std::string& reason)
 {
   // inelegent to just terminate any running trajectory,
   // but we must guarantee taring completes before starting

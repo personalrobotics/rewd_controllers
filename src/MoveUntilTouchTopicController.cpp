@@ -62,10 +62,10 @@ bool MoveUntilTouchTopicController::init(hardware_interface::RobotHW* robot,
   }
 
   // subscribe to sensor data
-  forceTorqueDataSub = nh.subscribe(ft_wrench_name, 1000, &MoveUntilTouchTopicController::forceTorqueDataCallback, this);
+  mForceTorqueDataSub = nh.subscribe(ft_wrench_name, 1, &MoveUntilTouchTopicController::forceTorqueDataCallback, this);
 
   // action client to kick off taring
-  tareActionClient = std::unique_ptr<TareActionClient>(new TareActionClient(nh, ft_tare_name));
+  mTareActionClient = std::unique_ptr<TareActionClient>(new TareActionClient(nh, ft_tare_name));
 
   // start action server
   mFTThresholdActionServer.reset(
@@ -93,11 +93,9 @@ void MoveUntilTouchTopicController::forceTorqueDataCallback(const geometry_msgs:
 
 //=============================================================================
 void MoveUntilTouchTopicController::taringTransitionCallback(TareActionClient::GoalHandle goalHandle) {
-  if (goalHandle.getResult()) {
-    if (goalHandle.getResult()->success) {
-      ROS_INFO("Taring completed!");
-      mTaringCompleted.store(true);
-    }
+  if (goalHandle.getResult() && goalHandle.getResult()->success) {
+    ROS_INFO("Taring completed!");
+    mTaringCompleted.store(true);
   }
 }
 
@@ -107,7 +105,7 @@ void MoveUntilTouchTopicController::starting(const ros::Time& time)
   // start asynchronous tare request
   ROS_INFO("Starting Taring");
   pr_control_msgs::TriggerGoal goal;
-  mTareGoalHandle = tareActionClient->sendGoal(goal, boost::bind(&MoveUntilTouchTopicController::taringTransitionCallback, this, _1));
+  mTareGoalHandle = mTareActionClient->sendGoal(goal, boost::bind(&MoveUntilTouchTopicController::taringTransitionCallback, this, _1));
 
   // start base trajectory controller
   startController(time);
@@ -144,18 +142,22 @@ bool MoveUntilTouchTopicController::shouldStopExecution(std::string& reason)
   double forceThreshold = mForceThreshold.load();
   double torqueThreshold = mTorqueThreshold.load();
 
-  forceTorqueDataMutex.lock();
+  std::lock_guard<std::mutex> lock(mForceTorqueDataMutex);
   bool forceThresholdExceeded = mForce.norm() >= forceThreshold;
   bool torqueThresholdExceeded = mTorque.norm() >= torqueThreshold;
-  forceTorqueDataMutex.unlock();
 
+  
   if (forceThresholdExceeded) {
-    reason = "Force Threshold exceeded!";
-    ROS_WARN(("Force Threshold exceeded!   " + std::to_string(forceThreshold) + "  |  " + std::to_string(mForce.x()) + " " + std::to_string(mForce.y()) + " " + std::to_string(mForce.z())).c_str());
+    std::stringstream reasonStream;
+    reasonStream << "Force Threshold exceeded!   Threshold: " << forceThreshold << "   Force: " << mForce.x() << ", " << mForce.y() << ", " << mForce.z();
+    reason = reasonStream.str();
+    ROS_WARN(reason.c_str());
   }
   if (torqueThresholdExceeded) {
-    reason = "Torque Threshold exceeded!";
-    ROS_WARN(("Torque threshold exceeded!   " + std::to_string(torqueThreshold) + "  |  " + std::to_string(mTorque.x()) + " " + std::to_string(mTorque.y()) + " " + std::to_string(mTorque.z())).c_str());
+    std::stringstream reasonStream;
+    reasonStream << "Torque Threshold exceeded!   Threshold: " << torqueThreshold << "   Torque: " << mTorque.x() << ", " << mTorque.y() << ", " << mTorque.z();
+    reason = reasonStream.str();
+    ROS_WARN(reason.c_str());
   }
 
   return forceThresholdExceeded || torqueThresholdExceeded;

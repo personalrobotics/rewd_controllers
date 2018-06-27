@@ -2,6 +2,7 @@
 #define REWD_CONTROLLERS_MOVEUNTILTOUCHTOPICCONTROLLER_HPP_
 
 #include <atomic>
+#include <mutex>
 #include <actionlib/server/action_server.h>
 #include <actionlib/client/simple_action_client.h>
 #include <hardware_interface/force_torque_sensor_interface.h>
@@ -79,7 +80,7 @@ private:
   using FTThresholdResult = pr_control_msgs::SetForceTorqueThresholdResult;
   using TareActionClient = actionlib::ActionClient<pr_control_msgs::TriggerAction>;
   
-  std::mutex forceTorqueDataMutex;
+  std::mutex mForceTorqueDataMutex;
   Eigen::Vector3d mForce;
   Eigen::Vector3d mTorque;
 
@@ -87,8 +88,8 @@ private:
   double mForceLimit;
   double mTorqueLimit;
 
-  ros::Subscriber forceTorqueDataSub;
-  std::unique_ptr<TareActionClient> tareActionClient;
+  ros::Subscriber mForceTorqueDataSub;
+  std::unique_ptr<TareActionClient> mTareActionClient;
   TareActionClient::GoalHandle mTareGoalHandle;
   std::unique_ptr<FTThresholdActionServer> mFTThresholdActionServer;
   std::atomic<double> mForceThreshold;

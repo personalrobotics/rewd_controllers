@@ -112,6 +112,9 @@ bool JointTrajectoryControllerBase::initController(
   mSkeletonUpdater.reset(
       new SkeletonJointStateUpdater{mSkeleton, jointStateInterface});
 
+  // Load goal constraints
+  mGoalConstraints = loadGoalConstraintsFromParameter(n, jointParameters);
+
   // Create adaptors to provide a uniform interface to different types.
   const auto numControlledDofs = mControlledSkeleton->getNumDofs();
   mAdapters.resize(numControlledDofs);
@@ -203,6 +206,12 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
   std::shared_ptr<TrajectoryContext> context;
   mCurrentTrajectory.get(context);
 
+  // Update the state of the Skeleton.
+  mSkeletonUpdater->update();
+  mActualPosition = mControlledSkeleton->getPositions();
+  mActualVelocity = mControlledSkeleton->getVelocities();
+  mActualEffort = mControlledSkeleton->getForces();
+
   if (context && !context->mCompleted.load()) {
     const auto& trajectory = context->mTrajectory;
     const auto timeFromStart = std::min((time - context->mStartTime).toSec(),
@@ -215,13 +224,25 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
     trajectory->evaluateDerivative(timeFromStart, 2, mDesiredAcceleration);
 
     // TODO: Check path constraints.
-    // TODO: Check goal constraints.
+
+    // Check goal constraints.
+    bool goalConstraintsSatisfied = true;
+    for (const auto& dof : mControlledSkeleton->getDofs()) {
+      auto goalIt = mGoalConstraints.find(dof->getName());
+      if (goalIt != mGoalConstraints.end()) {
+        std::size_t index = mControlledSkeleton->getIndexOf(dof);
+        if (std::abs(mDesiredPosition[index] - mActualPosition[index]) > (*goalIt).second) {
+          goalConstraintsSatisfied = false;
+          break;
+        }
+      }
+    }
 
     std::string stopReason;
     bool shouldStopExec = shouldStopExecution(stopReason);
 
     // Terminate the current trajectory.
-    if (timeFromStart >= trajectory->getDuration()) {
+    if (timeFromStart >= trajectory->getDuration() && goalConstraintsSatisfied) {
       context->mCompleted.store(true);
     } else if (shouldStopExec || mCancelCurrentTrajectory.load()) {
       // TODO: if there is no other work that needs done here, we can get rid of
@@ -236,12 +257,6 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
       }
     }
   }
-
-  // Update the state of the Skeleton.
-  mSkeletonUpdater->update();
-  mActualPosition = mControlledSkeleton->getPositions();
-  mActualVelocity = mControlledSkeleton->getVelocities();
-  mActualEffort = mControlledSkeleton->getForces();
 
   // Compute inverse dynamics torques from the set point and store them in the
   // skeleton. These values may be queried by the adapters below.

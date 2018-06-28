@@ -6,6 +6,7 @@
 #include <memory>
 #include <mutex>
 #include <vector>
+#include <unordered_map>
 
 #include <actionlib/server/action_server.h>
 #include <aikido/statespace/dart/MetaSkeletonStateSpace.hpp>
@@ -19,6 +20,9 @@
 
 namespace rewd_controllers
 {
+
+/// The JointTrajectoryControllerBase uses a bunch of ros parameters as configuration.
+/// It uses the constraints/joint_name/goal parameters to determine whether it has reached its goal.
 class JointTrajectoryControllerBase
 {
 protected:
@@ -155,6 +159,8 @@ private:
   std::string mAbortReason;
 
   TrajectoryContextPtr mNextTrajectory;
+
+  std::unordered_map<std::string, double> mGoalConstraints;
 };
 
 }  // namespace rewd_controllers

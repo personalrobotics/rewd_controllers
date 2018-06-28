@@ -7,7 +7,6 @@
 #include <hardware_interface/joint_command_interface.h>
 #include <pr_control_msgs/SetForceTorqueThresholdAction.h>
 #include <pr_hardware_interfaces/TriggerableInterface.h>
-#include <geometry_msgs/WrenchStamped.h>
 #include <rewd_controllers/MultiInterfaceController.hpp>
 #include <rewd_controllers/JointTrajectoryControllerBase.hpp>
 
@@ -19,7 +18,11 @@ class MoveUntilTouchController final
                                       hardware_interface::
                                           VelocityJointInterface,
                                       hardware_interface::EffortJointInterface,
-                                      hardware_interface::JointStateInterface>,
+                                      hardware_interface::JointStateInterface,
+                                      hardware_interface::
+                                          ForceTorqueSensorInterface,
+                                      pr_hardware_interfaces::
+                                          TriggerableInterface>,
       public JointTrajectoryControllerBase
 {
 public:
@@ -61,20 +64,14 @@ protected:
    */
   bool shouldStopExecution(std::string& reason) override;
 
-  void forceTorqueDataCallback(const geometry_msgs::WrenchStamped& msg);
-
 private:
   using SetFTThresholdAction = pr_control_msgs::SetForceTorqueThresholdAction;
   using FTThresholdActionServer = actionlib::ActionServer<SetFTThresholdAction>;
   using FTThresholdGoalHandle = FTThresholdActionServer::GoalHandle;
   using FTThresholdResult = pr_control_msgs::SetForceTorqueThresholdResult;
 
-  ros::Subscriber forceTorqueDataSub;
-
-  std::mutex forceTorqueDataMutex;
-  Eigen::Vector3d mForce;
-  Eigen::Vector3d mTorque;
-
+  hardware_interface::ForceTorqueSensorHandle mForceTorqueHandle;
+  pr_hardware_interfaces::TriggerableHandle mTareHandle;
   std::atomic_bool mTaringCompleted;
   double mForceLimit;
   double mTorqueLimit;

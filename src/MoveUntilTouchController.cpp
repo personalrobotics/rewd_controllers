@@ -61,8 +61,37 @@ bool MoveUntilTouchController::init(hardware_interface::RobotHW* robot,
     return false;
   }
 
-  // subscribe to sensor data
-  forceTorqueDataSub = nh.subscribe(ft_wrench_name, 1000, &MoveUntilTouchController::forceTorqueDataCallback, this);
+  // get hardware handles
+  const auto ft_interface =
+      robot->get<hardware_interface::ForceTorqueSensorInterface>();
+  if (!ft_interface) {
+    ROS_ERROR_STREAM("RobotHW has no 'ForceTorqueSensorInterface'.");
+    return false;
+  }
+  try {
+    mForceTorqueHandle = ft_interface->getHandle(ft_wrench_name);
+    ROS_INFO_STREAM("Reading force/torque data from '" << ft_wrench_name
+                                                       << "'.");
+  } catch (const hardware_interface::HardwareInterfaceException& e) {
+    ROS_ERROR_STREAM("Unable to get 'ForceTorqueSensorHandle' for '"
+                     << ft_wrench_name << "'.");
+    return false;
+  }
+
+  const auto tare_interface =
+      robot->get<pr_hardware_interfaces::TriggerableInterface>();
+  if (!tare_interface) {
+    ROS_ERROR_STREAM("RobotHW has no 'TriggerableInterface'.");
+    return false;
+  }
+  try {
+    mTareHandle = tare_interface->getHandle(ft_tare_name);
+    ROS_INFO_STREAM("Triggering tares on '" << ft_tare_name << "'.");
+  } catch (const hardware_interface::HardwareInterfaceException& e) {
+    ROS_ERROR_STREAM("Unable to get 'TriggerHandle' for '" << ft_tare_name
+                                                           << "'.");
+    return false;
+  }
 
   // start action server
   mFTThresholdActionServer.reset(
@@ -78,22 +107,10 @@ bool MoveUntilTouchController::init(hardware_interface::RobotHW* robot,
 }
 
 //=============================================================================
-void MoveUntilTouchController::forceTorqueDataCallback(const geometry_msgs::WrenchStamped& msg)
-{
-  mForce.x() = msg.wrench.force.x;
-  mForce.y() = msg.wrench.force.y;
-  mForce.z() = msg.wrench.force.z;
-  mTorque.x() = msg.wrench.torque.z;
-  mTorque.y() = msg.wrench.torque.z;
-  mTorque.z() = msg.wrench.torque.z;
-}
-
-//=============================================================================
 void MoveUntilTouchController::starting(const ros::Time& time)
 {
   // start asynchronous tare request
-  // TODO
-
+  mTareHandle.trigger();
   // start base trajectory controller
   startController(time);
 }
@@ -110,8 +127,7 @@ void MoveUntilTouchController::update(const ros::Time& time,
                                       const ros::Duration& period)
 {
   // check async tare request
-  // TODO
-  mTaringCompleted.store(true);
+  mTaringCompleted.store(mTareHandle.isTriggerComplete());
   // update base trajectory controller
   updateStep(time, period);
 }
@@ -128,15 +144,23 @@ bool MoveUntilTouchController::shouldStopExecution(std::string& reason)
     return true;
   }
 
+  const double* fArray = mForceTorqueHandle.getForce();
+  if (fArray == nullptr) {
+    return true;
+  }
+  Eigen::Map<const Eigen::Vector3d> force{fArray};
+
+  const double* tArray = mForceTorqueHandle.getTorque();
+  if (tArray == nullptr) {
+    return true;
+  }
+  Eigen::Map<const Eigen::Vector3d> torque{tArray};
+
   double forceThreshold = mForceThreshold.load();
   double torqueThreshold = mTorqueThreshold.load();
 
-  forceTorqueDataMutex.lock();
-  bool forceThresholdExceeded = mForce.norm() >= forceThreshold;
-  bool torqueThresholdExceeded = mTorque.norm() >= torqueThreshold;
-  forceTorqueDataMutex.unlock();
-
-  reason = "Force or Torque Threshold exceeded!";
+  bool forceThresholdExceeded = force.norm() >= forceThreshold;
+  bool torqueThresholdExceeded = torque.norm() >= torqueThreshold;
 
   return forceThresholdExceeded || torqueThresholdExceeded;
 }

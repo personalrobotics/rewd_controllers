@@ -6,7 +6,7 @@ namespace rewd_controllers {
 
 //=============================================================================
 dart::dynamics::SkeletonPtr loadRobotFromParameter(
-  ros::NodeHandle& nodeHandle, const std::string& nameParameter)
+  const ros::NodeHandle& nodeHandle, const std::string& nameParameter)
 {
   using aikido::io::CatkinResourceRetriever;
 
@@ -43,7 +43,7 @@ dart::dynamics::SkeletonPtr loadRobotFromParameter(
 
 //=============================================================================
 std::vector<JointParameter> loadJointsFromParameter(
-  ros::NodeHandle& nodeHandle,
+  const ros::NodeHandle& nodeHandle,
   const std::string& jointsParameter,
   const std::string& defaultType)
 {
@@ -109,6 +109,28 @@ std::vector<JointParameter> loadJointsFromParameter(
   }
 
   return output;
+}
+
+std::unordered_map<std::string, double> loadGoalConstraintsFromParameter(
+      const ros::NodeHandle& nodeHandle,
+      const std::vector<JointParameter>& jointParameters)
+{
+  std::unordered_map<std::string, double> goalConstraints;
+
+  for (const auto& jointParam : jointParameters) {
+    std::string jointName = jointParam.mName;
+
+    double goalConstraint;
+    if (nodeHandle.getParam("constraints/" + jointName + "/goal", goalConstraint)) {
+      goalConstraints[jointName] = goalConstraint;
+    }
+  }
+  if (goalConstraints.empty()) {
+    ROS_WARN("No goal constraint arguments specified. Define parameters like this: /constraint/jointname/goal: 0.1");
+  } else {
+    ROS_INFO_STREAM("Goal constraints loaded for " << goalConstraints.size() << " joints.");
+  }
+  return goalConstraints;
 }
 
 //=============================================================================

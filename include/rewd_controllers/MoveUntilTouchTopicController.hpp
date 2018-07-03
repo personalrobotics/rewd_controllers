@@ -17,9 +17,8 @@
 namespace rewd_controllers
 {
 
-/// Basically the same thing as MoveUntilTouchController
 /// Uses a standard JointTrajectoryControllerBase and aborts the trajectory if
-/// it the forces or torques are too big.
+/// the forces or torques are too big.
 /// Unlike MoveUntilTouchController, this controller gets its F/T data not
 /// via a hardware interface but rather via a ros topic.
 /// The other difference is, that taring is instigated through an action client
@@ -52,7 +51,7 @@ public:
   // inherit documentation
   void stopping(const ros::Time& time) override;
 
-  // inherit documentation
+  // Documentation Inherited.
   void update(const ros::Time& time, const ros::Duration& period) override;
 
 protected:
@@ -71,7 +70,7 @@ protected:
    * \returns True if current wrench exceeds force/torque threshold. If a
    * threshold is set to `0.0` (the default), it is ignored.
    */
-  bool shouldStopExecution(std::string& reason) override;
+  bool shouldStopExecution(std::string& message) override;
 
 private:
   using SetFTThresholdAction = pr_control_msgs::SetForceTorqueThresholdAction;
@@ -80,19 +79,40 @@ private:
   using FTThresholdResult = pr_control_msgs::SetForceTorqueThresholdResult;
   using TareActionClient = actionlib::ActionClient<pr_control_msgs::TriggerAction>;
   
+  // \brief Protects mForce and mTorque from simultaneous access.
   std::mutex mForceTorqueDataMutex;
+
+  // \brief The latest force of the sensor.
   Eigen::Vector3d mForce;
+
+  // \brief The latest torque of the sensor.
   Eigen::Vector3d mTorque;
 
+  // \brief Is true if the taring (or 'calibration') procedure is finished.
   std::atomic_bool mTaringCompleted;
+
+  // \brief Sensor force limit. Cannot set a threshold higher than that.
   double mForceLimit;
+
+  // \brief Sensor torque limit. Cannot set a threshold higher than that.
   double mTorqueLimit;
 
+  // \brief Gets data from the force/torque sensor
   ros::Subscriber mForceTorqueDataSub;
+
+  // \brief Starts and handles the taring (calibration) process of the sensor
   std::unique_ptr<TareActionClient> mTareActionClient;
+
+  // \brief Keeps track of the goal status for the mTareActionClient
   TareActionClient::GoalHandle mTareGoalHandle;
+
+  // \brief ActionServer that enables others to set the force/torque thresholds
   std::unique_ptr<FTThresholdActionServer> mFTThresholdActionServer;
+
+  // \brief If the force is higher than this threshold, the controller aborts.
   std::atomic<double> mForceThreshold;
+
+  // \brief If the torque is higher than this threshold, the controller aborts.
   std::atomic<double> mTorqueThreshold;
 
   /**
@@ -108,7 +128,7 @@ private:
   /**
    * \brief Called whenever the status of taring changes
    */
-  void taringTransitionCallback(TareActionClient::GoalHandle goalHandle);
+  void taringTransitionCallback(const TareActionClient::GoalHandle& goalHandle);
 };
 
 }  // namespace rewd_controllers

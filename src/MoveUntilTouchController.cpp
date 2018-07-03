@@ -25,7 +25,7 @@ bool MoveUntilTouchController::init(hardware_interface::RobotHW* robot,
   // check that doubles are lock-free atomics
   if (!mForceThreshold.is_lock_free()) {
     ROS_ERROR(
-        "double atomics not lock-free on this system. Cannot guarantee "
+        "Double atomics not lock-free on this system. Cannot guarantee "
         "realtime safety.");
     return false;
   }
@@ -136,7 +136,7 @@ void MoveUntilTouchController::update(const ros::Time& time,
 bool MoveUntilTouchController::shouldAcceptRequests() { return isRunning(); }
 
 //=============================================================================
-bool MoveUntilTouchController::shouldStopExecution(std::string& reason)
+bool MoveUntilTouchController::shouldStopExecution(std::string& message)
 {
   // inelegent to just terminate any running trajectory,
   // but we must guarantee taring completes before starting

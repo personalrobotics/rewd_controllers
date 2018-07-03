@@ -29,7 +29,7 @@ public:
   MoveUntilTouchController();
   ~MoveUntilTouchController();
 
-  // inherit documentation
+  // Documentation inherited
   bool init(hardware_interface::RobotHW* robot, ros::NodeHandle& n) override;
 
   /** \brief This is called from within the realtime thread just before the
@@ -40,7 +40,7 @@ public:
    */
   void starting(const ros::Time& time) override;
 
-  // inherit documentation
+  // Documentation inherited
   void stopping(const ros::Time& time) override;
 
   // Documentation Inherited.

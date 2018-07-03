@@ -165,8 +165,6 @@ void JointTrajectoryControllerBase::startController(const ros::Time& time)
   mDesiredVelocity.setZero();
   mDesiredAcceleration.setZero();
 
-  mAbortCurrentTrajectory.store(false);
-
   ROS_DEBUG_STREAM(
       "Initialized desired position: " << mDesiredPosition.transpose());
   ROS_DEBUG_STREAM(
@@ -186,6 +184,7 @@ void JointTrajectoryControllerBase::startController(const ros::Time& time)
 
   mCurrentTrajectory.set(nullptr);
   mCancelCurrentTrajectory.store(false);
+  mAbortCurrentTrajectory.store(false);
 
   mNonRealtimeTimer.start();
 }
@@ -512,5 +511,5 @@ void JointTrajectoryControllerBase::publishFeedback(
 }
 
 //=============================================================================
-bool JointTrajectoryControllerBase::shouldStopExecution(std::string& reason) { return false; }
+bool JointTrajectoryControllerBase::shouldStopExecution(std::string& message) { return false; }
 }  // namespace rewd_controllers

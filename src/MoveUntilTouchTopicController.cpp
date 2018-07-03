@@ -25,7 +25,7 @@ bool MoveUntilTouchTopicController::init(hardware_interface::RobotHW* robot,
   // check that doubles are lock-free atomics
   if (!mForceThreshold.is_lock_free()) {
     ROS_ERROR(
-        "double atomics not lock-free on this system. Cannot guarantee "
+        "Double atomics not lock-free on this system. Cannot guarantee "
         "realtime safety.");
     return false;
   }
@@ -83,16 +83,17 @@ bool MoveUntilTouchTopicController::init(hardware_interface::RobotHW* robot,
 //=============================================================================
 void MoveUntilTouchTopicController::forceTorqueDataCallback(const geometry_msgs::WrenchStamped& msg)
 {
+  std::lock_guard<std::mutex> lock(mForceTorqueDataMutex);
   mForce.x() = msg.wrench.force.x;
   mForce.y() = msg.wrench.force.y;
   mForce.z() = msg.wrench.force.z;
-  mTorque.x() = msg.wrench.torque.z;
-  mTorque.y() = msg.wrench.torque.z;
+  mTorque.x() = msg.wrench.torque.x;
+  mTorque.y() = msg.wrench.torque.y;
   mTorque.z() = msg.wrench.torque.z;
 }
 
 //=============================================================================
-void MoveUntilTouchTopicController::taringTransitionCallback(TareActionClient::GoalHandle goalHandle) {
+void MoveUntilTouchTopicController::taringTransitionCallback(const TareActionClient::GoalHandle& goalHandle) {
   if (goalHandle.getResult() && goalHandle.getResult()->success) {
     ROS_INFO("Taring completed!");
     mTaringCompleted.store(true);
@@ -130,7 +131,7 @@ void MoveUntilTouchTopicController::update(const ros::Time& time,
 bool MoveUntilTouchTopicController::shouldAcceptRequests() { return isRunning(); }
 
 //=============================================================================
-bool MoveUntilTouchTopicController::shouldStopExecution(std::string& reason)
+bool MoveUntilTouchTopicController::shouldStopExecution(std::string& message)
 {
   // inelegent to just terminate any running trajectory,
   // but we must guarantee taring completes before starting
@@ -148,16 +149,16 @@ bool MoveUntilTouchTopicController::shouldStopExecution(std::string& reason)
 
   
   if (forceThresholdExceeded) {
-    std::stringstream reasonStream;
-    reasonStream << "Force Threshold exceeded!   Threshold: " << forceThreshold << "   Force: " << mForce.x() << ", " << mForce.y() << ", " << mForce.z();
-    reason = reasonStream.str();
-    ROS_WARN(reason.c_str());
+    std::stringstream messageStream;
+    messageStream << "Force Threshold exceeded!   Threshold: " << forceThreshold << "   Force: " << mForce.x() << ", " << mForce.y() << ", " << mForce.z();
+    message = messageStream.str();
+    ROS_WARN(message.c_str());
   }
   if (torqueThresholdExceeded) {
-    std::stringstream reasonStream;
-    reasonStream << "Torque Threshold exceeded!   Threshold: " << torqueThreshold << "   Torque: " << mTorque.x() << ", " << mTorque.y() << ", " << mTorque.z();
-    reason = reasonStream.str();
-    ROS_WARN(reason.c_str());
+    std::stringstream messageStream;
+    messageStream << "Torque Threshold exceeded!   Threshold: " << torqueThreshold << "   Torque: " << mTorque.x() << ", " << mTorque.y() << ", " << mTorque.z();
+    message = messageStream.str();
+    ROS_WARN(message.c_str());
   }
 
   return forceThresholdExceeded || torqueThresholdExceeded;

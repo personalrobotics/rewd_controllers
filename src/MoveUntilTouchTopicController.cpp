@@ -1,4 +1,4 @@
-#include <rewd_controllers/MoveUntilTouchController.hpp>
+#include <rewd_controllers/MoveUntilTouchTopicController.hpp>
 
 #include <functional>
 #include <pluginlib/class_list_macros.h>
@@ -6,20 +6,23 @@
 namespace rewd_controllers
 {
 //=============================================================================
-MoveUntilTouchController::MoveUntilTouchController()
+MoveUntilTouchTopicController::MoveUntilTouchTopicController()
     : MultiInterfaceController{true}  // allow_optional_interfaces
     , JointTrajectoryControllerBase{}
     , mTaringCompleted{false}
     , mForceThreshold{0.0}
     , mTorqueThreshold{0.0}
 {
+  // Do nothing.
 }
 
 //=============================================================================
-MoveUntilTouchController::~MoveUntilTouchController() {}
+MoveUntilTouchTopicController::~MoveUntilTouchTopicController() {
+  // Do nothing.
+}
 
 //=============================================================================
-bool MoveUntilTouchController::init(hardware_interface::RobotHW* robot,
+bool MoveUntilTouchTopicController::init(hardware_interface::RobotHW* robot,
                                     ros::NodeHandle& nh)
 {
   // check that doubles are lock-free atomics
@@ -61,43 +64,17 @@ bool MoveUntilTouchController::init(hardware_interface::RobotHW* robot,
     return false;
   }
 
-  // get hardware handles
-  const auto ft_interface =
-      robot->get<hardware_interface::ForceTorqueSensorInterface>();
-  if (!ft_interface) {
-    ROS_ERROR_STREAM("RobotHW has no 'ForceTorqueSensorInterface'.");
-    return false;
-  }
-  try {
-    mForceTorqueHandle = ft_interface->getHandle(ft_wrench_name);
-    ROS_INFO_STREAM("Reading force/torque data from '" << ft_wrench_name
-                                                       << "'.");
-  } catch (const hardware_interface::HardwareInterfaceException& e) {
-    ROS_ERROR_STREAM("Unable to get 'ForceTorqueSensorHandle' for '"
-                     << ft_wrench_name << "'.");
-    return false;
-  }
+  // subscribe to sensor data
+  mForceTorqueDataSub = nh.subscribe(ft_wrench_name, 1, &MoveUntilTouchTopicController::forceTorqueDataCallback, this);
 
-  const auto tare_interface =
-      robot->get<pr_hardware_interfaces::TriggerableInterface>();
-  if (!tare_interface) {
-    ROS_ERROR_STREAM("RobotHW has no 'TriggerableInterface'.");
-    return false;
-  }
-  try {
-    mTareHandle = tare_interface->getHandle(ft_tare_name);
-    ROS_INFO_STREAM("Triggering tares on '" << ft_tare_name << "'.");
-  } catch (const hardware_interface::HardwareInterfaceException& e) {
-    ROS_ERROR_STREAM("Unable to get 'TriggerHandle' for '" << ft_tare_name
-                                                           << "'.");
-    return false;
-  }
+  // action client to kick off taring
+  mTareActionClient = std::unique_ptr<TareActionClient>(new TareActionClient(nh, ft_tare_name));
 
   // start action server
   mFTThresholdActionServer.reset(
       new actionlib::ActionServer<SetFTThresholdAction>{
           nh, "set_forcetorque_threshold",
-          std::bind(&MoveUntilTouchController::setForceTorqueThreshold, this,
+          std::bind(&MoveUntilTouchTopicController::setForceTorqueThreshold, this,
                     std::placeholders::_1),
           false});
   mFTThresholdActionServer->start();
@@ -107,66 +84,91 @@ bool MoveUntilTouchController::init(hardware_interface::RobotHW* robot,
 }
 
 //=============================================================================
-void MoveUntilTouchController::starting(const ros::Time& time)
+void MoveUntilTouchTopicController::forceTorqueDataCallback(const geometry_msgs::WrenchStamped& msg)
+{
+  std::lock_guard<std::mutex> lock(mForceTorqueDataMutex);
+  mForce.x() = msg.wrench.force.x;
+  mForce.y() = msg.wrench.force.y;
+  mForce.z() = msg.wrench.force.z;
+  mTorque.x() = msg.wrench.torque.x;
+  mTorque.y() = msg.wrench.torque.y;
+  mTorque.z() = msg.wrench.torque.z;
+}
+
+//=============================================================================
+void MoveUntilTouchTopicController::taringTransitionCallback(const TareActionClient::GoalHandle& goalHandle) {
+  if (goalHandle.getResult() && goalHandle.getResult()->success) {
+    ROS_INFO("Taring completed!");
+    mTaringCompleted.store(true);
+  }
+}
+
+//=============================================================================
+void MoveUntilTouchTopicController::starting(const ros::Time& time)
 {
   // start asynchronous tare request
-  mTareHandle.trigger();
+  ROS_INFO("Starting Taring");
+  pr_control_msgs::TriggerGoal goal;
+  mTareGoalHandle = mTareActionClient->sendGoal(goal, boost::bind(&MoveUntilTouchTopicController::taringTransitionCallback, this, _1));
+
   // start base trajectory controller
   startController(time);
 }
 
 //=============================================================================
-void MoveUntilTouchController::stopping(const ros::Time& time)
+void MoveUntilTouchTopicController::stopping(const ros::Time& time)
 {
   // stop base trajectory controller
   stopController(time);
 }
 
 //=============================================================================
-void MoveUntilTouchController::update(const ros::Time& time,
+void MoveUntilTouchTopicController::update(const ros::Time& time,
                                       const ros::Duration& period)
 {
-  // check async tare request
-  mTaringCompleted.store(mTareHandle.isTriggerComplete());
   // update base trajectory controller
   updateStep(time, period);
 }
 
 //=============================================================================
-bool MoveUntilTouchController::shouldAcceptRequests() { return isRunning(); }
+bool MoveUntilTouchTopicController::shouldAcceptRequests() { return isRunning(); }
 
 //=============================================================================
-bool MoveUntilTouchController::shouldStopExecution(std::string& message)
+bool MoveUntilTouchTopicController::shouldStopExecution(std::string& message)
 {
   // inelegent to just terminate any running trajectory,
   // but we must guarantee taring completes before starting
   if (!mTaringCompleted.load()) {
+    ROS_WARN("taring not yet completed!");
     return true;
   }
-
-  const double* fArray = mForceTorqueHandle.getForce();
-  if (fArray == nullptr) {
-    return true;
-  }
-  Eigen::Map<const Eigen::Vector3d> force{fArray};
-
-  const double* tArray = mForceTorqueHandle.getTorque();
-  if (tArray == nullptr) {
-    return true;
-  }
-  Eigen::Map<const Eigen::Vector3d> torque{tArray};
 
   double forceThreshold = mForceThreshold.load();
   double torqueThreshold = mTorqueThreshold.load();
 
-  bool forceThresholdExceeded = force.norm() >= forceThreshold;
-  bool torqueThresholdExceeded = torque.norm() >= torqueThreshold;
+  std::lock_guard<std::mutex> lock(mForceTorqueDataMutex);
+  bool forceThresholdExceeded = mForce.norm() >= forceThreshold;
+  bool torqueThresholdExceeded = mTorque.norm() >= torqueThreshold;
+
+  
+  if (forceThresholdExceeded) {
+    std::stringstream messageStream;
+    messageStream << "Force Threshold exceeded!   Threshold: " << forceThreshold << "   Force: " << mForce.x() << ", " << mForce.y() << ", " << mForce.z();
+    message = messageStream.str();
+    ROS_WARN(message.c_str());
+  }
+  if (torqueThresholdExceeded) {
+    std::stringstream messageStream;
+    messageStream << "Torque Threshold exceeded!   Threshold: " << torqueThreshold << "   Torque: " << mTorque.x() << ", " << mTorque.y() << ", " << mTorque.z();
+    message = messageStream.str();
+    ROS_WARN(message.c_str());
+  }
 
   return forceThresholdExceeded || torqueThresholdExceeded;
 }
 
 //=============================================================================
-void MoveUntilTouchController::setForceTorqueThreshold(FTThresholdGoalHandle gh)
+void MoveUntilTouchTopicController::setForceTorqueThreshold(FTThresholdGoalHandle gh)
 {
   const auto goal = gh.getGoal();
   ROS_INFO_STREAM("Setting thresholds: force = " << goal->force_threshold
@@ -204,6 +206,7 @@ void MoveUntilTouchController::setForceTorqueThreshold(FTThresholdGoalHandle gh)
   }
 
   if (!result.success) {
+    ROS_WARN_STREAM("MoveUntilTouchTopicController: " << result.message);
     gh.setRejected(result);
   } else {
     gh.setAccepted();
@@ -215,5 +218,5 @@ void MoveUntilTouchController::setForceTorqueThreshold(FTThresholdGoalHandle gh)
 }  // namespace rewd_controllers
 
 //=============================================================================
-PLUGINLIB_EXPORT_CLASS(rewd_controllers::MoveUntilTouchController,
+PLUGINLIB_EXPORT_CLASS(rewd_controllers::MoveUntilTouchTopicController,
                        controller_interface::ControllerBase)

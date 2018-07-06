@@ -1,33 +1,41 @@
-#ifndef REWD_CONTROLLERS_MOVEUNTILTOUCHCONTROLLER_HPP_
-#define REWD_CONTROLLERS_MOVEUNTILTOUCHCONTROLLER_HPP_
+#ifndef REWD_CONTROLLERS_MOVEUNTILTOUCHTOPICCONTROLLER_HPP_
+#define REWD_CONTROLLERS_MOVEUNTILTOUCHTOPICCONTROLLER_HPP_
 
 #include <atomic>
+#include <mutex>
 #include <actionlib/server/action_server.h>
+#include <actionlib/client/simple_action_client.h>
 #include <hardware_interface/force_torque_sensor_interface.h>
 #include <hardware_interface/joint_command_interface.h>
 #include <pr_control_msgs/SetForceTorqueThresholdAction.h>
+#include <pr_control_msgs/TriggerAction.h>
 #include <pr_hardware_interfaces/TriggerableInterface.h>
+#include <geometry_msgs/WrenchStamped.h>
 #include <rewd_controllers/MultiInterfaceController.hpp>
 #include <rewd_controllers/JointTrajectoryControllerBase.hpp>
 
 namespace rewd_controllers
 {
-class MoveUntilTouchController final
+
+/// Uses a standard JointTrajectoryControllerBase and aborts the trajectory if
+/// the forces or torques are too big.
+/// Unlike MoveUntilTouchController, this controller gets its F/T data not
+/// via a hardware interface but rather via a ros topic.
+/// The other difference is, that taring is instigated through an action client
+/// instead of a hardware interface.
+class MoveUntilTouchTopicController final
     : public MultiInterfaceController<hardware_interface::
                                           PositionJointInterface,
                                       hardware_interface::
                                           VelocityJointInterface,
                                       hardware_interface::EffortJointInterface,
-                                      hardware_interface::JointStateInterface,
-                                      hardware_interface::
-                                          ForceTorqueSensorInterface,
-                                      pr_hardware_interfaces::
-                                          TriggerableInterface>,
+                                      hardware_interface::JointStateInterface>,
       public JointTrajectoryControllerBase
 {
+
 public:
-  MoveUntilTouchController();
-  ~MoveUntilTouchController();
+  MoveUntilTouchTopicController();
+  ~MoveUntilTouchTopicController();
 
   // Documentation inherited
   bool init(hardware_interface::RobotHW* robot, ros::NodeHandle& n) override;
@@ -58,9 +66,7 @@ protected:
    * \brief Called from the real-time thread every control cycle, this method
    * reads the current force/torque sensor state and compares with
    * tolerances specified by the set_forcetorque_threshold service.
-   *  
-   * \param message If the execution should be stopped, this contains reason for stopping the execution.
-   * 
+   *
    * \returns True if current wrench exceeds force/torque threshold. If a
    * threshold is set to `0.0` (the default), it is ignored.
    */
@@ -71,23 +77,60 @@ private:
   using FTThresholdActionServer = actionlib::ActionServer<SetFTThresholdAction>;
   using FTThresholdGoalHandle = FTThresholdActionServer::GoalHandle;
   using FTThresholdResult = pr_control_msgs::SetForceTorqueThresholdResult;
+  using TareActionClient = actionlib::ActionClient<pr_control_msgs::TriggerAction>;
+  
+  // \brief Protects mForce and mTorque from simultaneous access.
+  std::mutex mForceTorqueDataMutex;
 
-  hardware_interface::ForceTorqueSensorHandle mForceTorqueHandle;
-  pr_hardware_interfaces::TriggerableHandle mTareHandle;
+  // \brief The latest force of the sensor.
+  Eigen::Vector3d mForce;
+
+  // \brief The latest torque of the sensor.
+  Eigen::Vector3d mTorque;
+
+  // \brief Is true if the taring (or 'calibration') procedure is finished.
   std::atomic_bool mTaringCompleted;
+
+  // \brief Sensor force limit. Cannot set a threshold higher than that.
   double mForceLimit;
+
+  // \brief Sensor torque limit. Cannot set a threshold higher than that.
   double mTorqueLimit;
 
+  // \brief Gets data from the force/torque sensor
+  ros::Subscriber mForceTorqueDataSub;
+
+  // \brief Starts and handles the taring (calibration) process of the sensor
+  std::unique_ptr<TareActionClient> mTareActionClient;
+
+  // \brief Keeps track of the goal status for the mTareActionClient
+  TareActionClient::GoalHandle mTareGoalHandle;
+
+  // \brief ActionServer that enables others to set the force/torque thresholds
   std::unique_ptr<FTThresholdActionServer> mFTThresholdActionServer;
+
+  // \brief If the force is higher than this threshold, the controller aborts.
   std::atomic<double> mForceThreshold;
+
+  // \brief If the torque is higher than this threshold, the controller aborts.
   std::atomic<double> mTorqueThreshold;
 
   /**
    * \brief Callback for pr_control_msgs::SetForceTorqueThresholdAction.
    */
   void setForceTorqueThreshold(FTThresholdGoalHandle gh);
+
+  /**
+   * \brief Called whenever a new Force/Torque message arrives on the ros topic
+   */
+  void forceTorqueDataCallback(const geometry_msgs::WrenchStamped& msg);
+
+  /**
+   * \brief Called whenever the status of taring changes
+   */
+  void taringTransitionCallback(const TareActionClient::GoalHandle& goalHandle);
 };
 
 }  // namespace rewd_controllers
 
-#endif  // REWD_CONTROLLERS_MOVEUNTILTOUCHCONTROLLER_HPP_
+#endif  // REWD_CONTROLLERS_MOVEUNTILTOUCHTOPICCONTROLLER_HPP_

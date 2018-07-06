@@ -15,7 +15,6 @@ find_package(catkin REQUIRED COMPONENTS
   controller_interface
   hardware_interface
   pr_control_msgs
-  pr_hardware_interfaces
   realtime_tools
 )
 include_directories(SYSTEM ${catkin_INCLUDE_DIRS})
@@ -41,7 +40,6 @@ catkin_package(
     controller_interface
     hardware_interface
     pr_control_msgs
-    pr_hardware_interfaces
     realtime_tools
   DEPENDS
     aikido

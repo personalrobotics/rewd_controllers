@@ -21,7 +21,7 @@ class MoveUntilTouchController final
                                       hardware_interface::JointStateInterface,
                                       hardware_interface::
                                           ForceTorqueSensorInterface,
-                                      pr_hardware_interfaces::
+                                      rewd_controllers::
                                           TriggerableInterface>,
       public JointTrajectoryControllerBase
 {
@@ -73,7 +73,7 @@ private:
   using FTThresholdResult = pr_control_msgs::SetForceTorqueThresholdResult;
 
   hardware_interface::ForceTorqueSensorHandle mForceTorqueHandle;
-  pr_hardware_interfaces::TriggerableHandle mTareHandle;
+  rewd_controllers::TriggerableHandle mTareHandle;
   std::atomic_bool mTaringCompleted;
   double mForceLimit;
   double mTorqueLimit;

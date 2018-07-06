@@ -7,7 +7,7 @@
 
 namespace rewd_controllers {
 
-/// The FTThresholdClient configures the MoveUntilTouchController's
+/// The FTThresholdClient configures the MoveUntilTouch(Topic)Controller's
 /// thresholds.
 /// When those thresholds are exceeded, the controller stops the movement.
 class FTThresholdClient
@@ -27,7 +27,7 @@ public:
   void setThresholdOrThrow(double forceThreshold, double torqueThreshold, double timeout = 3.0);
 
   /// Sets the MoveUntilTouchControllers thresholds.
-  /// Returns whether the thresholds were set successfully.
+  /// Returns true if the thresholds were set successfully.
   bool trySetThreshold(double forceThreshold, double torqueThreshold, double timeout = 3.0);
 
 private:

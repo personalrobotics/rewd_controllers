@@ -7,6 +7,7 @@ using SetFTThresholdAction = pr_control_msgs::SetForceTorqueThresholdAction;
 using FTThresholdActionClient
     = actionlib::SimpleActionClient<SetFTThresholdAction>;
 
+//=============================================================================
 FTThresholdClient::FTThresholdClient(const std::string& controllerThresholdTopic, ros::NodeHandle nodeHandle)
   : nodeHandle(nodeHandle)
 {
@@ -17,7 +18,8 @@ FTThresholdClient::FTThresholdClient(const std::string& controllerThresholdTopic
   ROS_INFO("FT Threshold Action Server started.");
 }
 
-void FTThresholdClient::trySetThresholdRepeatedly(double forceThreshold, double torqueThreshold)
+//=============================================================================
+bool FTThresholdClient::trySetThresholdRepeatedly(double forceThreshold, double torqueThreshold)
 {
   bool setFTSuccessful = false;
   while (!setFTSuccessful)
@@ -28,16 +30,18 @@ void FTThresholdClient::trySetThresholdRepeatedly(double forceThreshold, double 
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     if (!ros::ok())
     {
-      exit(0);
+      return false;
     }
   }
+  return true;
 }
 
+//=============================================================================
 bool FTThresholdClient::trySetThreshold(double forceThreshold, double torqueThreshold, double timeout)
 {
   try
   {
-    setThreshold(forceThreshold, torqueThreshold, timeout);
+    setThresholdOrThrow(forceThreshold, torqueThreshold, timeout);
   }
   catch (std::runtime_error)
   {
@@ -46,7 +50,8 @@ bool FTThresholdClient::trySetThreshold(double forceThreshold, double torqueThre
   return true;
 }
 
-void FTThresholdClient::setThreshold(double forceThreshold, double torqueThreshold, double timeout)
+//=============================================================================
+void FTThresholdClient::setThresholdOrThrow(double forceThreshold, double torqueThreshold, double timeout)
 {
   pr_control_msgs::SetForceTorqueThresholdGoal goal;
   goal.force_threshold = forceThreshold;

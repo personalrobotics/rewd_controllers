@@ -1,5 +1,5 @@
-#ifndef FTTHRESHOLDCLIENT_H
-#define FTTHRESHOLDCLIENT_H
+#ifndef REWD_CONTROLLERS_FTTHRESHOLDCLIENT_HPP
+#define REWD_CONTROLLERS_FTTHRESHOLDCLIENT_HPP
 
 #include <actionlib/client/simple_action_client.h>
 #include <pr_control_msgs/SetForceTorqueThresholdAction.h>
@@ -17,16 +17,16 @@ public:
   /// Constructor.
   FTThresholdClient(const std::string& controllerThresholdTopic, ros::NodeHandle nodeHandle);
 
-  /// Sets the MoveUntilTouchControllers Thresholds accordingly.
+  /// Sets the MoveUntilTouchControllers Thresholds.
   /// Blocks until the threshold could be set successfully.
-  /// Can be aborted with Ctrl-C.
-  void trySetThresholdRepeatedly(double forceThreshold, double torqueThreshold);
+  /// Can be aborted with !ros::ok(), in which case it returns false
+  bool trySetThresholdRepeatedly(double forceThreshold, double torqueThreshold);
 
-  /// Sets the MoveUntilTouchControllers Thresholds accordingly.
+  /// Sets the MoveUntilTouchControllers Thresholds.
   /// Throws a runtime_error if we are unable to set the thresholds.
-  void setThreshold(double forceThreshold, double torqueThreshold, double timeout = 3.0);
+  void setThresholdOrThrow(double forceThreshold, double torqueThreshold, double timeout = 3.0);
 
-  /// Sets the MoveUntilTouchControllers thresholds accordingly.
+  /// Sets the MoveUntilTouchControllers thresholds.
   /// Returns whether the thresholds were set successfully.
   bool trySetThreshold(double forceThreshold, double torqueThreshold, double timeout = 3.0);
 

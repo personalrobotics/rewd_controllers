@@ -19,6 +19,8 @@ find_package(catkin REQUIRED COMPONENTS
 )
 include_directories(SYSTEM ${catkin_INCLUDE_DIRS})
 
+message(STATUS "[DEBUG] controller_interface: ${controller_interface}")
+message(STATUS "[DEBUG] controller_interface_VERSION: ${controller_interface_VERSION}")
 if ("${controller_interface_VERSION}" VERSION_LESS 0.10.0)
   message(FATAL_ERROR "controller_interface package must be at least version 0.10.0, not packaged in Indigo. Please upgrade to Jade or Kinetic or build the ros_control packages from source.")
 endif()

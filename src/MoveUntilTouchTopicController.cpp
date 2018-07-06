@@ -13,10 +13,13 @@ MoveUntilTouchTopicController::MoveUntilTouchTopicController()
     , mForceThreshold{0.0}
     , mTorqueThreshold{0.0}
 {
+  // Do nothing.
 }
 
 //=============================================================================
-MoveUntilTouchTopicController::~MoveUntilTouchTopicController() {}
+MoveUntilTouchTopicController::~MoveUntilTouchTopicController() {
+  // Do nothing.
+}
 
 //=============================================================================
 bool MoveUntilTouchTopicController::init(hardware_interface::RobotHW* robot,

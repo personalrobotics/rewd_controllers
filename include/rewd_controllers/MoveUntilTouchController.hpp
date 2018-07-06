@@ -43,7 +43,7 @@ public:
   // Documentation inherited
   void stopping(const ros::Time& time) override;
 
-  // Documentation Inherited.
+  // Documentation inherited.
   void update(const ros::Time& time, const ros::Duration& period) override;
 
 protected:

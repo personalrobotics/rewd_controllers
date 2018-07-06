@@ -14,29 +14,39 @@ cache:
 matrix:
   include:
     - os: linux
-      compiler: gcc
-      env: CATKIN_CONFIG_OPTIONS="-DCMAKE_BUILD_TYPE=Debug"
+      env:
+        - BUILD_NAME=XENIAL_RELEASE
+        - DOCKER_FILE="ubuntu-xenial"
+        - BUILD_TYPE=Release
+        - CATKIN_CONFIG_OPTIONS="-DCMAKE_BUILD_TYPE=Release"
+      services: docker
     - os: linux
-      compiler: gcc
-      env: CATKIN_CONFIG_OPTIONS="-DCMAKE_BUILD_TYPE=Release"
+      env:
+        - BUILD_NAME=XENIAL_DEBUG
+        - DOCKER_FILE="ubuntu-debug"
+        - BUILD_TYPE=Debug
+        - CATKIN_CONFIG_OPTIONS="-DCMAKE_BUILD_TYPE=Debug"
+      services: docker
 
-# Install test fixture dependencies.
 before_install:
-  - mkdir -p "${HOME}/workspace/src"
-  - cd "${HOME}/workspace"
-  - git clone https://github.com/personalrobotics/pr-cleanroom.git scripts
-  - curl -sS "${DISTRIBUTION}" > distribution.yml
-  - ./scripts/internal-setup.sh
-  - export PACKAGE_NAMES="$(./scripts/internal-get-packages.py distribution.yml ${REPOSITORY})"
+  - if [ -n "$DOCKER_FILE" ]; then
+      docker build -t "$DOCKER_FILE" -f ".ci/docker/$DOCKER_FILE" .;
+      docker run -itd -v $TRAVIS_BUILD_DIR:$TRAVIS_BUILD_DIR --env-file .ci/docker/env.list --name my-docker "$DOCKER_FILE";
+      docker exec my-docker /bin/sh -c "cd $TRAVIS_BUILD_DIR && ./.ci/before_install.sh";
+    else
+      '.ci/before_install.sh';
+    fi
 
 install:
-  - mv "${TRAVIS_BUILD_DIR}" src
-  - ./scripts/internal-distro.py --workspace=src distribution.yml --repository "${REPOSITORY}"
+  - if [ -n "$DOCKER_FILE" ]; then
+      docker exec my-docker /bin/sh -c "cd $TRAVIS_BUILD_DIR && ./.ci/install.sh";
+    else
+      '.ci/install.sh';
+    fi
 
 script:
-  - ./scripts/internal-build.sh ${PACKAGE_NAMES}
-  - ./scripts/internal-test.sh ${PACKAGE_NAMES}
-
-after_failure:
-  - cat ./build/rewd_controllers/Testing/Temporary/LastTest.log
-  - cat ./build/rewd_controllers/Testing/Temporary/LastTestsFailed.log
+  - if [ -n "$DOCKER_FILE" ]; then
+      docker exec my-docker /bin/sh -c "cd $TRAVIS_BUILD_DIR && ./.ci/script.sh";
+    else
+      '.ci/script.sh';
+    fi

@@ -78,8 +78,7 @@ bool MoveUntilTouchController::init(hardware_interface::RobotHW* robot,
     return false;
   }
 
-  const auto tare_interface =
-      robot->get<pr_hardware_interfaces::TriggerableInterface>();
+  const auto tare_interface = robot->get<TriggerableInterface>();
   if (!tare_interface) {
     ROS_ERROR_STREAM("RobotHW has no 'TriggerableInterface'.");
     return false;

@@ -37,7 +37,7 @@ public:
   MoveUntilTouchTopicController();
   ~MoveUntilTouchTopicController();
 
-  // Documentation inheried
+  // Documentation inherited
   bool init(hardware_interface::RobotHW* robot, ros::NodeHandle& n) override;
 
   /** \brief This is called from within the realtime thread just before the
@@ -51,7 +51,7 @@ public:
   // Documentation inherited
   void stopping(const ros::Time& time) override;
 
-  // Documentation Inherited.
+  // Documentation inherited.
   void update(const ros::Time& time, const ros::Duration& period) override;
 
 protected:

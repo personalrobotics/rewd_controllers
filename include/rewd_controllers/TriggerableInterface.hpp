@@ -4,7 +4,7 @@
 #include <string>
 #include <hardware_interface/hardware_interface.h>
 #include <hardware_interface/internal/hardware_resource_manager.h>
-#include <pr_hardware_interfaces/TriggerState.h>
+#include <rewd_controllers/TriggerState.hpp>
 
 namespace rewd_controllers {
 

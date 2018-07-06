@@ -10,7 +10,7 @@
 #include <pr_control_msgs/SetForceTorqueThresholdAction.h>
 #include <pr_control_msgs/TriggerAction.h>
 #include <geometry_msgs/WrenchStamped.h>
-#include <rewd_controllers/TriggerableInterface.h>
+#include <rewd_controllers/TriggerableInterface.hpp>
 #include <rewd_controllers/MultiInterfaceController.hpp>
 #include <rewd_controllers/JointTrajectoryControllerBase.hpp>
 

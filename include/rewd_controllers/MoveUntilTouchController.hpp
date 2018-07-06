@@ -6,7 +6,7 @@
 #include <hardware_interface/force_torque_sensor_interface.h>
 #include <hardware_interface/joint_command_interface.h>
 #include <pr_control_msgs/SetForceTorqueThresholdAction.h>
-#include <rewd_controllers/TriggerableInterface.h>
+#include <rewd_controllers/TriggerableInterface.hpp>
 #include <rewd_controllers/MultiInterfaceController.hpp>
 #include <rewd_controllers/JointTrajectoryControllerBase.hpp>
 

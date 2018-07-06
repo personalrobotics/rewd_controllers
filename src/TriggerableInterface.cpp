@@ -1,4 +1,4 @@
-#include <rewd_controllers/TriggerableInterface.h>
+#include <rewd_controllers/TriggerableInterface.hpp>
 
 namespace rewd_controllers {
 

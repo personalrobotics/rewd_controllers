@@ -6,6 +6,7 @@
 #include <memory>
 #include <mutex>
 #include <vector>
+#include <unordered_map>
 
 #include <actionlib/server/action_server.h>
 #include <aikido/statespace/dart/MetaSkeletonStateSpace.hpp>
@@ -19,6 +20,9 @@
 
 namespace rewd_controllers
 {
+
+/// The JointTrajectoryControllerBase uses a bunch of ros parameters as configuration.
+/// It uses the constraints/joint_name/goal parameters to determine whether it has reached its goal.
 class JointTrajectoryControllerBase
 {
 protected:
@@ -72,8 +76,10 @@ protected:
   /**
    * \brief Called every update step in the real-time thread to let
    * subclassing controllers specify an early termination condition.
+   * 
+   * \param message If the execution should be stopped, this contains reason for stopping the execution.
    */
-  virtual bool shouldStopExecution();
+  virtual bool shouldStopExecution(std::string& message);
 
 private:
   /** \brief Contains all data needed to execute the currently
@@ -150,9 +156,18 @@ private:
   // However, this is not fully implemented in GCC 4.8.4, shipped with Ubuntu
   // 14.04.
   realtime_tools::RealtimeBox<TrajectoryContextPtr> mCurrentTrajectory;
+
+  // Difference between canceling and aborting a trajectory:
+  // If the higher level code stops the trajectory, it is "canceled".
+  // If the controller itself stops the trajectory, it is "aborted".
+  // This information is reflected in the goal handle and therefore accessible to the higher level code.
   std::atomic_bool mCancelCurrentTrajectory;
+  std::atomic_bool mAbortCurrentTrajectory;
+  std::string mAbortReason;
 
   TrajectoryContextPtr mNextTrajectory;
+
+  std::unordered_map<std::string, double> mGoalConstraints;
 };
 
 }  // namespace rewd_controllers

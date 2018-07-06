@@ -16,7 +16,7 @@
          base_class_type="controller_interface::ControllerBase">
     <description>
       The JointTrajectoryController implements the FollowJointTrajectory
-      action for  position, velocity, and effort joint interfaces. Position-
+      action for position, velocity, and effort joint interfaces. Position-
       and velocity-controlled joints track the desired position with PID.
       Effort-controlled joints track the desired position with PID with a
       feed-forward term computed via inverse dynamics.
@@ -37,7 +37,7 @@
          base_class_type="controller_interface::ControllerBase">
     <description>
       The MoveUntilTouchController implements the FollowJointTrajectory
-      action for  position, velocity, and effort joint interfaces. Position-
+      action for position, velocity, and effort joint interfaces. Position-
       and velocity-controlled joints track the desired position with PID.
       Effort-controlled joints track the desired position with PID with a
       feed-forward term computed via inverse dynamics.
@@ -45,6 +45,27 @@
       In addition, it claims a Force/Torque sensor and terminates execution
       as soon as the force threshold specified by the SetForceTorqueThreshold
       service is exceeded.
+    </description>
+  </class>
+
+  <class name="rewd_controllers/MoveUntilTouchTopicController"
+         type="rewd_controllers::MoveUntilTouchTopicController"
+         base_class_type="controller_interface::ControllerBase">
+    <description>
+      The MoveUntilTouchTopicController is basically the same as the
+      MoveUntilTouchController, but it communicates with the Force/Torque sensor
+      not through hardware interfaces, but rather through ros topics and action
+      clients.
+      
+      It implements the FollowJointTrajectory
+      action for position, velocity, and effort joint interfaces. Position-
+      and velocity-controlled joints track the desired position with PID.
+      Effort-controlled joints track the desired position with PID with a
+      feed-forward term computed via inverse dynamics.
+
+      In addition, it communicates with a Force/Torque sensor and terminates
+      execution as soon as the force threshold specified by the
+      SetForceTorqueThreshold service is exceeded.
     </description>
   </class>
 </library>

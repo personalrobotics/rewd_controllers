@@ -22,8 +22,10 @@ bool FTThresholdClient::trySetThresholdRepeatedly(double forceThreshold, double 
 {
   while (ros::ok())
   {
+    try {
     if (setThreshold(forceThreshold, torqueThreshold))
       return true;
+    } catch (std::runtime_error) {}
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   }
   return false;
@@ -31,20 +33,6 @@ bool FTThresholdClient::trySetThresholdRepeatedly(double forceThreshold, double 
 
 //=============================================================================
 bool FTThresholdClient::setThreshold(double forceThreshold, double torqueThreshold, double timeout)
-{
-  try
-  {
-    setThresholdOrThrow(forceThreshold, torqueThreshold, timeout);
-  }
-  catch (std::runtime_error)
-  {
-    return false;
-  }
-  return true;
-}
-
-//=============================================================================
-void FTThresholdClient::setThresholdOrThrow(double forceThreshold, double torqueThreshold, double timeout)
 {
   pr_control_msgs::SetForceTorqueThresholdGoal goal;
   goal.force_threshold = forceThreshold;
@@ -63,10 +51,12 @@ void FTThresholdClient::setThresholdOrThrow(double forceThreshold, double torque
           "F/T Thresholds could not be set: " + state.toString() + ", "
           + mFTThresholdActionClient->getResult()->message);
     }
+    return true;
   }
   else
   {
-    throw std::runtime_error("F/T Thresholds could not be set: Timeout");
+    return false;
   }
 }
+
 }

@@ -22,10 +22,6 @@ public:
   /// Can be aborted with !ros::ok(), in which case it returns false
   bool trySetThresholdRepeatedly(double forceThreshold, double torqueThreshold);
 
-  /// Sets the MoveUntilTouchControllers Thresholds.
-  /// Throws a runtime_error if we are unable to set the thresholds.
-  void setThresholdOrThrow(double forceThreshold, double torqueThreshold, double timeout = 3.0);
-
   /// Sets the MoveUntilTouchControllers thresholds.
   /// Returns true if the thresholds were set successfully.
   bool setThreshold(double forceThreshold, double torqueThreshold, double timeout = 3.0);

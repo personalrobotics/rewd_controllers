@@ -20,11 +20,11 @@ public:
   /// Sets the MoveUntilTouchControllers Thresholds.
   /// Blocks until the threshold could be set successfully.
   /// Can be aborted with !ros::ok(), in which case it returns false
-  bool trySetThresholdRepeatedly(double forceThreshold, double torqueThreshold);
+  bool trySetThresholdsRepeatedly(double forceThreshold, double torqueThreshold);
 
   /// Sets the MoveUntilTouchControllers thresholds.
   /// Returns true if the thresholds were set successfully.
-  bool setThreshold(double forceThreshold, double torqueThreshold, double timeout = 3.0);
+  bool setThresholds(double forceThreshold, double torqueThreshold, double timeout = 3.0);
 
 private:
 

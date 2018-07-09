@@ -189,6 +189,8 @@ void MoveUntilTouchTopicController::setForceTorqueThreshold(FTThresholdGoalHandl
     result.message =
         "Must wait until initial taring of force/torque sensor is complete "
         "before setting thresholds or sending trajectories.";
+    gh.setAccepted();
+    gh.setAborted(result);
   }
   // check threshold validity
   else if (goal->force_threshold > mForceLimit) {

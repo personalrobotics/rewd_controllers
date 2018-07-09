@@ -22,10 +22,8 @@ bool FTThresholdClient::trySetThresholdsRepeatedly(double forceThreshold, double
 {
   while (ros::ok())
   {
-    try {
     if (setThresholds(forceThreshold, torqueThreshold))
       return true;
-    } catch (std::runtime_error) {}
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   }
   return false;
@@ -45,7 +43,17 @@ bool FTThresholdClient::setThresholds(double forceThreshold, double torqueThresh
   {
     actionlib::SimpleClientGoalState state
         = mFTThresholdActionClient->getState();
-    if (state != actionlib::SimpleClientGoalState::StateEnum::SUCCEEDED)
+
+
+    if (state == actionlib::SimpleClientGoalState::StateEnum::SUCCEEDED)
+    {
+      return true;
+    }
+    else if (state == actionlib::SimpleClientGoalState::StateEnum::ABORTED)
+    {
+      return false;
+    }
+    else
     {
       throw std::runtime_error(
           "F/T Thresholds could not be set: " + state.toString() + ", "

@@ -189,6 +189,7 @@ void MoveUntilTouchController::setForceTorqueThreshold(FTThresholdGoalHandle gh)
         "before setting thresholds or sending trajectories.";
     gh.setAccepted();
     gh.setAborted(result);
+    return;
   }
   // check threshold validity
   else if (goal->force_threshold > mForceLimit) {

@@ -39,31 +39,27 @@ bool FTThresholdClient::setThresholds(double forceThreshold, double torqueThresh
   bool finished_before_timeout
       = mFTThresholdActionClient->waitForResult(ros::Duration(timeout));
 
-  if (finished_before_timeout)
+
+  actionlib::SimpleClientGoalState state
+      = mFTThresholdActionClient->getState();
+
+  if (!finished_before_timeout)
   {
-    actionlib::SimpleClientGoalState state
-        = mFTThresholdActionClient->getState();
-
-
-    if (state == actionlib::SimpleClientGoalState::StateEnum::SUCCEEDED)
-    {
-      return true;
-    }
-    else if (state == actionlib::SimpleClientGoalState::StateEnum::ABORTED)
-    {
-      return false;
-    }
-    else
-    {
-      throw std::runtime_error(
-          "F/T Thresholds could not be set: " + state.toString() + ", "
-          + mFTThresholdActionClient->getResult()->message);
-    }
+    return false;
+  }
+  else if (state == actionlib::SimpleClientGoalState::StateEnum::SUCCEEDED)
+  {
     return true;
+  }
+  else if (state == actionlib::SimpleClientGoalState::StateEnum::ABORTED)
+  {
+    return false;
   }
   else
   {
-    return false;
+    throw std::runtime_error(
+        "F/T Thresholds could not be set: " + state.toString() + ", "
+        + mFTThresholdActionClient->getResult()->message);
   }
 }
 

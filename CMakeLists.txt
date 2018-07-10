@@ -63,6 +63,7 @@ add_library("${PROJECT_NAME}" SHARED
   src/JointTrajectoryController.cpp
   src/MoveUntilTouchController.cpp
   src/MoveUntilTouchTopicController.cpp
+  src/FTThresholdClient.cpp
   src/TriggerableInterface.cpp
 )
 target_link_libraries("${PROJECT_NAME}"

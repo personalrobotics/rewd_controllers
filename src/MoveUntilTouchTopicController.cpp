@@ -179,6 +179,9 @@ void MoveUntilTouchTopicController::setForceTorqueThreshold(FTThresholdGoalHandl
   if (!isRunning()) {
     result.success = false;
     result.message = "Controller not started.";
+    gh.setAccepted();
+    gh.setAborted(result);
+    return;
   }
   // check initial taring is complete
   // NOTE: this is a hacky way to hopefully force the user to wait until taring

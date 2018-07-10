@@ -177,6 +177,9 @@ void MoveUntilTouchController::setForceTorqueThreshold(FTThresholdGoalHandle gh)
   if (!isRunning()) {
     result.success = false;
     result.message = "Controller not started.";
+    gh.setAccepted();
+    gh.setAborted(result);
+    return;
   }
   // check initial taring is complete
   // NOTE: this is a hacky way to hopefully force the user to wait until taring
@@ -187,6 +190,9 @@ void MoveUntilTouchController::setForceTorqueThreshold(FTThresholdGoalHandle gh)
     result.message =
         "Must wait until initial taring of force/torque sensor is complete "
         "before setting thresholds or sending trajectories.";
+    gh.setAccepted();
+    gh.setAborted(result);
+    return;
   }
   // check threshold validity
   else if (goal->force_threshold > mForceLimit) {

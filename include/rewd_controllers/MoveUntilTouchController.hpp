@@ -6,7 +6,7 @@
 #include <hardware_interface/force_torque_sensor_interface.h>
 #include <hardware_interface/joint_command_interface.h>
 #include <pr_control_msgs/SetForceTorqueThresholdAction.h>
-#include <rewd_controllers/TriggerableInterface.hpp>
+#include <pr_hardware_interfaces/TriggerableInterface.h>
 #include <rewd_controllers/MultiInterfaceController.hpp>
 #include <rewd_controllers/JointTrajectoryControllerBase.hpp>
 
@@ -21,7 +21,7 @@ class MoveUntilTouchController final
                                       hardware_interface::JointStateInterface,
                                       hardware_interface::
                                           ForceTorqueSensorInterface,
-                                      rewd_controllers::
+                                      pr_hardware_interfaces::
                                           TriggerableInterface>,
       public JointTrajectoryControllerBase
 {
@@ -73,7 +73,7 @@ private:
   using FTThresholdResult = pr_control_msgs::SetForceTorqueThresholdResult;
 
   hardware_interface::ForceTorqueSensorHandle mForceTorqueHandle;
-  rewd_controllers::TriggerableHandle mTareHandle;
+  pr_hardware_interfaces::TriggerableHandle mTareHandle;
   std::atomic_bool mTaringCompleted;
   double mForceLimit;
   double mTorqueLimit;

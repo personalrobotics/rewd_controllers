@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   controller_interface
   hardware_interface
   pr_control_msgs
+  pr_hardware_interfaces
   realtime_tools
 )
 include_directories(SYSTEM ${catkin_INCLUDE_DIRS})
@@ -40,6 +41,7 @@ catkin_package(
     controller_interface
     hardware_interface
     pr_control_msgs
+    pr_hardware_interfaces
     realtime_tools
   DEPENDS
     aikido
@@ -64,7 +66,6 @@ add_library("${PROJECT_NAME}" SHARED
   src/MoveUntilTouchController.cpp
   src/MoveUntilTouchTopicController.cpp
   src/FTThresholdClient.cpp
-  src/TriggerableInterface.cpp
 )
 target_link_libraries("${PROJECT_NAME}"
   ${DART_LIBRARIES}

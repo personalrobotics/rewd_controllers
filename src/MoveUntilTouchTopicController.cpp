@@ -93,12 +93,14 @@ void MoveUntilTouchTopicController::forceTorqueDataCallback(const geometry_msgs:
   mTorque.x() = msg.wrench.torque.x;
   mTorque.y() = msg.wrench.torque.y;
   mTorque.z() = msg.wrench.torque.z;
+  timeOfLastSensorDataReceived = std::chrono::steady_clock::now();
 }
 
 //=============================================================================
 void MoveUntilTouchTopicController::taringTransitionCallback(const TareActionClient::GoalHandle& goalHandle) {
   if (goalHandle.getResult() && goalHandle.getResult()->success) {
     ROS_INFO("Taring completed!");
+    timeOfLastSensorDataReceived = std::chrono::steady_clock::now();
     mTaringCompleted.store(true);
   }
 }
@@ -126,6 +128,11 @@ void MoveUntilTouchTopicController::stopping(const ros::Time& time)
 void MoveUntilTouchTopicController::update(const ros::Time& time,
                                       const ros::Duration& period)
 {
+  if (mTaringCompleted.load()
+      && (std::chrono::steady_clock::now() - timeOfLastSensorDataReceived > std::chrono::milliseconds(400))) {
+    throw std::runtime_error("Lost connection to F/T sensor!");
+  }
+
   // update base trajectory controller
   updateStep(time, period);
 }

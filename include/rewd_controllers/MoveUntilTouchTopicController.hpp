@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <mutex>
+  #include <chrono>
 #include <actionlib/server/action_server.h>
 #include <actionlib/client/simple_action_client.h>
 #include <hardware_interface/force_torque_sensor_interface.h>
@@ -114,6 +115,8 @@ private:
 
   // \brief If the torque is higher than this threshold, the controller aborts.
   std::atomic<double> mTorqueThreshold;
+
+   std::chrono::time_point<std::chrono::steady_clock> timeOfLastSensorDataReceived;
 
   /**
    * \brief Callback for pr_control_msgs::SetForceTorqueThresholdAction.

@@ -7,6 +7,7 @@
 #include <mutex>
 #include <vector>
 #include <unordered_map>
+#include <fstream>
 
 #include <actionlib/server/action_server.h>
 #include <aikido/statespace/dart/MetaSkeletonStateSpace.hpp>
@@ -14,6 +15,7 @@
 #include <control_msgs/FollowJointTrajectoryAction.h>
 #include <dart/dynamics/dynamics.hpp>
 #include <realtime_tools/realtime_buffer.h>
+#include <sensor_msgs/JointState.h>
 #include <realtime_tools/realtime_server_goal_handle.h>
 #include <rewd_controllers/helpers.hpp>
 #include <ros/node_handle.h>
@@ -127,6 +129,9 @@ private:
    */
   bool processCancelRequest(GoalHandle& ghToCancel);
 
+  void jointStateUpdateCallback(const sensor_msgs::JointState::ConstPtr& msg);
+
+
   std::unique_ptr<ros::NodeHandle> mNodeHandle;
   JointAdapterFactory mAdapterFactory;
   dart::dynamics::SkeletonPtr mSkeleton;
@@ -168,6 +173,13 @@ private:
   TrajectoryContextPtr mNextTrajectory;
 
   std::unordered_map<std::string, double> mGoalConstraints;
+
+  std::ofstream desiredFile;
+  std::ofstream actualFile;
+  std::ofstream jointStatesFile;
+  ros::Subscriber mSub;
+  std::mutex mJointStateUpdateMutex;
+  Eigen::VectorXd mCurrentVelocity;
 };
 
 }  // namespace rewd_controllers

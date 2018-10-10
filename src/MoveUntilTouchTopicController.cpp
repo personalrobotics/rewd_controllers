@@ -129,7 +129,7 @@ void MoveUntilTouchTopicController::update(const ros::Time& time,
                                       const ros::Duration& period)
 {
   if (mTaringCompleted.load()
-      && (std::chrono::steady_clock::now() - timeOfLastSensorDataReceived > std::chrono::milliseconds(400))) {
+      && (std::chrono::steady_clock::now() - timeOfLastSensorDataReceived > std::chrono::milliseconds(2000))) {
     throw std::runtime_error("Lost connection to F/T sensor!");
   }
 
@@ -154,8 +154,8 @@ bool MoveUntilTouchTopicController::shouldStopExecution(std::string& message)
   double torqueThreshold = mTorqueThreshold.load();
 
   std::lock_guard<std::mutex> lock(mForceTorqueDataMutex);
-  bool forceThresholdExceeded = mForce.norm() >= forceThreshold;
-  bool torqueThresholdExceeded = mTorque.norm() >= torqueThreshold;
+  bool forceThresholdExceeded = std::abs(mForce.x()) >= forceThreshold;
+  bool torqueThresholdExceeded = false; // mTorque.norm() >= torqueThreshold;
 
   
   if (forceThresholdExceeded) {

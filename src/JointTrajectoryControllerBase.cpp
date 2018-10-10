@@ -40,10 +40,19 @@ JointTrajectoryControllerBase::JointTrajectoryControllerBase()
       "velocity");
   mAdapterFactory.registerFactory<EffortJointInterface, JointEffortAdapter>(
       "effort");
+
+       desiredFile.open ("/home/herb/control_desired.txt", std::ios::out);
+       actualFile.open ("/home/herb/control_actual.txt", std::ios::out);
+       jointStatesFile.open ("/home/herb/control_jointStates.txt", std::ios::out);
+
+  mCurrentVelocity = Eigen::VectorXd::Zero(6);
 }
 
 //=============================================================================
-JointTrajectoryControllerBase::~JointTrajectoryControllerBase() {}
+JointTrajectoryControllerBase::~JointTrajectoryControllerBase() {
+  desiredFile.close();
+  actualFile.close();
+}
 
 //=============================================================================
 bool JointTrajectoryControllerBase::initController(
@@ -56,6 +65,10 @@ bool JointTrajectoryControllerBase::initController(
         "realtime safety.");
     return false;
   }
+
+
+  // subscribe to the joint state publisher
+  mSub = mNodeHandle->subscribe("/joint_states", 10, &JointTrajectoryControllerBase::jointStateUpdateCallback, this);
 
   using aikido::statespace::dart::MetaSkeletonStateSpace;
   using hardware_interface::JointStateInterface;
@@ -155,6 +168,19 @@ bool JointTrajectoryControllerBase::initController(
   return true;
 }
 
+//==============================================================================
+void JointTrajectoryControllerBase::jointStateUpdateCallback(const sensor_msgs::JointState::ConstPtr& msg)
+{
+  std::lock_guard<std::mutex> currPosVelLock{mJointStateUpdateMutex, 
+                                                 std::adopt_lock};
+  std::size_t velDimSize = mCurrentVelocity.size();
+  for(std::size_t i=0; i < velDimSize; i++)
+  {
+    mCurrentVelocity[i] = msg->velocity[i];
+  }
+
+}
+
 //=============================================================================
 void JointTrajectoryControllerBase::startController(const ros::Time& time)
 {
@@ -237,6 +263,7 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
       }
     }
 
+
     std::string stopReason;
     bool shouldStopExec = shouldStopExecution(stopReason);
 
@@ -246,16 +273,52 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
     } else if (shouldStopExec || mCancelCurrentTrajectory.load()) {
       // TODO: if there is no other work that needs done here, we can get rid of
       // the cancel atomic_bool
-      mDesiredVelocity.fill(0.0);
-      mDesiredAcceleration.fill(0.0);
+      // mDesiredVelocity.fill(0.0);
+      // mDesiredAcceleration.fill(0.0);
       context->mCompleted.store(true);
 
       if (shouldStopExec) {
+        mDesiredVelocity.fill(0.0);
+        mDesiredAcceleration.fill(0.0);
         mAbortCurrentTrajectory.store(true);
         mAbortReason = stopReason;
       }
     }
+
+
+
+Eigen::VectorXd jointStatesCurrentVelocities(6);
+
+  {
+    std::lock_guard<std::mutex> currPosVelLock{mJointStateUpdateMutex, 
+                                                 std::adopt_lock};
+
+    jointStatesCurrentVelocities = mCurrentVelocity;
   }
+
+
+    for(std::size_t i=0; i<6;i++)
+    {
+      jointStatesFile << jointStatesCurrentVelocities[i] << " ";
+    }
+    jointStatesFile << std::endl;
+
+    desiredFile << timeFromStart << ",    ";
+    for(std::size_t i=0; i<6;i++)
+    {
+      desiredFile << mDesiredPosition[i] << ", " << mDesiredVelocity[i] << ", ";
+    }
+    desiredFile << std::endl;
+
+    for(std::size_t i=0; i<6;i++)
+    {
+      actualFile << mActualPosition[i] << " " << mActualVelocity[i] << " ";
+    }
+    actualFile << std::endl;
+  }
+
+
+
 
   // Compute inverse dynamics torques from the set point and store them in the
   // skeleton. These values may be queried by the adapters below.
@@ -354,6 +417,14 @@ void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle)
     std::lock_guard<std::mutex> newTrajectoryLock{mNewTrajectoryRequestsMutex};
     mNewTrajectoryRequests.push_back(newContext);
   }  // exit critical section
+
+
+  // DEBUG
+  Eigen::VectorXd desiredVelocity(mDesiredVelocity.size());
+  newContext->mTrajectory->evaluateDerivative(newContext->mTrajectory->getStartTime(), 1, desiredVelocity);
+  Eigen::VectorXd actualVelocity = mControlledSkeleton->getVelocities();
+  std::cout << "DESIRED VELOCITY: " << desiredVelocity.matrix().transpose() << std::endl;
+  std::cout << "CURRENT VELOCITY: " << actualVelocity.matrix().transpose() << std::endl;
 }
 
 //=============================================================================
@@ -361,6 +432,10 @@ void JointTrajectoryControllerBase::cancelCallback(GoalHandle goalHandle)
 {
   ROS_INFO_STREAM("Requesting cancelation of trajectory '"
                   << goalHandle.getGoalID().id << "'.");
+  
+  Eigen::VectorXd actualVelocity = mControlledSkeleton->getVelocities();
+  std::cout << "BEFORE ABORTION VELOCITY: " << actualVelocity.matrix().transpose() << std::endl;
+
   if (!shouldAcceptRequests()) {
     Result result;
     result.error_code = Result::INVALID_GOAL;

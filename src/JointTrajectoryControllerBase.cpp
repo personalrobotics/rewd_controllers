@@ -3,9 +3,12 @@
 #include <algorithm>
 #include <functional>
 #include <stdexcept>
+#include <cmath>
 
 #include <aikido/control/ros/Conversions.hpp>
 #include <aikido/statespace/dart/MetaSkeletonStateSpace.hpp>
+#include <aikido/statespace/CartesianProduct.hpp>
+#include <aikido/statespace/Rn.hpp>
 #include <aikido/trajectory/Spline.hpp>
 #include <aikido/common/Spline.hpp>
 #include <dart/dynamics/dynamics.hpp>
@@ -226,7 +229,18 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
                                                const ros::Duration& period)
 {
   // TODO: Make this a member variable to avoid dynamic allocation.
-  auto mDesiredState = mControlledSpace->createState();
+  // auto mDesiredState = mControlledSpace->createState();
+  std::vector<aikido::statespace::ConstStateSpacePtr> subspaces;
+  for (std::size_t i = 0; i < mControlledSpace->getDimension(); ++i)
+  {
+    subspaces.emplace_back(std::make_shared<aikido::statespace::R1>());
+  }
+  auto compoundSpace
+      = std::make_shared<const aikido::statespace::CartesianProduct>(subspaces);
+  auto mDesiredState = compoundSpace->createState();
+  auto stateHolder = compoundSpace->createState();
+  Eigen::VectorXd desiredHolder(mControlledSpace->getDimension()); 
+  Eigen::VectorXd actualHolder(mControlledSpace->getDimension()); 
 
   std::shared_ptr<TrajectoryContext> context;
   mCurrentTrajectory.get(context);
@@ -237,6 +251,12 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
   mActualVelocity = mControlledSkeleton->getVelocities();
   mActualEffort = mControlledSkeleton->getForces();
 
+  mControlledSpace->convertPositionsToState(mActualPosition, stateHolder);
+  mControlledSpace->convertStateToPositions(stateHolder, actualHolder);
+
+  std::cout << "DART " << mActualPosition.transpose() << std::endl;
+  // std::cout << "DART " << actualHolder.transpose() << std::endl;
+
   if (context && !context->mCompleted.load()) {
     const auto& trajectory = context->mTrajectory;
     const auto timeFromStart = std::min((time - context->mStartTime).toSec(),
@@ -244,19 +264,29 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
 
     // Evaluate the trajectory at the current time.
     trajectory->evaluate(timeFromStart, mDesiredState);
-    mControlledSpace->convertStateToPositions(mDesiredState, mDesiredPosition);
+    // mControlledSpace->convertStateToPositions(mDesiredState, mDesiredPosition);
+    compoundSpace->logMap(mDesiredState, mDesiredPosition);
+    mDesiredPosition -= mOffset;
+
     trajectory->evaluateDerivative(timeFromStart, 1, mDesiredVelocity);
     trajectory->evaluateDerivative(timeFromStart, 2, mDesiredAcceleration);
 
     // TODO: Check path constraints.
 
     // Check goal constraints.
+    mControlledSpace->convertPositionsToState(mDesiredPosition, stateHolder);
+    mControlledSpace->convertStateToPositions(stateHolder, desiredHolder);
+    std::cout << "REWD: " << mDesiredPosition.transpose() << std::endl;
+
     bool goalConstraintsSatisfied = true;
-    for (const auto& dof : mControlledSkeleton->getDofs()) {
+    for (const auto& dof : mControlledSkeleton->getDofs()) 
+    {
       auto goalIt = mGoalConstraints.find(dof->getName());
-      if (goalIt != mGoalConstraints.end()) {
+      if (goalIt != mGoalConstraints.end()) 
+      {
         std::size_t index = mControlledSkeleton->getIndexOf(dof);
-        if (std::abs(mDesiredPosition[index] - mActualPosition[index]) > (*goalIt).second) {
+        if (std::abs(desiredHolder[index] - actualHolder[index]) > (*goalIt).second) 
+        {
           goalConstraintsSatisfied = false;
           break;
         }
@@ -268,9 +298,11 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
     bool shouldStopExec = shouldStopExecution(stopReason);
 
     // Terminate the current trajectory.
-    if (timeFromStart >= trajectory->getDuration() && goalConstraintsSatisfied) {
+    if (timeFromStart >= trajectory->getDuration() && goalConstraintsSatisfied) 
+    {
       context->mCompleted.store(true);
-    } else if (shouldStopExec || mCancelCurrentTrajectory.load()) {
+    } 
+    else if (shouldStopExec || mCancelCurrentTrajectory.load()) {
       // TODO: if there is no other work that needs done here, we can get rid of
       // the cancel atomic_bool
       // mDesiredVelocity.fill(0.0);
@@ -411,6 +443,34 @@ void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle)
   newContext->mStartTime = startTime;
   newContext->mTrajectory = trajectory;
   newContext->mGoalHandle = goalHandle;
+
+  // Initialize offset
+  std::vector<aikido::statespace::ConstStateSpacePtr> subspaces;
+  for (std::size_t i = 0; i < mControlledSpace->getDimension(); ++i)
+  {
+    subspaces.emplace_back(std::make_shared<aikido::statespace::R1>());
+  }
+  auto compoundSpace
+      = std::make_shared<const aikido::statespace::CartesianProduct>(subspaces);
+
+  // Evaluate the trajectory at the current time.
+  auto offsetDesiredState = mControlledSpace->createState();
+  Eigen::VectorXd offsetDesiredPosition(mControlledSpace->getDimension());
+  trajectory->evaluate(0, offsetDesiredState);
+  compoundSpace->logMap(offsetDesiredState, offsetDesiredPosition);
+
+  Eigen::VectorXd offsetActualPosition(mControlledSpace->getDimension());
+  offsetActualPosition = mControlledSkeleton->getPositions();
+
+  Eigen::VectorXd offset(mControlledSpace->getDimension());
+  offset = offsetDesiredPosition - offsetActualPosition;
+  offset = (offset / (2*M_PI));
+  for (int i = 0; i < offset.size(); ++i)
+  {
+    offset(i) = round(offset(i))*2*M_PI;
+  }
+  mOffset = offset;
+
 
   newContext->mGoalHandle.setAccepted();
   {  // enter critical section

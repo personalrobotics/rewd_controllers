@@ -251,9 +251,6 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
   mActualVelocity = mControlledSkeleton->getVelocities();
   mActualEffort = mControlledSkeleton->getForces();
 
-  mControlledSpace->convertPositionsToState(mActualPosition, stateHolder);
-  mControlledSpace->convertStateToPositions(stateHolder, actualHolder);
-
   std::cout << "DART " << mActualPosition.transpose() << std::endl;
   // std::cout << "DART " << actualHolder.transpose() << std::endl;
 
@@ -266,7 +263,12 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
     trajectory->evaluate(timeFromStart, mDesiredState);
     // mControlledSpace->convertStateToPositions(mDesiredState, mDesiredPosition);
     compoundSpace->logMap(mDesiredState, mDesiredPosition);
+    std::cout << "REWD: " << mDesiredPosition.transpose() << std::endl;
+
+    // apply offset
     mDesiredPosition -= mOffset;
+
+    std::cout << "OFFSET: " << mOffset.transpose() << std::endl;
 
     trajectory->evaluateDerivative(timeFromStart, 1, mDesiredVelocity);
     trajectory->evaluateDerivative(timeFromStart, 2, mDesiredAcceleration);
@@ -274,10 +276,6 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
     // TODO: Check path constraints.
 
     // Check goal constraints.
-    mControlledSpace->convertPositionsToState(mDesiredPosition, stateHolder);
-    mControlledSpace->convertStateToPositions(stateHolder, desiredHolder);
-    std::cout << "REWD: " << mDesiredPosition.transpose() << std::endl;
-
     bool goalConstraintsSatisfied = true;
     for (const auto& dof : mControlledSkeleton->getDofs()) 
     {
@@ -285,7 +283,7 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
       if (goalIt != mGoalConstraints.end()) 
       {
         std::size_t index = mControlledSkeleton->getIndexOf(dof);
-        if (std::abs(desiredHolder[index] - actualHolder[index]) > (*goalIt).second) 
+        if (std::abs(mDesiredPosition[index] - mActualPosition[index]) > (*goalIt).second) 
         {
           goalConstraintsSatisfied = false;
           break;

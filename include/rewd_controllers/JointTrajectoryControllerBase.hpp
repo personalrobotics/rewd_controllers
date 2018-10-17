@@ -181,6 +181,9 @@ private:
   ros::Subscriber mSub;
   std::mutex mJointStateUpdateMutex;
   Eigen::VectorXd mCurrentVelocity;
+
+  int mStepCounter = 0;
+  int mOutputAtStep = 1;
 };
 
 }  // namespace rewd_controllers

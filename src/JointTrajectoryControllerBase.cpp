@@ -228,6 +228,10 @@ void JointTrajectoryControllerBase::stopController(const ros::Time& time)
 void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
                                                const ros::Duration& period)
 {
+
+  mStepCounter = (mStepCounter % mOutputAtStep) + 1;
+
+
   // TODO: Make this a member variable to avoid dynamic allocation.
   // auto mDesiredState = mControlledSpace->createState();
   std::vector<aikido::statespace::ConstStateSpacePtr> subspaces;
@@ -251,8 +255,9 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
   mActualVelocity = mControlledSkeleton->getVelocities();
   mActualEffort = mControlledSkeleton->getForces();
 
-  std::cout << "DART " << mActualPosition.transpose() << std::endl;
-  // std::cout << "DART " << actualHolder.transpose() << std::endl;
+  if (mStepCounter == mOutputAtStep) {
+    std::cout << "DART " << mActualPosition.transpose() << std::endl;
+  }
 
   if (context && !context->mCompleted.load()) {
     const auto& trajectory = context->mTrajectory;
@@ -263,12 +268,17 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
     trajectory->evaluate(timeFromStart, mDesiredState);
     // mControlledSpace->convertStateToPositions(mDesiredState, mDesiredPosition);
     compoundSpace->logMap(mDesiredState, mDesiredPosition);
-    std::cout << "REWD: " << mDesiredPosition.transpose() << std::endl;
 
     // apply offset
     mDesiredPosition -= mOffset;
 
-    std::cout << "OFFSET: " << mOffset.transpose() << std::endl;
+    if (mStepCounter == mOutputAtStep) {
+      std::cout << "REWD: " << mDesiredPosition.transpose() << std::endl;
+    }
+
+    if (mStepCounter == mOutputAtStep) {
+      // std::cout << "OFFSET: " << mOffset.transpose() << std::endl;
+    }
 
     trajectory->evaluateDerivative(timeFromStart, 1, mDesiredVelocity);
     trajectory->evaluateDerivative(timeFromStart, 2, mDesiredAcceleration);
@@ -363,6 +373,11 @@ Eigen::VectorXd jointStatesCurrentVelocities(6);
   // may be used by the adapters below.
   mControlledSkeleton->setPositions(mActualPosition);
   mControlledSkeleton->setVelocities(mActualVelocity);
+
+  if (mStepCounter == mOutputAtStep) {
+    // std::cout << "Desired Velocity: " << mDesiredVelocity.transpose() << std::endl;
+    // std::cout << "Actual Velocity: " << mActualVelocity.transpose() << std::endl;
+  }
 
   for (size_t idof = 0; idof < mAdapters.size(); ++idof) {
     mAdapters[idof]->update(time, period, mActualPosition[idof],
@@ -461,13 +476,21 @@ void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle)
   offsetActualPosition = mControlledSkeleton->getPositions();
 
   Eigen::VectorXd offset(mControlledSpace->getDimension());
+  std::cout << "OFFSETDESIRED: " << offsetDesiredPosition.transpose() << std::endl;
+  std::cout << "OFFSETACTUAL:  " << offsetActualPosition.transpose() << std::endl;
   offset = offsetDesiredPosition - offsetActualPosition;
+  std::cout << "OFFSET1: " << mOffset.transpose() << std::endl;
   offset = (offset / (2*M_PI));
+  std::cout << "OFFSET2: " << mOffset.transpose() << std::endl;
   for (int i = 0; i < offset.size(); ++i)
   {
     offset(i) = round(offset(i))*2*M_PI;
   }
   mOffset = offset;
+  std::cout << "OFFSET: " << mOffset.transpose() << std::endl;
+
+  // output first one
+  mStepCounter = mOutputAtStep-1;
 
 
   newContext->mGoalHandle.setAccepted();

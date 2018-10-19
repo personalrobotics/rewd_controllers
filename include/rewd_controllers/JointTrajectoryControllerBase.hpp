@@ -183,7 +183,7 @@ private:
   Eigen::VectorXd mCurrentVelocity;
 
   int mStepCounter = 0;
-  int mOutputAtStep = 1;
+  int mOutputAtStep = -1;
 };
 
 }  // namespace rewd_controllers

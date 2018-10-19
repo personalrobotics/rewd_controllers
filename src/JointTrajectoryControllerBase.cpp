@@ -187,6 +187,7 @@ void JointTrajectoryControllerBase::jointStateUpdateCallback(const sensor_msgs::
 //=============================================================================
 void JointTrajectoryControllerBase::startController(const ros::Time& time)
 {
+  ROS_INFO_STREAM("began starting controller");
   mSkeletonUpdater->update();
 
   // Hold the current position.
@@ -216,6 +217,7 @@ void JointTrajectoryControllerBase::startController(const ros::Time& time)
   mAbortCurrentTrajectory.store(false);
 
   mNonRealtimeTimer.start();
+  ROS_INFO_STREAM("finished starting controller");
 }
 
 //=============================================================================
@@ -399,6 +401,7 @@ void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle)
     result.error_code = Result::INVALID_GOAL;
     result.error_string = "Controller not running.";
     goalHandle.setRejected(result);
+    ROS_ERROR_STREAM("rejected trajectory because I shouldn't accept any right now.");
     return;
   }
 

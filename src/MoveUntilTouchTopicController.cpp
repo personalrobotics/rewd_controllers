@@ -132,7 +132,6 @@ void MoveUntilTouchTopicController::update(const ros::Time& time,
       && (std::chrono::steady_clock::now() - timeOfLastSensorDataReceived > std::chrono::milliseconds(2000))) {
     throw std::runtime_error("Lost connection to F/T sensor!");
   }
-
   // update base trajectory controller
   updateStep(time, period);
 }
@@ -178,7 +177,7 @@ bool MoveUntilTouchTopicController::shouldStopExecution(std::string& message)
 void MoveUntilTouchTopicController::setForceTorqueThreshold(FTThresholdGoalHandle gh)
 {
   const auto goal = gh.getGoal();
-  ROS_INFO_STREAM("Setting thresholds: force = " << goal->force_threshold
+  ROS_WARN_STREAM("Setting thresholds: force = " << goal->force_threshold
                                                  << ", torque = "
                                                  << goal->torque_threshold);
   FTThresholdResult result;

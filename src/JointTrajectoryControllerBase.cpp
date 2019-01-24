@@ -6,7 +6,6 @@
 #include <stdexcept>
 
 #include <aikido/control/ros/Conversions.hpp>
-#include <aikido/statespace/CartesianProduct.hpp>
 #include <aikido/statespace/dart/MetaSkeletonStateSpace.hpp>
 #include <aikido/statespace/Rn.hpp>
 #include <aikido/trajectory/Spline.hpp>
@@ -104,6 +103,14 @@ bool JointTrajectoryControllerBase::initController(
 
   mControlledSpace =
       std::make_shared<MetaSkeletonStateSpace>(mControlledSkeleton.get());
+
+  std::vector<aikido::statespace::ConstStateSpacePtr> subspaces;
+  for (std::size_t i = 0; i < mControlledSpace->getDimension(); ++i)
+  {
+    subspaces.emplace_back(std::make_shared<aikido::statespace::R1>());
+  }
+  mCompoundSpace
+      = std::move(std::make_shared<aikido::statespace::CartesianProduct>(subspaces));
 
   // the full skeleton.
   const auto jointStateInterface = robot->get<JointStateInterface>();
@@ -203,17 +210,7 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
                                                const ros::Duration& period)
 {
 
-// ====
-  std::vector<aikido::statespace::ConstStateSpacePtr> subspaces;
-  for (std::size_t i = 0; i < mControlledSpace->getDimension(); ++i)
-  {
-    subspaces.emplace_back(std::make_shared<aikido::statespace::R1>());
-  }
-  auto compoundSpace
-      = std::make_shared<const aikido::statespace::CartesianProduct>(subspaces);
-  auto mDesiredState = compoundSpace->createState();
-
-// ====
+  auto mDesiredState = mCompoundSpace->createState();
 
   std::shared_ptr<TrajectoryContext> context;
   mCurrentTrajectory.get(context);
@@ -224,25 +221,18 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
   mActualVelocity = mControlledSkeleton->getVelocities();
   mActualEffort = mControlledSkeleton->getForces();
 
-  if (context && !context->mCompleted.load()) {
+  if (context && !context->mCompleted.load()) 
+  {
     const auto& trajectory = context->mTrajectory;
     const auto timeFromStart = std::min((time - context->mStartTime).toSec(),
                                         trajectory->getEndTime());
 
     // Evaluate the trajectory at the current time.
     trajectory->evaluate(timeFromStart, mDesiredState);
+    mCompoundSpace->logMap(mDesiredState, mDesiredPosition);
 
-// ====
-
-    // mControlledSpace->convertStateToPositions(mDesiredState, mDesiredPosition);
-
-    compoundSpace->logMap(mDesiredState, mDesiredPosition);
-
-    // apply offset
+    // Apply offset
     mDesiredPosition -= mOffset;
-
-// ====
-
 
     trajectory->evaluateDerivative(timeFromStart, 1, mDesiredVelocity);
     trajectory->evaluateDerivative(timeFromStart, 2, mDesiredAcceleration);
@@ -305,7 +295,8 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
   mControlledSkeleton->setPositions(mActualPosition);
   mControlledSkeleton->setVelocities(mActualVelocity);
 
-  for (size_t idof = 0; idof < mAdapters.size(); ++idof) {
+  for (size_t idof = 0; idof < mAdapters.size(); ++idof) 
+  {
     mAdapters[idof]->update(time, period, mActualPosition[idof],
                             mDesiredPosition[idof], mActualVelocity[idof],
                             mDesiredVelocity[idof], mDesiredEffort[idof]);
@@ -383,20 +374,11 @@ void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle)
   newContext->mTrajectory = trajectory;
   newContext->mGoalHandle = goalHandle;
 
-  // Initialize offset for the next goal.
-  std::vector<aikido::statespace::ConstStateSpacePtr> subspaces;
-  for (std::size_t i = 0; i < mControlledSpace->getDimension(); ++i)
-  {
-    subspaces.emplace_back(std::make_shared<aikido::statespace::R1>());
-  }
-  auto compoundSpace
-      = std::make_shared<const aikido::statespace::CartesianProduct>(subspaces);
-
   // Evaluate the trajectory at the current time.
   auto offsetDesiredState = mControlledSpace->createState();
   Eigen::VectorXd offsetDesiredPosition(mControlledSpace->getDimension());
   trajectory->evaluate(0, offsetDesiredState);
-  compoundSpace->logMap(offsetDesiredState, offsetDesiredPosition);
+  mCompoundSpace->logMap(offsetDesiredState, offsetDesiredPosition);
 
   Eigen::VectorXd offsetActualPosition(mControlledSpace->getDimension());
   offsetActualPosition = mControlledSkeleton->getPositions();

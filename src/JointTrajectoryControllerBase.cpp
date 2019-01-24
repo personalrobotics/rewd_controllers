@@ -212,9 +212,6 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
   auto compoundSpace
       = std::make_shared<const aikido::statespace::CartesianProduct>(subspaces);
   auto mDesiredState = compoundSpace->createState();
-  auto stateHolder = compoundSpace->createState();
-  Eigen::VectorXd desiredHolder(mControlledSpace->getDimension()); 
-  Eigen::VectorXd actualHolder(mControlledSpace->getDimension()); 
 
 // ====
 

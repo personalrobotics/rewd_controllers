@@ -15,6 +15,7 @@
 #include <rewd_controllers/MultiInterfaceController.hpp>
 #include <rewd_controllers/JointTrajectoryControllerBase.hpp>
 
+
 namespace rewd_controllers
 {
 
@@ -74,6 +75,8 @@ protected:
   bool shouldStopExecution(std::string& message) override;
 
 private:
+  static constexpr std::chrono::milliseconds MAX_DELAY = std::chrono::milliseconds(400);
+
   using SetFTThresholdAction = pr_control_msgs::SetForceTorqueThresholdAction;
   using FTThresholdActionServer = actionlib::ActionServer<SetFTThresholdAction>;
   using FTThresholdGoalHandle = FTThresholdActionServer::GoalHandle;

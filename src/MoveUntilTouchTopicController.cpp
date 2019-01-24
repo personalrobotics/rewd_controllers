@@ -129,7 +129,7 @@ void MoveUntilTouchTopicController::update(const ros::Time& time,
                                       const ros::Duration& period)
 {
   if (mTaringCompleted.load()
-      && (std::chrono::steady_clock::now() - mTimeOfLastSensorDataReceived > std::chrono::milliseconds(400)))
+      && (std::chrono::steady_clock::now() - mTimeOfLastSensorDataReceived > MAX_DELAY))
   {
     throw std::runtime_error("Lost connection to F/T sensor!");
   }

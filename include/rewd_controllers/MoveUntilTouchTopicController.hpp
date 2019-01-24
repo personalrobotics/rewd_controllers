@@ -3,7 +3,7 @@
 
 #include <atomic>
 #include <mutex>
-  #include <chrono>
+#include <chrono>
 #include <actionlib/server/action_server.h>
 #include <actionlib/client/simple_action_client.h>
 #include <hardware_interface/force_torque_sensor_interface.h>
@@ -79,7 +79,7 @@ private:
   using FTThresholdGoalHandle = FTThresholdActionServer::GoalHandle;
   using FTThresholdResult = pr_control_msgs::SetForceTorqueThresholdResult;
   using TareActionClient = actionlib::ActionClient<pr_control_msgs::TriggerAction>;
-  
+
   // \brief Protects mForce and mTorque from simultaneous access.
   std::mutex mForceTorqueDataMutex;
 
@@ -116,7 +116,8 @@ private:
   // \brief If the torque is higher than this threshold, the controller aborts.
   std::atomic<double> mTorqueThreshold;
 
-   std::chrono::time_point<std::chrono::steady_clock> timeOfLastSensorDataReceived;
+  // \brief Keeps track of the last update time
+ std::chrono::time_point<std::chrono::steady_clock> mTimeOfLastSensorDataReceived;
 
   /**
    * \brief Callback for pr_control_msgs::SetForceTorqueThresholdAction.

@@ -93,14 +93,14 @@ void MoveUntilTouchTopicController::forceTorqueDataCallback(const geometry_msgs:
   mTorque.x() = msg.wrench.torque.x;
   mTorque.y() = msg.wrench.torque.y;
   mTorque.z() = msg.wrench.torque.z;
-  timeOfLastSensorDataReceived = std::chrono::steady_clock::now();
+  mTimeOfLastSensorDataReceived = std::chrono::steady_clock::now();
 }
 
 //=============================================================================
 void MoveUntilTouchTopicController::taringTransitionCallback(const TareActionClient::GoalHandle& goalHandle) {
   if (goalHandle.getResult() && goalHandle.getResult()->success) {
     ROS_INFO("Taring completed!");
-    timeOfLastSensorDataReceived = std::chrono::steady_clock::now();
+    mTimeOfLastSensorDataReceived = std::chrono::steady_clock::now();
     mTaringCompleted.store(true);
   }
 }
@@ -129,7 +129,8 @@ void MoveUntilTouchTopicController::update(const ros::Time& time,
                                       const ros::Duration& period)
 {
   if (mTaringCompleted.load()
-      && (std::chrono::steady_clock::now() - timeOfLastSensorDataReceived > std::chrono::milliseconds(400))) {
+      && (std::chrono::steady_clock::now() - mTimeOfLastSensorDataReceived > std::chrono::milliseconds(400)))
+  {
     throw std::runtime_error("Lost connection to F/T sensor!");
   }
 
@@ -157,16 +158,20 @@ bool MoveUntilTouchTopicController::shouldStopExecution(std::string& message)
   bool forceThresholdExceeded = mForce.norm() >= forceThreshold;
   bool torqueThresholdExceeded = mTorque.norm() >= torqueThreshold;
 
-  
+
   if (forceThresholdExceeded) {
     std::stringstream messageStream;
-    messageStream << "Force Threshold exceeded!   Threshold: " << forceThreshold << "   Force: " << mForce.x() << ", " << mForce.y() << ", " << mForce.z();
+    messageStream << "Force Threshold exceeded!   Threshold: "
+    << forceThreshold << "   Force: " << mForce.x()
+    << ", " << mForce.y() << ", " << mForce.z();
     message = messageStream.str();
     ROS_WARN(message.c_str());
   }
   if (torqueThresholdExceeded) {
     std::stringstream messageStream;
-    messageStream << "Torque Threshold exceeded!   Threshold: " << torqueThreshold << "   Torque: " << mTorque.x() << ", " << mTorque.y() << ", " << mTorque.z();
+    messageStream << "Torque Threshold exceeded!   Threshold: "
+    << torqueThreshold << "   Torque: " << mTorque.x()
+    << ", " << mTorque.y() << ", " << mTorque.z();
     message = messageStream.str();
     ROS_WARN(message.c_str());
   }

@@ -158,7 +158,6 @@ bool MoveUntilTouchTopicController::shouldStopExecution(std::string& message)
   bool forceThresholdExceeded = mForce.norm() >= forceThreshold;
   bool torqueThresholdExceeded = mTorque.norm() >= torqueThreshold;
 
-
   if (forceThresholdExceeded) {
     std::stringstream messageStream;
     messageStream << "Force Threshold exceeded!   Threshold: "

@@ -69,7 +69,7 @@ std::string enumerateElements(
     const std::string& suffix = "");
 
 } // namespace
-  /** \endcond */
+/** \endcond */
 
 /**
  * \brief %Controller able to claim resources from multiple hardware interfaces.
@@ -86,14 +86,11 @@ std::string enumerateElements(
  *
  * By default, all specified hardware interfaces are required, and their
  * existence will be enforced by \ref initRequest. It is possible to make
- * hardware
- * interfaces optional by means of the \c allow_optional_interfaces
+ * hardware interfaces optional by means of the \c allow_optional_interfaces
  * \ref MultiInterfaceController::MultiInterfaceController "constructor"
- * parameter.
- * This allows to write controllers where some interfaces are mandatory, and
- * others, if present, improve controller performance, but whose absence does
- * not
- * prevent the controller from running.
+ * parameter. This allows to write controllers where some interfaces are 
+ * mandatory, and others, if present, improve controller performance, but whose
+ * absence does not prevent the controller from running.
  *
  * The following is an example of a controller claiming resources from velocity-
  * and effort-controlled joints.
@@ -154,8 +151,7 @@ std::string enumerateElements(
  *   {
  *     // robot_hw pointer contains at most the two interfaces requested by the
  *     // controller. It may have none, only one or both, depending on whether
- * the
- *     // robot exposes them
+ *     // the robot exposes them
  *
  *     // v is a required interface
  *     VelocityJointInterface* v = robot_hw->get<VelocityJointInterface>;
@@ -165,10 +161,8 @@ std::string enumerateElements(
  *     }
  *
  *     // e is an optional interface. If present, additional features are
- * enabled.
- *     // Controller can still function if interface or some of its resources
- * are
- *     // absent
+ *     // enabled. Controller can still function if interface or some of its
+ *     // resources are absent.
  *     EffortJointInterface* e = robot_hw->get<EffortJointInterface>;
  *
  *     // Fetch resources from interfaces, perform rest of initialization
@@ -220,6 +214,7 @@ public:
 
   virtual ~MultiInterfaceController()
   {
+    // Do nothing.
   }
 
   /** \name Non Real-Time Safe Functions
@@ -233,8 +228,7 @@ public:
    * and resource pre-allocation.
    *
    * \param robot_hw Robot hardware abstraction containing a subset of the
-   * entire
-   * robot. If \ref MultiInterfaceController::MultiInterfaceController
+   * entire robot. If \ref MultiInterfaceController::MultiInterfaceController
    * "MultiInterfaceController" was called with \c allow_optional_interfaces set
    * to \c false (the default), this parameter contains all the interfaces
    * requested by the controller.
@@ -244,8 +238,7 @@ public:
    * \ref MultiInterfaceController "class description".
    *
    * \param controller_nh A NodeHandle in the namespace from which the
-   * controller
-   * should read its configuration, and where it should set up its ROS
+   * controller should read its configuration, and where it should set up its ROS
    * interface.
    *
    * \returns True if initialization was successful and the controller
@@ -266,15 +259,13 @@ public:
    * and resource pre-allocation.
    *
    * \param robot_hw Robot hardware abstraction containing a subset of the
-   * entire
-   * robot. If \ref MultiInterfaceController::MultiInterfaceController
+   * entire robot. If \ref MultiInterfaceController::MultiInterfaceController
    * "MultiInterfaceController" was called with \c allow_optional_interfaces set
    * to \c false (the default), this parameter contains all the interfaces
-   * requested by the controller.
-   * If \c allow_optional_interfaces was set to \c false, this parameter may
-   * contain none, some or all interfaces requested by the controller, depending
-   * on whether the robot exposes them. Please refer to the code examples in the
-   * \ref MultiInterfaceController "class description".
+   * requested by the controller. If \c allow_optional_interfaces was set to \c 
+   * false, this parameter may contain none, some or all interfaces requested by
+   * the controller, depending on whether the robot exposes them. Please refer to
+   * the code examples in the \ref MultiInterfaceController "class description".
    *
    * \param root_nh A NodeHandle in the root of the controller manager
    * namespace.

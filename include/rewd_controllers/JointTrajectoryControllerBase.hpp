@@ -155,7 +155,7 @@ private:
 
   /// Offset that keeps track of the 2*M_PI multiples difference
   /// between end of a trajectory and start of next trajectory.
-  Eigen::VectorXd mOffset;
+  Eigen::VectorXd mCurrentTrajectoryOffset;
 
   /// Cartesian product space equivalent to mControlledSpace
   /// but with all R1 joints instead. 

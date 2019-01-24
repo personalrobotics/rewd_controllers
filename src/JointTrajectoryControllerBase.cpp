@@ -232,7 +232,7 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
     mCompoundSpace->logMap(mDesiredState, mDesiredPosition);
 
     // Apply offset
-    mDesiredPosition -= mOffset;
+    mDesiredPosition -= mCurrentTrajectoryOffset;
 
     trajectory->evaluateDerivative(timeFromStart, 1, mDesiredVelocity);
     trajectory->evaluateDerivative(timeFromStart, 2, mDesiredAcceleration);
@@ -386,12 +386,15 @@ void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle)
   Eigen::VectorXd offset(mControlledSpace->getDimension());
   offset = initialTrajectoryPosition - actualSkeletonPosition;
   
-  offset = (offset / (2*M_PI));
+  // The offset is a strict multiple of 2*M_PI to disallow any arbitrary
+  // jumps in the execution i.e. if the next trajectory is offset from 2pi
+  // in its start state, we still expect a smoother transition.
+  auto multiplier = offset / (2*M_PI);
   for (int i = 0; i < offset.size(); ++i)
   {
-    offset(i) = round(offset(i))*2*M_PI;
+    offset(i) = round(multiplier(i))*2*M_PI;
   }
-  mOffset = offset;
+  mCurrentTrajectoryOffset = offset;
 
   newContext->mGoalHandle.setAccepted();
   {  // enter critical section

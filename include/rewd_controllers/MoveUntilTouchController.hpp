@@ -7,11 +7,10 @@
 #include <hardware_interface/joint_command_interface.h>
 #include <pr_control_msgs/SetForceTorqueThresholdAction.h>
 #include <pr_hardware_interfaces/TriggerableInterface.h>
-#include <rewd_controllers/MultiInterfaceController.hpp>
 #include <rewd_controllers/JointTrajectoryControllerBase.hpp>
+#include <rewd_controllers/MultiInterfaceController.hpp>
 
-namespace rewd_controllers
-{
+namespace rewd_controllers {
 class MoveUntilTouchController final
     : public MultiInterfaceController<hardware_interface::
                                           PositionJointInterface,
@@ -58,9 +57,10 @@ protected:
    * \brief Called from the real-time thread every control cycle, this method
    * reads the current force/torque sensor state and compares with
    * tolerances specified by the set_forcetorque_threshold service.
-   *  
-   * \param message If the execution should be stopped, this contains reason for stopping the execution.
-   * 
+   *
+   * \param message If the execution should be stopped, this contains reason for
+   * stopping the execution.
+   *
    * \returns True if current wrench exceeds force/torque threshold. If a
    * threshold is set to `0.0` (the default), it is ignored.
    */
@@ -88,6 +88,6 @@ private:
   void setForceTorqueThreshold(FTThresholdGoalHandle gh);
 };
 
-}  // namespace rewd_controllers
+} // namespace rewd_controllers
 
-#endif  // REWD_CONTROLLERS_MOVEUNTILTOUCHCONTROLLER_HPP_
+#endif // REWD_CONTROLLERS_MOVEUNTILTOUCHCONTROLLER_HPP_

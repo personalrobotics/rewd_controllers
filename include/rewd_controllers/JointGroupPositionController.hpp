@@ -3,20 +3,20 @@
 
 #include <memory>
 #include <controller_interface/multi_interface_controller.h>
+#include <dart/dynamics/dynamics.hpp>
 #include <realtime_tools/realtime_buffer.h>
 #include <ros/node_handle.h>
 #include <sensor_msgs/JointState.h>
-#include <dart/dynamics/dynamics.hpp>
 #include "helpers.hpp"
 
 namespace rewd_controllers {
 
 class JointGroupPositionController
-  : public controller_interface::MultiInterfaceController<
-      hardware_interface::PositionJointInterface,
-      hardware_interface::VelocityJointInterface,
-      hardware_interface::EffortJointInterface,
-      hardware_interface::JointStateInterface>
+    : public controller_interface::
+          MultiInterfaceController<hardware_interface::PositionJointInterface,
+                                   hardware_interface::VelocityJointInterface,
+                                   hardware_interface::EffortJointInterface,
+                                   hardware_interface::JointStateInterface>
 {
 public:
   JointGroupPositionController();
@@ -66,7 +66,7 @@ private:
 
   realtime_tools::RealtimeBuffer<Eigen::VectorXd> mDesiredPositionBuffer;
   Eigen::VectorXd mDesiredPosition;
-  ros::Subscriber mCommandSubscriber; 
+  ros::Subscriber mCommandSubscriber;
 };
 
 } // namespace rewd_controllers

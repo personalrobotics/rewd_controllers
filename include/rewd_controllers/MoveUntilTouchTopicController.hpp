@@ -3,19 +3,18 @@
 
 #include <atomic>
 #include <mutex>
-#include <actionlib/server/action_server.h>
 #include <actionlib/client/simple_action_client.h>
+#include <actionlib/server/action_server.h>
+#include <geometry_msgs/WrenchStamped.h>
 #include <hardware_interface/force_torque_sensor_interface.h>
 #include <hardware_interface/joint_command_interface.h>
 #include <pr_control_msgs/SetForceTorqueThresholdAction.h>
 #include <pr_control_msgs/TriggerAction.h>
 #include <pr_hardware_interfaces/TriggerableInterface.h>
-#include <geometry_msgs/WrenchStamped.h>
-#include <rewd_controllers/MultiInterfaceController.hpp>
 #include <rewd_controllers/JointTrajectoryControllerBase.hpp>
+#include <rewd_controllers/MultiInterfaceController.hpp>
 
-namespace rewd_controllers
-{
+namespace rewd_controllers {
 
 /// Uses a standard JointTrajectoryControllerBase and aborts the trajectory if
 /// the forces or torques are too big.
@@ -77,8 +76,9 @@ private:
   using FTThresholdActionServer = actionlib::ActionServer<SetFTThresholdAction>;
   using FTThresholdGoalHandle = FTThresholdActionServer::GoalHandle;
   using FTThresholdResult = pr_control_msgs::SetForceTorqueThresholdResult;
-  using TareActionClient = actionlib::ActionClient<pr_control_msgs::TriggerAction>;
-  
+  using TareActionClient
+      = actionlib::ActionClient<pr_control_msgs::TriggerAction>;
+
   // \brief Protects mForce and mTorque from simultaneous access.
   std::mutex mForceTorqueDataMutex;
 
@@ -131,6 +131,6 @@ private:
   void taringTransitionCallback(const TareActionClient::GoalHandle& goalHandle);
 };
 
-}  // namespace rewd_controllers
+} // namespace rewd_controllers
 
-#endif  // REWD_CONTROLLERS_MOVEUNTILTOUCHTOPICCONTROLLER_HPP_
+#endif // REWD_CONTROLLERS_MOVEUNTILTOUCHTOPICCONTROLLER_HPP_

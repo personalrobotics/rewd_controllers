@@ -1,14 +1,14 @@
 #ifndef REWD_CONTROLLERS_HELPERS_HPP_
 #define REWD_CONTROLLERS_HELPERS_HPP_
-#include <typeinfo>
 #include <string>
+#include <typeinfo>
 #include <vector>
-#include <ros/ros.h>
 #include <dart/dynamics/dynamics.hpp>
 #include <hardware_interface/joint_command_interface.h>
 #include <hardware_interface/joint_state_interface.h>
 #include <hardware_interface/robot_hw.h>
 #include <ros/node_handle.h>
+#include <ros/ros.h>
 #include "JointAdapter.hpp"
 #include "JointAdapterFactory.hpp"
 
@@ -26,8 +26,8 @@ class SkeletonJointStateUpdater final
 {
 public:
   SkeletonJointStateUpdater(
-    dart::dynamics::SkeletonPtr skeleton,
-    hardware_interface::JointStateInterface* jointStateInterface);
+      dart::dynamics::SkeletonPtr skeleton,
+      hardware_interface::JointStateInterface* jointStateInterface);
 
   void update();
 
@@ -41,20 +41,21 @@ private:
 
 //=============================================================================
 dart::dynamics::SkeletonPtr loadRobotFromParameter(
-  const ros::NodeHandle& nodeHandle, const std::string& nameParameter);
+    const ros::NodeHandle& nodeHandle, const std::string& nameParameter);
 
 std::vector<JointParameter> loadJointsFromParameter(
-  const ros::NodeHandle& nodeHandle, const std::string& jointsParameter,
-  const std::string& defaultType);
+    const ros::NodeHandle& nodeHandle,
+    const std::string& jointsParameter,
+    const std::string& defaultType);
 
 std::unordered_map<std::string, double> loadGoalConstraintsFromParameter(
-  const ros::NodeHandle& nodeHandle,
-  const std::vector<JointParameter>& jointParameters);
+    const ros::NodeHandle& nodeHandle,
+    const std::vector<JointParameter>& jointParameters);
 
 dart::dynamics::MetaSkeletonPtr getControlledMetaSkeleton(
-  const dart::dynamics::SkeletonPtr& skeleton,
-  const std::vector<JointParameter>& parameters,
-  const std::string& name);
+    const dart::dynamics::SkeletonPtr& skeleton,
+    const std::vector<JointParameter>& parameters,
+    const std::string& name);
 
 ros::NodeHandle createDefaultAdapterNodeHandle(
     const ros::NodeHandle& parentNodeHandle,

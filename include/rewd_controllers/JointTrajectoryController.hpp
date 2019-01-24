@@ -2,11 +2,10 @@
 #define REWD_CONTROLLERS_JOINTTRAJECTORYCONTROLLER_HPP_
 
 #include <hardware_interface/joint_command_interface.h>
-#include <rewd_controllers/MultiInterfaceController.hpp>
 #include <rewd_controllers/JointTrajectoryControllerBase.hpp>
+#include <rewd_controllers/MultiInterfaceController.hpp>
 
-namespace rewd_controllers
-{
+namespace rewd_controllers {
 class JointTrajectoryController final
     : public MultiInterfaceController<hardware_interface::
                                           PositionJointInterface,
@@ -57,6 +56,6 @@ protected:
   bool shouldAcceptRequests() override;
 };
 
-}  // namespace rewd_controllers
+} // namespace rewd_controllers
 
-#endif  // REWD_CONTROLLERS_JOINTTRAJECTORYCONTROLLER_HPP_
+#endif // REWD_CONTROLLERS_JOINTTRAJECTORYCONTROLLER_HPP_

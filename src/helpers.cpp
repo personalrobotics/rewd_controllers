@@ -6,7 +6,7 @@ namespace rewd_controllers {
 
 //=============================================================================
 dart::dynamics::SkeletonPtr loadRobotFromParameter(
-  const ros::NodeHandle& nodeHandle, const std::string& nameParameter)
+    const ros::NodeHandle& nodeHandle, const std::string& nameParameter)
 {
   using aikido::io::CatkinResourceRetriever;
 
@@ -15,14 +15,14 @@ dart::dynamics::SkeletonPtr loadRobotFromParameter(
   // Get the name of the "robot_description" parameter.
   std::string parameterName;
   nodeHandle.param<std::string>(
-    nameParameter, parameterName, "/robot_description");
+      nameParameter, parameterName, "/robot_description");
 
   // Load the URDF from the parameter server.
   std::string robotDescription;
   if (!nodeHandle.getParam(parameterName, robotDescription))
   {
-    ROS_ERROR_STREAM("Failed loading URDF from '" << parameterName
-      << "' parameter.");
+    ROS_ERROR_STREAM(
+        "Failed loading URDF from '" << parameterName << "' parameter.");
     return nullptr;
   }
 
@@ -30,7 +30,7 @@ dart::dynamics::SkeletonPtr loadRobotFromParameter(
   dart::utils::DartLoader urdfLoader;
   const auto resourceRetriever = std::make_shared<CatkinResourceRetriever>();
   const auto skeleton = urdfLoader.parseSkeletonString(
-    robotDescription, emptyUri, resourceRetriever);
+      robotDescription, emptyUri, resourceRetriever);
 
   if (!skeleton)
   {
@@ -43,9 +43,9 @@ dart::dynamics::SkeletonPtr loadRobotFromParameter(
 
 //=============================================================================
 std::vector<JointParameter> loadJointsFromParameter(
-  const ros::NodeHandle& nodeHandle,
-  const std::string& jointsParameter,
-  const std::string& defaultType)
+    const ros::NodeHandle& nodeHandle,
+    const std::string& jointsParameter,
+    const std::string& defaultType)
 {
   using XmlRpc::XmlRpcValue;
 
@@ -54,14 +54,15 @@ std::vector<JointParameter> loadJointsFromParameter(
   XmlRpcValue jointsXml;
   if (!nodeHandle.getParam("joints", jointsXml))
   {
-      ROS_ERROR_STREAM("Parameter '" << nodeHandle.getNamespace()
-        << "/joints' is required.");
+    ROS_ERROR_STREAM(
+        "Parameter '" << nodeHandle.getNamespace() << "/joints' is required.");
   }
 
   if (jointsXml.getType() != XmlRpcValue::TypeArray)
   {
-    ROS_ERROR_STREAM("Parameter '" << nodeHandle.getNamespace()
-      << "/joints' is not an array.");
+    ROS_ERROR_STREAM(
+        "Parameter '" << nodeHandle.getNamespace()
+                      << "/joints' is not an array.");
     return emptyResult;
   }
 
@@ -83,8 +84,9 @@ std::vector<JointParameter> loadJointsFromParameter(
       auto& nameXml = jointXml["name"];
       if (nameXml.getType() != XmlRpcValue::TypeString)
       {
-        ROS_ERROR_STREAM("Parameter '" << nodeHandle.getNamespace() << "/joints["
-          << i << "]/name' is not a string.");
+        ROS_ERROR_STREAM(
+            "Parameter '" << nodeHandle.getNamespace() << "/joints[" << i
+                          << "]/name' is not a string.");
         return emptyResult;
       }
       jointParameters.mName = static_cast<std::string>(nameXml);
@@ -92,16 +94,18 @@ std::vector<JointParameter> loadJointsFromParameter(
       auto& typeXml = jointXml["type"];
       if (typeXml.getType() != XmlRpcValue::TypeString)
       {
-        ROS_ERROR_STREAM("Parameter '" << nodeHandle.getNamespace() << "/joints["
-          << i << "]/type' is not a string.");
+        ROS_ERROR_STREAM(
+            "Parameter '" << nodeHandle.getNamespace() << "/joints[" << i
+                          << "]/type' is not a string.");
         return emptyResult;
       }
       jointParameters.mType = static_cast<std::string>(typeXml);
     }
     else
     {
-      ROS_ERROR_STREAM("Parameter '" << nodeHandle.getNamespace() << "/joints["
-        << i << "]' is not a struct.");
+      ROS_ERROR_STREAM(
+          "Parameter '" << nodeHandle.getNamespace() << "/joints[" << i
+                        << "]' is not a struct.");
       return emptyResult;
     }
 
@@ -112,32 +116,41 @@ std::vector<JointParameter> loadJointsFromParameter(
 }
 
 std::unordered_map<std::string, double> loadGoalConstraintsFromParameter(
-      const ros::NodeHandle& nodeHandle,
-      const std::vector<JointParameter>& jointParameters)
+    const ros::NodeHandle& nodeHandle,
+    const std::vector<JointParameter>& jointParameters)
 {
   std::unordered_map<std::string, double> goalConstraints;
 
-  for (const auto& jointParam : jointParameters) {
+  for (const auto& jointParam : jointParameters)
+  {
     std::string jointName = jointParam.mName;
 
     double goalConstraint;
-    if (nodeHandle.getParam("constraints/" + jointName + "/goal", goalConstraint)) {
+    if (nodeHandle.getParam(
+            "constraints/" + jointName + "/goal", goalConstraint))
+    {
       goalConstraints[jointName] = goalConstraint;
     }
   }
-  if (goalConstraints.empty()) {
-    ROS_WARN("No goal constraint arguments specified. Define parameters like this: /constraint/jointname/goal: 0.1");
-  } else {
-    ROS_INFO_STREAM("Goal constraints loaded for " << goalConstraints.size() << " joints.");
+  if (goalConstraints.empty())
+  {
+    ROS_WARN(
+        "No goal constraint arguments specified. Define parameters like this: "
+        "/constraint/jointname/goal: 0.1");
+  }
+  else
+  {
+    ROS_INFO_STREAM(
+        "Goal constraints loaded for " << goalConstraints.size() << " joints.");
   }
   return goalConstraints;
 }
 
 //=============================================================================
 dart::dynamics::MetaSkeletonPtr getControlledMetaSkeleton(
-  const dart::dynamics::SkeletonPtr& skeleton,
-  const std::vector<JointParameter>& parameters,
-  const std::string& name)
+    const dart::dynamics::SkeletonPtr& skeleton,
+    const std::vector<JointParameter>& parameters,
+    const std::string& name)
 {
   using dart::dynamics::Group;
 
@@ -151,7 +164,7 @@ dart::dynamics::MetaSkeletonPtr getControlledMetaSkeleton(
     if (!dof)
     {
       ROS_ERROR_STREAM(
-        "Skeleton has no DegreeOfFreedom named '" << dofName << "'.");
+          "Skeleton has no DegreeOfFreedom named '" << dofName << "'.");
       return nullptr;
     }
 
@@ -176,8 +189,8 @@ dart::dynamics::MetaSkeletonPtr getControlledMetaSkeleton(
 
 //=============================================================================
 SkeletonJointStateUpdater::SkeletonJointStateUpdater(
-      dart::dynamics::SkeletonPtr skeleton,
-      hardware_interface::JointStateInterface* jointStateInterface)
+    dart::dynamics::SkeletonPtr skeleton,
+    hardware_interface::JointStateInterface* jointStateInterface)
   : mSkeleton{skeleton}
   , mDefaultPosition(skeleton->getNumDofs())
   , mDefaultVelocity(skeleton->getNumDofs())
@@ -206,9 +219,10 @@ SkeletonJointStateUpdater::SkeletonJointStateUpdater(
       missingJointNames.emplace(dofName);
 
       // Use the default position, velocity, and effort.
-      handle = hardware_interface::JointStateHandle{
-        dofName, &mDefaultPosition[idof], &mDefaultVelocity[idof],
-        &mDefaultEffort[idof]};
+      handle = hardware_interface::JointStateHandle{dofName,
+                                                    &mDefaultPosition[idof],
+                                                    &mDefaultVelocity[idof],
+                                                    &mDefaultEffort[idof]};
     }
 
     mHandles.emplace_back(handle);
@@ -246,7 +260,8 @@ ros::NodeHandle createDefaultAdapterNodeHandle(
     const dart::dynamics::DegreeOfFreedom* dof)
 {
   auto dofName = dof->getName();
-  while (dofName.at(0) == '/') {
+  while (dofName.at(0) == '/')
+  {
     // a leading slash creates a root level namespace
     // ignoring the parent workspace, which is
     // obviously not where we want to read parameters from

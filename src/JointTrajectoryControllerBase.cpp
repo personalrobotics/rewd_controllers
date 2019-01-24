@@ -4,10 +4,10 @@
 #include <functional>
 #include <stdexcept>
 
+#include <aikido/common/Spline.hpp>
 #include <aikido/control/ros/Conversions.hpp>
 #include <aikido/statespace/dart/MetaSkeletonStateSpace.hpp>
 #include <aikido/trajectory/Spline.hpp>
-#include <aikido/common/Spline.hpp>
 #include <dart/dynamics/dynamics.hpp>
 #include <dart/utils/urdf/DartLoader.hpp>
 #include <hardware_interface/joint_command_interface.h>
@@ -15,17 +15,15 @@
 
 using aikido::statespace::dart::MetaSkeletonStateSpace;
 
-namespace rewd_controllers
-{
-namespace
-{
+namespace rewd_controllers {
+namespace {
 //=============================================================================
 std::vector<double> toVector(const Eigen::VectorXd& input)
 {
   return std::vector<double>{input.data(), input.data() + input.size()};
 }
 
-}  // namespace
+} // namespace
 
 //=============================================================================
 JointTrajectoryControllerBase::JointTrajectoryControllerBase()
@@ -43,14 +41,17 @@ JointTrajectoryControllerBase::JointTrajectoryControllerBase()
 }
 
 //=============================================================================
-JointTrajectoryControllerBase::~JointTrajectoryControllerBase() {}
+JointTrajectoryControllerBase::~JointTrajectoryControllerBase()
+{
+}
 
 //=============================================================================
 bool JointTrajectoryControllerBase::initController(
     hardware_interface::RobotHW* robot, ros::NodeHandle& n)
 {
   mNodeHandle.reset(new ros::NodeHandle{n});
-  if (!mCancelCurrentTrajectory.is_lock_free()) {
+  if (!mCancelCurrentTrajectory.is_lock_free())
+  {
     ROS_ERROR_STREAM(
         "Boolean atomics not lock-free on this system. Cannot guarantee "
         "realtime safety.");
@@ -62,18 +63,26 @@ bool JointTrajectoryControllerBase::initController(
 
   // load the control type from paramter (position, velocity, effort)
   std::string control_type;
-  if (!n.getParam("control_type", control_type)) {
+  if (!n.getParam("control_type", control_type))
+  {
     ROS_ERROR("Failed to load 'control_type' parameter.");
     return false;
   }
-  if (control_type != "position" && control_type != "velocity" && control_type != "effort") {
-    ROS_ERROR_STREAM("Invalid 'control_type' parameter. Must be 'position', 'velocity', or 'effort', but is " << control_type);
+  if (control_type != "position" && control_type != "velocity"
+      && control_type != "effort")
+  {
+    ROS_ERROR_STREAM(
+        "Invalid 'control_type' parameter. Must be 'position', 'velocity', or "
+        "'effort', but is "
+        << control_type);
     return false;
   }
 
   // Build up the list of controlled DOFs.
-  const auto jointParameters = loadJointsFromParameter(n, "joints", control_type);
-  if (jointParameters.empty()) return false;
+  const auto jointParameters
+      = loadJointsFromParameter(n, "joints", control_type);
+  if (jointParameters.empty())
+    return false;
 
   ROS_INFO_STREAM("Controlling " << jointParameters.size() << " joints:");
   for (const auto& param : jointParameters)
@@ -81,30 +90,37 @@ bool JointTrajectoryControllerBase::initController(
 
   // Load the URDF as a Skeleton.
   mSkeleton = loadRobotFromParameter(n, "robot_description_parameter");
-  if (!mSkeleton) return false;
+  if (!mSkeleton)
+    return false;
 
   // Check for zero-mass bodies that will be used incorrectly in calculations
   bool hasZeroMassBody = false;
-  for (auto body : mSkeleton->getBodyNodes()) {
-    if (body->getMass() <= 0.0) {
-      ROS_ERROR_STREAM("Robot link '" << body->getName()
-                                      << "' has mass = " << body->getMass());
+  for (auto body : mSkeleton->getBodyNodes())
+  {
+    if (body->getMass() <= 0.0)
+    {
+      ROS_ERROR_STREAM(
+          "Robot link '" << body->getName() << "' has mass = "
+                         << body->getMass());
       hasZeroMassBody = true;
     }
   }
-  if (hasZeroMassBody) return false;  // TODO is this actually a problem?
+  if (hasZeroMassBody)
+    return false; // TODO is this actually a problem?
 
   // Extract the subset of the Skeleton that is being controlled.
-  mControlledSkeleton =
-      getControlledMetaSkeleton(mSkeleton, jointParameters, "Controlled");
-  if (!mControlledSkeleton) return false;
+  mControlledSkeleton
+      = getControlledMetaSkeleton(mSkeleton, jointParameters, "Controlled");
+  if (!mControlledSkeleton)
+    return false;
 
-  mControlledSpace =
-      std::make_shared<MetaSkeletonStateSpace>(mControlledSkeleton.get());
+  mControlledSpace
+      = std::make_shared<MetaSkeletonStateSpace>(mControlledSkeleton.get());
 
   // the full skeleton.
   const auto jointStateInterface = robot->get<JointStateInterface>();
-  if (!jointStateInterface) {
+  if (!jointStateInterface)
+  {
     ROS_ERROR("Unable to get JointStateInterface from RobotHW instance.");
     return false;
   }
@@ -119,16 +135,19 @@ bool JointTrajectoryControllerBase::initController(
   const auto numControlledDofs = mControlledSkeleton->getNumDofs();
   mAdapters.resize(numControlledDofs);
 
-  for (size_t idof = 0; idof < numControlledDofs; ++idof) {
+  for (size_t idof = 0; idof < numControlledDofs; ++idof)
+  {
     const auto dof = mControlledSkeleton->getDof(idof);
     const auto param = jointParameters[idof];
 
     auto adapter = mAdapterFactory.create(param.mType, robot, dof);
-    if (!adapter) return false;
+    if (!adapter)
+      return false;
 
     // Initialize the adapter using parameters stored on the parameter server.
     ros::NodeHandle adapterNodeHandle = createDefaultAdapterNodeHandle(n, dof);
-    if (!adapter->initialize(adapterNodeHandle)) return false;
+    if (!adapter->initialize(adapterNodeHandle))
+      return false;
 
     mAdapters[idof] = std::move(adapter);
   }
@@ -141,16 +160,21 @@ bool JointTrajectoryControllerBase::initController(
 
   // Start the action server. This must be last.
   using std::placeholders::_1;
-  mActionServer.reset(new actionlib::ActionServer<Action>{
-      n, "follow_joint_trajectory",
-      std::bind(&JointTrajectoryControllerBase::goalCallback, this, _1),
-      std::bind(&JointTrajectoryControllerBase::cancelCallback, this, _1),
-      false});
+  mActionServer.reset(
+      new actionlib::ActionServer<Action>{
+          n,
+          "follow_joint_trajectory",
+          std::bind(&JointTrajectoryControllerBase::goalCallback, this, _1),
+          std::bind(&JointTrajectoryControllerBase::cancelCallback, this, _1),
+          false});
   mActionServer->start();
 
   mNonRealtimeTimer = n.createTimer(
-      ros::Duration(0.02), &JointTrajectoryControllerBase::nonRealtimeCallback,
-      this, false, false);
+      ros::Duration(0.02),
+      &JointTrajectoryControllerBase::nonRealtimeCallback,
+      this,
+      false,
+      false);
 
   return true;
 }
@@ -173,7 +197,8 @@ void JointTrajectoryControllerBase::startController(const ros::Time& time)
       "Initialized desired acceleration: " << mDesiredAcceleration.transpose());
 
   // Reset any internal state in the adapters (e.g. integral windup).
-  for (const auto& adapter : mAdapters) adapter->reset();
+  for (const auto& adapter : mAdapters)
+    adapter->reset();
 
   ROS_DEBUG("Reset joint adapters.");
 
@@ -196,8 +221,8 @@ void JointTrajectoryControllerBase::stopController(const ros::Time& time)
 }
 
 //=============================================================================
-void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
-                                               const ros::Duration& period)
+void JointTrajectoryControllerBase::updateStep(
+    const ros::Time& time, const ros::Duration& period)
 {
   // TODO: Make this a member variable to avoid dynamic allocation.
   auto mDesiredState = mControlledSpace->createState();
@@ -211,10 +236,11 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
   mActualVelocity = mControlledSkeleton->getVelocities();
   mActualEffort = mControlledSkeleton->getForces();
 
-  if (context && !context->mCompleted.load()) {
+  if (context && !context->mCompleted.load())
+  {
     const auto& trajectory = context->mTrajectory;
-    const auto timeFromStart = std::min((time - context->mStartTime).toSec(),
-                                        trajectory->getEndTime());
+    const auto timeFromStart = std::min(
+        (time - context->mStartTime).toSec(), trajectory->getEndTime());
 
     // Evaluate the trajectory at the current time.
     trajectory->evaluate(timeFromStart, mDesiredState);
@@ -226,11 +252,15 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
 
     // Check goal constraints.
     bool goalConstraintsSatisfied = true;
-    for (const auto& dof : mControlledSkeleton->getDofs()) {
+    for (const auto& dof : mControlledSkeleton->getDofs())
+    {
       auto goalIt = mGoalConstraints.find(dof->getName());
-      if (goalIt != mGoalConstraints.end()) {
+      if (goalIt != mGoalConstraints.end())
+      {
         std::size_t index = mControlledSkeleton->getIndexOf(dof);
-        if (std::abs(mDesiredPosition[index] - mActualPosition[index]) > (*goalIt).second) {
+        if (std::abs(mDesiredPosition[index] - mActualPosition[index])
+            > (*goalIt).second)
+        {
           goalConstraintsSatisfied = false;
           break;
         }
@@ -241,16 +271,20 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
     bool shouldStopExec = shouldStopExecution(stopReason);
 
     // Terminate the current trajectory.
-    if (timeFromStart >= trajectory->getDuration() && goalConstraintsSatisfied) {
+    if (timeFromStart >= trajectory->getDuration() && goalConstraintsSatisfied)
+    {
       context->mCompleted.store(true);
-    } else if (shouldStopExec || mCancelCurrentTrajectory.load()) {
+    }
+    else if (shouldStopExec || mCancelCurrentTrajectory.load())
+    {
       // TODO: if there is no other work that needs done here, we can get rid of
       // the cancel atomic_bool
       mDesiredVelocity.fill(0.0);
       mDesiredAcceleration.fill(0.0);
       context->mCompleted.store(true);
 
-      if (shouldStopExec) {
+      if (shouldStopExec)
+      {
         mAbortCurrentTrajectory.store(true);
         mAbortReason = stopReason;
       }
@@ -271,10 +305,16 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
   mControlledSkeleton->setPositions(mActualPosition);
   mControlledSkeleton->setVelocities(mActualVelocity);
 
-  for (size_t idof = 0; idof < mAdapters.size(); ++idof) {
-    mAdapters[idof]->update(time, period, mActualPosition[idof],
-                            mDesiredPosition[idof], mActualVelocity[idof],
-                            mDesiredVelocity[idof], mDesiredEffort[idof]);
+  for (size_t idof = 0; idof < mAdapters.size(); ++idof)
+  {
+    mAdapters[idof]->update(
+        time,
+        period,
+        mActualPosition[idof],
+        mDesiredPosition[idof],
+        mActualVelocity[idof],
+        mDesiredVelocity[idof],
+        mDesiredEffort[idof]);
   }
 }
 
@@ -282,11 +322,13 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
 void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle)
 {
   const auto goal = goalHandle.getGoal();
-  ROS_INFO_STREAM("Received trajectory '"
-                  << goalHandle.getGoalID().id << "' with "
-                  << goal->trajectory.points.size() << " waypoints.");
+  ROS_INFO_STREAM(
+      "Received trajectory '" << goalHandle.getGoalID().id << "' with "
+                              << goal->trajectory.points.size()
+                              << " waypoints.");
 
-  if (!shouldAcceptRequests()) {
+  if (!shouldAcceptRequests())
+  {
     Result result;
     result.error_code = Result::INVALID_GOAL;
     result.error_string = "Controller not running.";
@@ -296,10 +338,15 @@ void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle)
 
   // Convert the JointTrajectory message to a format that we can execute.
   std::shared_ptr<aikido::trajectory::Spline> trajectory;
-  try {
+  try
+  {
     trajectory = aikido::control::ros::toSplineJointTrajectory(
-      mControlledSpace, goal->trajectory, mControlledSkeleton->getPositions());
-  } catch (const std::runtime_error& e) {
+        mControlledSpace,
+        goal->trajectory,
+        mControlledSkeleton->getPositions());
+  }
+  catch (const std::runtime_error& e)
+  {
     Result result;
     result.error_code = Result::INVALID_GOAL;
     result.error_string = e.what();
@@ -309,25 +356,31 @@ void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle)
     return;
   }
 
-  ROS_INFO_STREAM("Converted to Aikido trajectory with "
-                  << trajectory->getNumSegments() << " segments and "
-                  << trajectory->getNumDerivatives() << " derivatives.");
+  ROS_INFO_STREAM(
+      "Converted to Aikido trajectory with " << trajectory->getNumSegments()
+                                             << " segments and "
+                                             << trajectory->getNumDerivatives()
+                                             << " derivatives.");
 
   // Infer the start time of the trajectory.
   const auto now = ros::Time::now();
   const auto specifiedStartTime = goal->trajectory.header.stamp;
 
   ros::Time startTime;
-  if (!specifiedStartTime.isZero()) {
+  if (!specifiedStartTime.isZero())
+  {
     startTime = specifiedStartTime;
-  } else {
+  }
+  else
+  {
     startTime = now;
     ROS_INFO(
         "Trajectory does not have an explicit start time, so"
         " we assume that it will start immediately.");
   }
 
-  if (startTime < now) {
+  if (startTime < now)
+  {
     std::stringstream message;
     message << "Trajectory starts in the past: " << specifiedStartTime << " < "
             << now << ".";
@@ -350,23 +403,27 @@ void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle)
   newContext->mGoalHandle = goalHandle;
 
   newContext->mGoalHandle.setAccepted();
-  {  // enter critical section
+  { // enter critical section
     std::lock_guard<std::mutex> newTrajectoryLock{mNewTrajectoryRequestsMutex};
     mNewTrajectoryRequests.push_back(newContext);
-  }  // exit critical section
+  } // exit critical section
 }
 
 //=============================================================================
 void JointTrajectoryControllerBase::cancelCallback(GoalHandle goalHandle)
 {
-  ROS_INFO_STREAM("Requesting cancelation of trajectory '"
-                  << goalHandle.getGoalID().id << "'.");
-  if (!shouldAcceptRequests()) {
+  ROS_INFO_STREAM(
+      "Requesting cancelation of trajectory '" << goalHandle.getGoalID().id
+                                               << "'.");
+  if (!shouldAcceptRequests())
+  {
     Result result;
     result.error_code = Result::INVALID_GOAL;
     result.error_string = "Controller not running.";
     goalHandle.setRejected(result);
-  } else {
+  }
+  else
+  {
     goalHandle.setAccepted();
     std::lock_guard<std::mutex> cancelTrajectoryLock{mCancelRequestsMutex};
     mCancelRequests.push_back(goalHandle);
@@ -379,7 +436,7 @@ void JointTrajectoryControllerBase::nonRealtimeCallback(
 {
   TrajectoryContextPtr latestTrajRequest;
 
-  {  // enter critical section
+  { // enter critical section
     std::lock(mNewTrajectoryRequestsMutex, mCancelRequestsMutex);
     std::lock_guard<std::mutex> newTrajectoryLock{mNewTrajectoryRequestsMutex,
                                                   std::adopt_lock};
@@ -388,61 +445,74 @@ void JointTrajectoryControllerBase::nonRealtimeCallback(
 
     // process and delete pending cancel requests
     for (auto cancelItr = mCancelRequests.begin();
-         cancelItr != mCancelRequests.end();) {
-      if (processCancelRequest(*cancelItr)) {
+         cancelItr != mCancelRequests.end();)
+    {
+      if (processCancelRequest(*cancelItr))
+      {
         cancelItr = mCancelRequests.erase(cancelItr);
-      } else {
+      }
+      else
+      {
         ++cancelItr;
       }
     }
 
     // find latest new trajectory requested and cancel other unstarted
     // trajectories
-    if (!mNextTrajectory && !mNewTrajectoryRequests.empty()) {
+    if (!mNextTrajectory && !mNewTrajectoryRequests.empty())
+    {
       mNextTrajectory = mNewTrajectoryRequests.front();
       mNewTrajectoryRequests.pop_front();
     }
-  }  // exit critical section
+  } // exit critical section
 
   TrajectoryContextPtr currentTraj;
   mCurrentTrajectory.get(currentTraj);
-  if (currentTraj) {
+  if (currentTraj)
+  {
     // if completed...
-    if (currentTraj->mCompleted.load()) {
+    if (currentTraj->mCompleted.load())
+    {
       // if completed due to cancelation inform caller
-      if (mCancelCurrentTrajectory.load()) {
-        ROS_INFO_STREAM("Canceled trajectory '"
-                        << currentTraj->mGoalHandle.getGoalID().id << "'.");
+      if (mCancelCurrentTrajectory.load())
+      {
+        ROS_INFO_STREAM(
+            "Canceled trajectory '" << currentTraj->mGoalHandle.getGoalID().id
+                                    << "'.");
         currentTraj->mGoalHandle.setCanceled();
       }
       // if completed due to being aborted
-      else if (mAbortCurrentTrajectory.load()) {
-        ROS_INFO_STREAM("Aborted trajectory '"
-                        << currentTraj->mGoalHandle.getGoalID().id << "'. Reason: " << mAbortReason);
+      else if (mAbortCurrentTrajectory.load())
+      {
+        ROS_INFO_STREAM(
+            "Aborted trajectory '" << currentTraj->mGoalHandle.getGoalID().id
+                                   << "'. Reason: "
+                                   << mAbortReason);
         currentTraj->mGoalHandle.setAborted(Result(), mAbortReason);
       }
       // if completed due to finishing trajectory set success and reset
-      else {
-        ROS_INFO_STREAM("Trajectory '"
-                        << currentTraj->mGoalHandle.getGoalID().id
-                        << "' completed successfully.");
+      else
+      {
+        ROS_INFO_STREAM(
+            "Trajectory '" << currentTraj->mGoalHandle.getGoalID().id
+                           << "' completed successfully.");
         currentTraj->mGoalHandle.setSucceeded();
       }
 
       // reset trajectory upon completion
       mCancelCurrentTrajectory.store(false);
       mAbortCurrentTrajectory.store(false);
-      mCurrentTrajectory.set(
-          mNextTrajectory);  // either sets to nullptr or next
-                             // trajectory if available
+      mCurrentTrajectory.set(mNextTrajectory); // either sets to nullptr or next
+                                               // trajectory if available
       mNextTrajectory.reset();
     }
   }
   // if no active trajectory directly start next trajectory
-  else {
+  else
+  {
     mCancelCurrentTrajectory.store(false);
-    mCurrentTrajectory.set(mNextTrajectory);  // either sets to nullptr or next
-                                              // trajectory if available
+    mCurrentTrajectory.set(mNextTrajectory); // either sets to nullptr or next
+                                             // trajectory if available
     mNextTrajectory.reset();
   }
 
@@ -456,15 +526,20 @@ bool JointTrajectoryControllerBase::processCancelRequest(GoalHandle& ghToCancel)
   // check if should cancel active trajectory
   TrajectoryContextPtr existingTraj;
   mCurrentTrajectory.get(existingTraj);
-  if (existingTraj
-      && ghIdToCancel == existingTraj->mGoalHandle.getGoalID().id) {
+  if (existingTraj && ghIdToCancel == existingTraj->mGoalHandle.getGoalID().id)
+  {
     mCancelCurrentTrajectory.store(true);
     return true;
-  } else {
+  }
+  else
+  {
     // otherwise cancel pending trajectories
     for (auto itr = mNewTrajectoryRequests.begin();
-         itr != mNewTrajectoryRequests.end(); ++itr) {
-      if (ghIdToCancel == (*itr)->mGoalHandle.getGoalID().id) {
+         itr != mNewTrajectoryRequests.end();
+         ++itr)
+    {
+      if (ghIdToCancel == (*itr)->mGoalHandle.getGoalID().id)
+      {
         (*itr)->mGoalHandle.setCanceled();
         ROS_INFO_STREAM("Canceled trajectory '" << ghIdToCancel << "'.");
         mNewTrajectoryRequests.erase(itr);
@@ -483,11 +558,12 @@ void JointTrajectoryControllerBase::publishFeedback(
   std::shared_ptr<TrajectoryContext> context;
   mCurrentTrajectory.get(context);
 
-  if (context) {
+  if (context)
+  {
     const ros::Duration timeFromStart{currentTime - context->mStartTime};
 
     Feedback feedback;
-    feedback.header.stamp = currentTime;  // TODO: Use control loop time.
+    feedback.header.stamp = currentTime; // TODO: Use control loop time.
 
     for (const auto dof : mControlledSkeleton->getDofs())
       feedback.joint_names.emplace_back(dof->getName());
@@ -511,5 +587,8 @@ void JointTrajectoryControllerBase::publishFeedback(
 }
 
 //=============================================================================
-bool JointTrajectoryControllerBase::shouldStopExecution(std::string& message) { return false; }
-}  // namespace rewd_controllers
+bool JointTrajectoryControllerBase::shouldStopExecution(std::string& message)
+{
+  return false;
+}
+} // namespace rewd_controllers

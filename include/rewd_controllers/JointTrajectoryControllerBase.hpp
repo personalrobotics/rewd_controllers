@@ -5,8 +5,8 @@
 #include <deque>
 #include <memory>
 #include <mutex>
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
 #include <actionlib/server/action_server.h>
 #include <aikido/statespace/dart/MetaSkeletonStateSpace.hpp>
@@ -18,11 +18,12 @@
 #include <rewd_controllers/helpers.hpp>
 #include <ros/node_handle.h>
 
-namespace rewd_controllers
-{
+namespace rewd_controllers {
 
-/// The JointTrajectoryControllerBase uses a bunch of ros parameters as configuration.
-/// It uses the constraints/joint_name/goal parameters to determine whether it has reached its goal.
+/// The JointTrajectoryControllerBase uses a bunch of ros parameters as
+/// configuration.
+/// It uses the constraints/joint_name/goal parameters to determine whether it
+/// has reached its goal.
 class JointTrajectoryControllerBase
 {
 protected:
@@ -76,8 +77,9 @@ protected:
   /**
    * \brief Called every update step in the real-time thread to let
    * subclassing controllers specify an early termination condition.
-   * 
-   * \param message If the execution should be stopped, this contains reason for stopping the execution.
+   *
+   * \param message If the execution should be stopped, this contains reason for
+   * stopping the execution.
    */
   virtual bool shouldStopExecution(std::string& message);
 
@@ -90,7 +92,8 @@ private:
    * in its entirety. Assigning to individual components
    * is UNSAFE with the exception of the mCompleted atomic.
    */
-  struct TrajectoryContext {
+  struct TrajectoryContext
+  {
     ros::Time mStartTime;
     std::shared_ptr<aikido::trajectory::Trajectory> mTrajectory;
     GoalHandle mGoalHandle;
@@ -160,7 +163,8 @@ private:
   // Difference between canceling and aborting a trajectory:
   // If the higher level code stops the trajectory, it is "canceled".
   // If the controller itself stops the trajectory, it is "aborted".
-  // This information is reflected in the goal handle and therefore accessible to the higher level code.
+  // This information is reflected in the goal handle and therefore accessible
+  // to the higher level code.
   std::atomic_bool mCancelCurrentTrajectory;
   std::atomic_bool mAbortCurrentTrajectory;
   std::string mAbortReason;
@@ -170,6 +174,6 @@ private:
   std::unordered_map<std::string, double> mGoalConstraints;
 };
 
-}  // namespace rewd_controllers
+} // namespace rewd_controllers
 
-#endif  // ifndef REWD_CONTROLLERS_JOINTTRAJECTORYCONTROLLERBASE_HPP_
+#endif // ifndef REWD_CONTROLLERS_JOINTTRAJECTORYCONTROLLERBASE_HPP_

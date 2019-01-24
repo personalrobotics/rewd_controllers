@@ -7,8 +7,7 @@
 #include <ros/node_handle.h>
 #include "helpers.hpp"
 
-namespace rewd_controllers
-{
+namespace rewd_controllers {
 class GravityCompensationController
     : public controller_interface::
           MultiInterfaceController<hardware_interface::EffortJointInterface,
@@ -49,6 +48,6 @@ private:
   Eigen::VectorXd mCalculatedForces;
 };
 
-}  // namespace
+} // namespace
 
 #endif

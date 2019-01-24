@@ -375,16 +375,16 @@ void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle)
   newContext->mGoalHandle = goalHandle;
 
   // Evaluate the trajectory at the current time.
-  auto offsetDesiredState = mControlledSpace->createState();
-  Eigen::VectorXd offsetDesiredPosition(mControlledSpace->getDimension());
-  trajectory->evaluate(0, offsetDesiredState);
-  mCompoundSpace->logMap(offsetDesiredState, offsetDesiredPosition);
+  auto initialTrajectoryState = mControlledSpace->createState();
+  Eigen::VectorXd initialTrajectoryPosition(mControlledSpace->getDimension());
+  trajectory->evaluate(0, initialTrajectoryState);
+  mCompoundSpace->logMap(initialTrajectoryState, initialTrajectoryPosition);
 
-  Eigen::VectorXd offsetActualPosition(mControlledSpace->getDimension());
-  offsetActualPosition = mControlledSkeleton->getPositions();
+  Eigen::VectorXd actualSkeletonPosition(mControlledSpace->getDimension());
+  actualSkeletonPosition = mControlledSkeleton->getPositions();
 
   Eigen::VectorXd offset(mControlledSpace->getDimension());
-  offset = offsetDesiredPosition - offsetActualPosition;
+  offset = initialTrajectoryPosition - actualSkeletonPosition;
   
   offset = (offset / (2*M_PI));
   for (int i = 0; i < offset.size(); ++i)

@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <mutex>
+#include <chrono>
 #include <actionlib/server/action_server.h>
 #include <actionlib/client/simple_action_client.h>
 #include <hardware_interface/force_torque_sensor_interface.h>
@@ -13,6 +14,7 @@
 #include <geometry_msgs/WrenchStamped.h>
 #include <rewd_controllers/MultiInterfaceController.hpp>
 #include <rewd_controllers/JointTrajectoryControllerBase.hpp>
+
 
 namespace rewd_controllers
 {
@@ -73,12 +75,14 @@ protected:
   bool shouldStopExecution(std::string& message) override;
 
 private:
+  static constexpr std::chrono::milliseconds MAX_DELAY = std::chrono::milliseconds(400);
+
   using SetFTThresholdAction = pr_control_msgs::SetForceTorqueThresholdAction;
   using FTThresholdActionServer = actionlib::ActionServer<SetFTThresholdAction>;
   using FTThresholdGoalHandle = FTThresholdActionServer::GoalHandle;
   using FTThresholdResult = pr_control_msgs::SetForceTorqueThresholdResult;
   using TareActionClient = actionlib::ActionClient<pr_control_msgs::TriggerAction>;
-  
+
   // \brief Protects mForce and mTorque from simultaneous access.
   std::mutex mForceTorqueDataMutex;
 
@@ -114,6 +118,9 @@ private:
 
   // \brief If the torque is higher than this threshold, the controller aborts.
   std::atomic<double> mTorqueThreshold;
+
+  // \brief Keeps track of the last update time
+ std::chrono::time_point<std::chrono::steady_clock> mTimeOfLastSensorDataReceived;
 
   /**
    * \brief Callback for pr_control_msgs::SetForceTorqueThresholdAction.

@@ -152,6 +152,10 @@ private:
   std::deque<TrajectoryContextPtr> mNewTrajectoryRequests;
   std::mutex mNewTrajectoryRequestsMutex;
 
+  /// Offset that keeps track of the 2*M_PI multiples difference
+  /// between end of a trajectory and start of next trajectory.
+  Eigen::VectorXd mOffset;
+
   // TODO: It would be better to use std::atomic<std::shared_ptr<T>> here.
   // However, this is not fully implemented in GCC 4.8.4, shipped with Ubuntu
   // 14.04.

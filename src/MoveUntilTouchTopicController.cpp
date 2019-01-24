@@ -3,6 +3,8 @@
 #include <functional>
 #include <pluginlib/class_list_macros.h>
 
+static const std::chrono::milliseconds MAX_DELAY = std::chrono::milliseconds(400);
+
 namespace rewd_controllers
 {
 //=============================================================================

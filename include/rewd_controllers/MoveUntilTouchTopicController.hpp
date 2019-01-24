@@ -3,6 +3,8 @@
 
 #include <atomic>
 #include <mutex>
+#include <chrono>
+#include <actionlib/server/action_server.h>
 #include <actionlib/client/simple_action_client.h>
 #include <actionlib/server/action_server.h>
 #include <geometry_msgs/WrenchStamped.h>
@@ -72,6 +74,8 @@ protected:
   bool shouldStopExecution(std::string& message) override;
 
 private:
+  static constexpr std::chrono::milliseconds MAX_DELAY = std::chrono::milliseconds(400);
+
   using SetFTThresholdAction = pr_control_msgs::SetForceTorqueThresholdAction;
   using FTThresholdActionServer = actionlib::ActionServer<SetFTThresholdAction>;
   using FTThresholdGoalHandle = FTThresholdActionServer::GoalHandle;
@@ -114,6 +118,9 @@ private:
 
   // \brief If the torque is higher than this threshold, the controller aborts.
   std::atomic<double> mTorqueThreshold;
+
+  // \brief Keeps track of the last update time
+  std::chrono::time_point<std::chrono::steady_clock> mTimeOfLastSensorDataReceived;
 
   /**
    * \brief Callback for pr_control_msgs::SetForceTorqueThresholdAction.

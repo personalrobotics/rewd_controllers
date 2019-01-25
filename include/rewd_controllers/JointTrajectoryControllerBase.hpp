@@ -9,6 +9,7 @@
 #include <unordered_map>
 
 #include <actionlib/server/action_server.h>
+#include <aikido/statespace/CartesianProduct.hpp>
 #include <aikido/statespace/dart/MetaSkeletonStateSpace.hpp>
 #include <aikido/trajectory.hpp>
 #include <control_msgs/FollowJointTrajectoryAction.h>
@@ -151,6 +152,15 @@ private:
   std::mutex mCancelRequestsMutex;
   std::deque<TrajectoryContextPtr> mNewTrajectoryRequests;
   std::mutex mNewTrajectoryRequestsMutex;
+
+  /// Offset that keeps track of the 2*M_PI multiples difference
+  /// between end of a trajectory and start of next trajectory.
+  Eigen::VectorXd mCurrentTrajectoryOffset;
+
+  /// Cartesian product space equivalent to mControlledSpace
+  /// but with all R1 joints instead. 
+  std::shared_ptr<aikido::statespace::CartesianProduct>
+      mCompoundSpace;
 
   // TODO: It would be better to use std::atomic<std::shared_ptr<T>> here.
   // However, this is not fully implemented in GCC 4.8.4, shipped with Ubuntu

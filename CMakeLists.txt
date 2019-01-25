@@ -27,7 +27,7 @@ endif()
 find_package(aikido REQUIRED COMPONENTS common control control_ros io statespace trajectory)
 include_directories(SYSTEM ${aikido_INCLUDE_DIRS})
 
-find_package(DART REQUIRED COMPONENTS utils utils-urdf CONFIG)
+find_package(DART REQUIRED COMPONENTS utils utils-urdf optimizer-nlopt CONFIG)
 include_directories(SYSTEM ${DART_INCLUDE_DIRS})
 
 #==============================================================================

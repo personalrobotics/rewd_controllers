@@ -177,7 +177,11 @@ private:
 
   TrajectoryContextPtr mNextTrajectory;
 
+  /// Specified by ROS parameter constraints/<joint>/goal
   std::unordered_map<std::string, double> mGoalConstraints;
+
+  /// Specified by ROS parameter constraints/<joint>/trajectory
+  std::unordered_map<std::string, double> mTrajectoryConstraints;
 };
 
 }  // namespace rewd_controllers

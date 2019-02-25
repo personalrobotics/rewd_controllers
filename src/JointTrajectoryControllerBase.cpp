@@ -122,8 +122,9 @@ bool JointTrajectoryControllerBase::initController(
   mSkeletonUpdater.reset(
       new SkeletonJointStateUpdater{mSkeleton, jointStateInterface});
 
-  // Load goal constraints
+  // Load goal and trajectory constraints
   mGoalConstraints = loadGoalConstraintsFromParameter(n, jointParameters);
+  mTrajectoryConstraints = loadTrajectoryConstraintsFromParameter(n, jointParameters);
 
   // Create adaptors to provide a uniform interface to different types.
   const auto numControlledDofs = mControlledSkeleton->getNumDofs();
@@ -236,8 +237,6 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
 
     trajectory->evaluateDerivative(timeFromStart, 1, mDesiredVelocity);
     trajectory->evaluateDerivative(timeFromStart, 2, mDesiredAcceleration);
-
-    // TODO: Check path constraints.
 
     // Check goal constraints.
     bool goalConstraintsSatisfied = true;
@@ -558,5 +557,27 @@ void JointTrajectoryControllerBase::publishFeedback(
 }
 
 //=============================================================================
-bool JointTrajectoryControllerBase::shouldStopExecution(std::string& message) { return false; }
+bool JointTrajectoryControllerBase::shouldStopExecution(std::string& message) {
+  // If any trajectory constraints are violated, abort immediately.
+  for (const auto& dof : mControlledSkeleton->getDofs())
+  {
+    auto it = mTrajectoryConstraints.find(dof->getName());
+    if (it != mTrajectoryConstraints.end())
+    {
+      std::size_t index = mControlledSkeleton->getIndexOf(dof);
+      auto error = std::abs(mDesiredPosition[index] - mActualPosition[index]);
+      if (error > it->second)
+      {
+        std::stringstream msg;
+        msg << dof->getName() << " violated trajectory constraint: "
+            << error << " > " << it->second;
+        message = msg.str();
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 }  // namespace rewd_controllers

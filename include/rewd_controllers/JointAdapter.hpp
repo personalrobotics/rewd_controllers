@@ -1,5 +1,6 @@
 #ifndef REWD_CONTROLLERS_JOINTADAPTER_HPP_
 #define REWD_CONTROLLERS_JOINTADAPTER_HPP_
+
 #include <ros/time.h>
 #include <dart/dynamics/dynamics.hpp>
 #include <hardware_interface/joint_command_interface.h>
@@ -15,8 +16,6 @@ public:
 
   virtual ~JointAdapter();
 
-  virtual void setDesiredPosition(double desiredPosition);
-
   virtual bool initialize(const ros::NodeHandle& nodeHandle) = 0;
 
   virtual void update(
@@ -26,9 +25,6 @@ public:
     double nominalEffort) = 0;
 
   virtual void reset() = 0;
-
-protected:
-  double mDesiredPosition;
 };
 
 //=============================================================================

@@ -8,19 +8,14 @@ namespace rewd_controllers {
 
 //=============================================================================
 JointAdapter::JointAdapter()
-  : mDesiredPosition{0.}
 {
+  // Do nothing.
 }
 
 //=============================================================================
 JointAdapter::~JointAdapter()
 {
-}
-
-//=============================================================================
-void JointAdapter::setDesiredPosition(double desiredPosition)
-{
-  mDesiredPosition = desiredPosition;
+  // Do nothing.
 }
 
 //=============================================================================
@@ -30,12 +25,13 @@ JointPositionAdapter::JointPositionAdapter(
   : mPositionHandle{positionHandle}
   , mDof{dof}
 {
+  // Do nothing.
 }
 
 //=============================================================================
 bool JointPositionAdapter::initialize(const ros::NodeHandle& nodeHandle)
 {
-  return true; // Do nothing.
+  return true;
 }
 
 //=============================================================================
@@ -61,6 +57,7 @@ JointVelocityAdapter::JointVelocityAdapter(
   : mVelocityHandle{effortHandle}
   , mDof{dof}
 {
+  // Do nothing.
 }
 
 //=============================================================================
@@ -103,6 +100,7 @@ JointEffortAdapter::JointEffortAdapter(
   : mEffortHandle{effortHandle}
   , mDof{dof}
 {
+  // Do nothing.
 }
 
 //=============================================================================

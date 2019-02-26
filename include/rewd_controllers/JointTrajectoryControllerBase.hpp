@@ -144,6 +144,7 @@ private:
   Eigen::VectorXd mActualPosition;
   Eigen::VectorXd mActualVelocity;
   Eigen::VectorXd mActualEffort;
+  Eigen::VectorXd mCommand;
 
   std::unique_ptr<ActionServer> mActionServer;
   ros::Timer mNonRealtimeTimer;

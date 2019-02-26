@@ -124,10 +124,12 @@ void JointGroupPositionController::update(
   // robot's hardware interface.
   for (size_t idof = 0; idof < mAdapters.size(); ++idof)
   {
-    mAdapters[idof]->update(time, period,
+    double command = mAdapters[idof]->computeCommand(time, period,
       mControlledSkeleton->getPosition(idof), mDesiredPosition[idof],
       mControlledSkeleton->getVelocity(idof), desiredVelocity,
       mControlledSkeleton->getForce(idof));
+    if (mAdapters[idof]->checkCommand(command))
+      mAdapters[idof]->update(command);
   }
 }
 

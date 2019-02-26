@@ -148,6 +148,7 @@ bool JointTrajectoryControllerBase::initController(
   mDesiredVelocity.resize(numControlledDofs);
   mDesiredAcceleration.resize(numControlledDofs);
   mDesiredEffort.resize(numControlledDofs);
+  mCommand.resize(numControlledDofs);
 
   // Start the action server. This must be last.
   using std::placeholders::_1;
@@ -221,7 +222,7 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
   mActualVelocity = mControlledSkeleton->getVelocities();
   mActualEffort = mControlledSkeleton->getForces();
 
-  if (context && !context->mCompleted.load()) 
+  if (context && !context->mCompleted.load())
   {
     const auto& trajectory = context->mTrajectory;
     const auto timeFromStart = std::min((time - context->mStartTime).toSec(),
@@ -237,22 +238,45 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
     trajectory->evaluateDerivative(timeFromStart, 1, mDesiredVelocity);
     trajectory->evaluateDerivative(timeFromStart, 2, mDesiredAcceleration);
 
+    // Compute inverse dynamics torques from the set point and store them in the
+    // skeleton. These values may be queried by the adapters below.
+    mControlledSkeleton->setPositions(mDesiredPosition);
+    mControlledSkeleton->setVelocities(mDesiredVelocity);
+    mControlledSkeleton->setAccelerations(mDesiredAcceleration);
+
+    mSkeleton->computeInverseDynamics();
+    mDesiredEffort = mControlledSkeleton->getForces();
+
+    // Restore the state of the Skeleton from JointState interfaces. These values
+    // may be used by the adapters below.
+    mControlledSkeleton->setPositions(mActualPosition);
+    mControlledSkeleton->setVelocities(mActualVelocity);
+
     // TODO: Check path constraints.
 
     // Check goal constraints.
     bool goalConstraintsSatisfied = true;
-    for (const auto& dof : mControlledSkeleton->getDofs()) 
+    for (const auto& dof : mControlledSkeleton->getDofs())
     {
       auto goalIt = mGoalConstraints.find(dof->getName());
-      if (goalIt != mGoalConstraints.end()) 
+      if (goalIt != mGoalConstraints.end())
       {
         std::size_t index = mControlledSkeleton->getIndexOf(dof);
-        if (std::abs(mDesiredPosition[index] - mActualPosition[index]) > (*goalIt).second) 
+        if (std::abs(mDesiredPosition[index] - mActualPosition[index]) > (*goalIt).second)
         {
           goalConstraintsSatisfied = false;
           break;
         }
       }
+    }
+
+    for (size_t idof = 0; idof < mAdapters.size(); ++idof)
+    {
+      mCommand[idof] = mAdapters[idof]->computeCommand(
+          time, period,
+          mActualPosition[idof], mDesiredPosition[idof],
+          mActualVelocity[idof], mDesiredVelocity[idof],
+          mDesiredEffort[idof]);
     }
 
     std::string stopReason;
@@ -281,25 +305,9 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
     }
   }
 
-  // Compute inverse dynamics torques from the set point and store them in the
-  // skeleton. These values may be queried by the adapters below.
-  mControlledSkeleton->setPositions(mDesiredPosition);
-  mControlledSkeleton->setVelocities(mDesiredVelocity);
-  mControlledSkeleton->setAccelerations(mDesiredAcceleration);
-
-  mSkeleton->computeInverseDynamics();
-  mDesiredEffort = mControlledSkeleton->getForces();
-
-  // Restore the state of the Skeleton from JointState interfaces. These values
-  // may be used by the adapters below.
-  mControlledSkeleton->setPositions(mActualPosition);
-  mControlledSkeleton->setVelocities(mActualVelocity);
-
-  for (size_t idof = 0; idof < mAdapters.size(); ++idof) 
+  for (size_t idof = 0; idof < mAdapters.size(); ++idof)
   {
-    mAdapters[idof]->update(time, period, mActualPosition[idof],
-                            mDesiredPosition[idof], mActualVelocity[idof],
-                            mDesiredVelocity[idof], mDesiredEffort[idof]);
+    mAdapters[idof]->update(mCommand[idof]);
   }
 }
 
@@ -558,5 +566,20 @@ void JointTrajectoryControllerBase::publishFeedback(
 }
 
 //=============================================================================
-bool JointTrajectoryControllerBase::shouldStopExecution(std::string& message) { return false; }
+bool JointTrajectoryControllerBase::shouldStopExecution(std::string& message) {
+  for (std::size_t idof = 0; idof < mAdapters.size(); ++idof)
+  {
+    if (!mAdapters[idof]->checkCommand(mCommand[idof]))
+    {
+      auto dofName = mControlledSkeleton->getDof(idof)->getName();
+      std::stringstream msg;
+      msg << "Command for joint '" << dofName << "' exceeded limits";
+      message = msg.str();
+      return true;
+    }
+  }
+
+  return false;
+}
+
 }  // namespace rewd_controllers

@@ -19,11 +19,15 @@ public:
 
   virtual bool initialize(const ros::NodeHandle& nodeHandle) = 0;
 
-  virtual void update(
+  virtual double computeCommand(
     const ros::Time& time, const ros::Duration& period,
     double actualPosition, double desiredPosition,
     double actualVelocity, double desiredVelocity,
     double nominalEffort) = 0;
+
+  virtual bool checkCommand(double command) = 0;
+
+  virtual void update(double command) = 0;
 
   virtual void reset() = 0;
 
@@ -40,17 +44,23 @@ public:
 
   bool initialize(const ros::NodeHandle& nodeHandle) override;
 
-  void update(
+  double computeCommand(
     const ros::Time& time, const ros::Duration& period,
     double actualPosition, double desiredPosition,
     double actualVelocity, double desiredVelocity,
     double nominalEffort) override;
+
+  bool checkCommand(double command) override;
+
+  void update(double command) override;
 
   void reset() override;
 
 private:
   hardware_interface::JointHandle mPositionHandle;
   dart::dynamics::DegreeOfFreedom* mDof;
+  double mLowerLimit;
+  double mUpperLimit;
 };
 
 //=============================================================================
@@ -62,17 +72,23 @@ public:
 
   bool initialize(const ros::NodeHandle& nodeHandle) override;
 
-  void update(
+  double computeCommand(
     const ros::Time& time, const ros::Duration& period,
     double actualPosition, double desiredPosition,
     double actualVelocity, double desiredVelocity,
     double nominalEffort) override;
+
+  bool checkCommand(double command) override;
+
+  void update(double command) override;
 
   void reset() override;
 
 private:
   hardware_interface::JointHandle mVelocityHandle;
   dart::dynamics::DegreeOfFreedom* mDof;
+  double mLowerLimit;
+  double mUpperLimit;
   control_toolbox::Pid mPid;
 };
 
@@ -85,17 +101,23 @@ public:
 
   bool initialize(const ros::NodeHandle& nodeHandle) override;
 
-  void update(
+  double computeCommand(
     const ros::Time& time, const ros::Duration& period,
     double actualPosition, double desiredPosition,
     double actualVelocity, double desiredVelocity,
     double nominalEffort) override;
+
+  bool checkCommand(double command) override;
+
+  void update(double command) override;
 
   void reset() override;
 
 private:
   hardware_interface::JointHandle mEffortHandle;
   dart::dynamics::DegreeOfFreedom* mDof;
+  double mLowerLimit;
+  double mUpperLimit;
   control_toolbox::Pid mPid;
 };
 

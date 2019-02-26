@@ -29,6 +29,8 @@ JointPositionAdapter::JointPositionAdapter(
       dart::dynamics::DegreeOfFreedom* dof)
   : mPositionHandle{positionHandle}
   , mDof{dof}
+  , mLowerLimit{dof->getPositionLowerLimit()}
+  , mUpperLimit{dof->getPositionUpperLimit()}
 {
 }
 
@@ -39,13 +41,25 @@ bool JointPositionAdapter::initialize(const ros::NodeHandle& nodeHandle)
 }
 
 //=============================================================================
-void JointPositionAdapter::update(
+double JointPositionAdapter::computeCommand(
   const ros::Time& /*time*/, const ros::Duration& /*period*/,
   double /*actualPosition*/, double desiredPosition,
   double /*actualVelocity*/, double /*desiredVelocity*/,
   double /*nominalEffort*/)
 {
-  mPositionHandle.setCommand(desiredPosition);
+  return desiredPosition;
+}
+
+//=============================================================================
+bool JointPositionAdapter::checkCommand(double command)
+{
+  return mLowerLimit <= command && command <= mUpperLimit;
+}
+
+//=============================================================================
+void JointPositionAdapter::update(double command)
+{
+  mPositionHandle.setCommand(command);
 }
 
 //=============================================================================
@@ -60,6 +74,8 @@ JointVelocityAdapter::JointVelocityAdapter(
       dart::dynamics::DegreeOfFreedom* dof)
   : mVelocityHandle{effortHandle}
   , mDof{dof}
+  , mLowerLimit{dof->getVelocityLowerLimit()}
+  , mUpperLimit{dof->getVelocityUpperLimit()}
 {
 }
 
@@ -70,7 +86,7 @@ bool JointVelocityAdapter::initialize(const ros::NodeHandle& nodeHandle)
 }
 
 //=============================================================================
-void JointVelocityAdapter::update(
+double JointVelocityAdapter::computeCommand(
     const ros::Time& /*time*/, const ros::Duration& period,
     double actualPosition, double desiredPosition,
     double actualVelocity, double desiredVelocity,
@@ -87,7 +103,19 @@ void JointVelocityAdapter::update(
   if (std::isnan(pidVelocity))
     throw std::range_error("calculated pidVelocity is NaN");
 
-  mVelocityHandle.setCommand(desiredVelocity + pidVelocity);
+  return desiredVelocity + pidVelocity;
+}
+
+//=============================================================================
+bool JointVelocityAdapter::checkCommand(double command)
+{
+  return mLowerLimit <= command && command <= mUpperLimit;
+}
+
+//=============================================================================
+void JointVelocityAdapter::update(double command)
+{
+  mVelocityHandle.setCommand(command);
 }
 
 //=============================================================================
@@ -102,6 +130,8 @@ JointEffortAdapter::JointEffortAdapter(
       dart::dynamics::DegreeOfFreedom* dof)
   : mEffortHandle{effortHandle}
   , mDof{dof}
+  , mLowerLimit{dof->getForceLowerLimit()}
+  , mUpperLimit{dof->getForceUpperLimit()}
 {
 }
 
@@ -112,7 +142,7 @@ bool JointEffortAdapter::initialize(const ros::NodeHandle& nodeHandle)
 }
 
 //=============================================================================
-void JointEffortAdapter::update(
+double JointEffortAdapter::computeCommand(
     const ros::Time& /*time*/, const ros::Duration& period,
     double actualPosition, double desiredPosition,
     double actualVelocity, double desiredVelocity,
@@ -128,7 +158,19 @@ void JointEffortAdapter::update(
   if (std::isnan(pidEffort))
     throw std::range_error("calculated pidEffort is NaN");
 
-  mEffortHandle.setCommand(nominalEffort + pidEffort);
+  return nominalEffort + pidEffort;
+}
+
+//=============================================================================
+bool JointEffortAdapter::checkCommand(double command)
+{
+  return mLowerLimit <= command && command <= mUpperLimit;
+}
+
+//=============================================================================
+void JointEffortAdapter::update(double command)
+{
+  mEffortHandle.setCommand(command);
 }
 
 //=============================================================================

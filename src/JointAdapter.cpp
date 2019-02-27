@@ -20,6 +20,7 @@ JointAdapter::~JointAdapter()
 //=============================================================================
 void JointAdapter::setDesiredPosition(double desiredPosition)
 {
+  std::cout << "SET DESIRED POSITION\n\n\n" << std::endl;
   mDesiredPosition = desiredPosition;
 }
 
@@ -86,6 +87,13 @@ void JointVelocityAdapter::update(
     throw std::range_error("desiredVelocity is NaN");
   if (std::isnan(pidVelocity))
     throw std::range_error("calculated pidVelocity is NaN");
+
+  if (desiredVelocity + pidVelocity > 5.0)
+  {
+    std::stringstream ss;
+    ss << "Overall velocity " << desiredVelocity + pidVelocity << std::endl;
+    throw std::range_error(ss.str());
+  }
 
   mVelocityHandle.setCommand(desiredVelocity + pidVelocity);
 }

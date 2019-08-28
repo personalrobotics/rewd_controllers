@@ -77,7 +77,6 @@ void JointVelocityAdapter::update(
     double actualVelocity, double desiredVelocity,
     double /*nominalEffort*/)
 {
-  // TODO: Handle position wrapping on SO(2) joints.
   const auto pidVelocity = mPid.computeCommand(
     desiredPosition - actualPosition,
     desiredVelocity - actualVelocity,
@@ -90,6 +89,10 @@ void JointVelocityAdapter::update(
 
   if (desiredVelocity + pidVelocity > 5.0)
   {
+    std::cout << "Desired Position: " << desiredPosition << std::endl;
+    std::cout << "Actual Position: " << actualPosition << std::endl;
+    std::cout << "Desired Velocity: " << desiredVelocity << std::endl;
+    std::cout << "Actual Position: " << actualVelocity << std::endl;
     std::stringstream ss;
     ss << "Overall velocity " << desiredVelocity + pidVelocity << std::endl;
     throw std::range_error(ss.str());

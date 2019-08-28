@@ -8,6 +8,8 @@
 #include <aikido/control/ros/Conversions.hpp>
 #include <aikido/statespace/dart/MetaSkeletonStateSpace.hpp>
 #include <aikido/statespace/Rn.hpp>
+#include <aikido/statespace/SO2.hpp>
+#include <aikido/statespace/dart/RnJoint.hpp>
 #include <aikido/trajectory/Spline.hpp>
 #include <aikido/common/Spline.hpp>
 #include <dart/dynamics/dynamics.hpp>
@@ -16,6 +18,7 @@
 #include <hardware_interface/joint_state_interface.h>
 
 using aikido::statespace::dart::MetaSkeletonStateSpace;
+using aikido::statespace::dart::R1Joint;
 
 namespace rewd_controllers
 {
@@ -107,7 +110,7 @@ bool JointTrajectoryControllerBase::initController(
   std::vector<aikido::statespace::ConstStateSpacePtr> subspaces;
   for (std::size_t i = 0; i < mControlledSpace->getDimension(); ++i)
   {
-    subspaces.emplace_back(std::make_shared<aikido::statespace::R1>());
+      subspaces.emplace_back(std::make_shared<aikido::statespace::R1>());
   }
   mCompoundSpace
       = std::move(std::make_shared<aikido::statespace::CartesianProduct>(subspaces));
@@ -247,7 +250,18 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
       if (goalIt != mGoalConstraints.end())
       {
         std::size_t index = mControlledSkeleton->getIndexOf(dof);
-        if (std::abs(mDesiredPosition[index] - mActualPosition[index]) > (*goalIt).second)
+        auto diff = std::abs(mDesiredPosition[index] - mActualPosition[index]);
+
+        // Check for SO2:
+        auto jointSpace = mControlledSpace->getJointSpace(index);
+        auto r1Joint = std::dynamic_pointer_cast<const R1Joint>(jointSpace);
+        if(!r1Joint) {
+          if(diff > M_PI) {
+            diff = 2 * M_PI - diff;
+          }
+        }
+
+        if (diff > (*goalIt).second)
         {
           goalConstraintsSatisfied = false;
           break;
@@ -297,8 +311,22 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
 
   for (size_t idof = 0; idof < mAdapters.size(); ++idof)
   {
-    mAdapters[idof]->update(time, period, mActualPosition[idof],
-                            mDesiredPosition[idof], mActualVelocity[idof],
+    // Check for SO2
+    auto actualPos = mActualPosition[idof];
+    auto desiredPos = mDesiredPosition[idof];
+    auto jointSpace = mControlledSpace->getJointSpace(idof);
+    auto r1Joint = std::dynamic_pointer_cast<const R1Joint>(jointSpace);
+    if(!r1Joint) {
+      if(desiredPos - actualPos > M_PI) {
+        actualPos += 2*M_PI;
+      } else if(desiredPos - actualPos < -M_PI) {
+        actualPos -= 2*M_PI;
+      }
+    }
+
+    // Call Adapter
+    mAdapters[idof]->update(time, period, actualPos,
+                            desiredPos, mActualVelocity[idof],
                             mDesiredVelocity[idof], mDesiredEffort[idof]);
   }
 }

@@ -240,6 +240,8 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
     trajectory->evaluateDerivative(timeFromStart, 1, mDesiredVelocity);
     trajectory->evaluateDerivative(timeFromStart, 2, mDesiredAcceleration);
 
+    ROS_INFO_STREAM("Desired Velocity: " << mDesiredVelocity.transpose());
+
     // TODO: Check path constraints.
 
     // Check goal constraints.

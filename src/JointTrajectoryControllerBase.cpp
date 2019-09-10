@@ -222,6 +222,7 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
   mSkeletonUpdater->update();
   mActualPosition = mControlledSkeleton->getPositions();
   mActualVelocity = mControlledSkeleton->getVelocities();
+  ROS_INFO_STREAM("Actual velocity is: " << mActualVelocity.transpose());
   mActualEffort = mControlledSkeleton->getForces();
 
   if (context && !context->mCompleted.load())
@@ -285,9 +286,11 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
       // the cancel atomic_bool. We do not make the desired velocity and acceleration
       // zero since the trajectory can potentially have been appended with another.
       context->mCompleted.store(true);
+      // ROS_INFO_STREAM("Cancelled the previous trajectory");
 
       if (shouldStopExec)
       {
+        ROS_INFO_STREAM("Setting current velocity to be 0");
         mDesiredVelocity.fill(0.0);
         mDesiredAcceleration.fill(0.0);
 
@@ -300,6 +303,7 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
   // Compute inverse dynamics torques from the set point and store them in the
   // skeleton. These values may be queried by the adapters below.
   mControlledSkeleton->setPositions(mDesiredPosition);
+  ROS_INFO_STREAM("Desired velocity setting to: " << mDesiredVelocity.transpose());
   mControlledSkeleton->setVelocities(mDesiredVelocity);
   mControlledSkeleton->setAccelerations(mDesiredAcceleration);
 

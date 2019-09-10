@@ -11,7 +11,7 @@ namespace rewd_controllers {
 class JointAdapter
 {
 public:
-  JointAdapter();
+  JointAdapter(double velocityLimit = 5.0);
 
   virtual ~JointAdapter();
 
@@ -29,6 +29,7 @@ public:
 
 protected:
   double mDesiredPosition;
+  double mVelocityLimit;
 };
 
 //=============================================================================

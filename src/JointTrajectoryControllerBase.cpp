@@ -396,8 +396,6 @@ void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle)
   }
   mCurrentTrajectoryOffset = offset;
 
-  ROS_WARN_STREAM("Offset " << offset.transpose());
-
   newContext->mGoalHandle.setAccepted();
   {  // enter critical section
     std::lock_guard<std::mutex> newTrajectoryLock{mNewTrajectoryRequestsMutex};

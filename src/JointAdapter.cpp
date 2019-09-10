@@ -20,7 +20,6 @@ JointAdapter::~JointAdapter()
 //=============================================================================
 void JointAdapter::setDesiredPosition(double desiredPosition)
 {
-  std::cout << "SET DESIRED POSITION\n\n\n" << std::endl;
   mDesiredPosition = desiredPosition;
 }
 

@@ -189,6 +189,17 @@ void MoveUntilTouchTopicController::setForceTorqueThreshold(FTThresholdGoalHandl
                                                  << goal->torque_threshold);
   FTThresholdResult result;
   result.success = true;
+
+  // Magic Taring
+  
+  if(goal->force_threshold < 0) {
+    ROS_INFO("Starting Taring");
+    pr_control_msgs::TriggerGoal triggerGoal;
+    mTareGoalHandle = mTareActionClient->sendGoal(triggerGoal, boost::bind(&MoveUntilTouchTopicController::taringTransitionCallback, this, _1));
+    mTaringCompleted.store(false);
+  }
+
+
   if (!isRunning()) {
     result.success = false;
     result.message = "Controller not started.";

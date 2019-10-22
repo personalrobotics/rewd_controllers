@@ -7,9 +7,8 @@
 namespace rewd_controllers {
 
 //=============================================================================
-JointAdapter::JointAdapter(double velocityLimit)
-  : mDesiredPosition{0.},
-    mVelocityLimit{velocityLimit}
+JointAdapter::JointAdapter()
+  : mDesiredPosition{0.}
 {
 }
 
@@ -88,14 +87,19 @@ void JointVelocityAdapter::update(
   if (std::isnan(pidVelocity))
     throw std::range_error("calculated pidVelocity is NaN");
 
-  if (desiredVelocity + pidVelocity > mVelocityLimit)
+  auto finalVelocity = desiredVelocity + pidVelocity;
+  auto upperVelLimit = mDof->getVelocityUpperLimit();
+  auto lowerVelLimit = mDof->getVelocityLowerLimit();
+
+  if (finalVelocity > upperVelLimit || finalVelocity < lowerVelLimit)
   {
     std::stringstream ss;
-    ss << "Overall velocity [" << desiredVelocity + pidVelocity << "] is beyond the velocity limit [" << mVelocityLimit << "]" << std::endl;
+    ss << "Overall velocity [" << desiredVelocity + pidVelocity << "] is beyond the velocity"
+      << " limits [" << lowerVelLimit << ", " << upperVelLimit << "]" << std::endl;
     throw std::range_error(ss.str());
   }
 
-  mVelocityHandle.setCommand(desiredVelocity + pidVelocity);
+  mVelocityHandle.setCommand(finalVelocity);
 }
 
 //=============================================================================

@@ -91,7 +91,7 @@ void JointVelocityAdapter::update(
   if (desiredVelocity + pidVelocity > mVelocityLimit)
   {
     std::stringstream ss;
-    ss << "Overall velocity " << desiredVelocity + pidVelocity << std::endl;
+    ss << "Overall velocity [" << desiredVelocity + pidVelocity << "] is beyond the velocity limit [" << mVelocityLimit << "]" << std::endl;
     throw std::range_error(ss.str());
   }
 

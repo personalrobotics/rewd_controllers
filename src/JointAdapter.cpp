@@ -89,9 +89,9 @@ void JointVelocityAdapter::update(
   if (std::isnan(pidVelocity))
     throw std::range_error("calculated pidVelocity is NaN");
 
-  auto finalVelocity = desiredVelocity + pidVelocity;
+  auto commandedVelocity = desiredVelocity + pidVelocity;
 
-  if (finalVelocity > mUpperVelLimit || finalVelocity < mLowerVelLimit)
+  if (commandedVelocity > mUpperVelLimit || commandedVelocity < mLowerVelLimit)
   {
     std::stringstream ss;
     ss << "Overall velocity [" << desiredVelocity + pidVelocity << "] is beyond the velocity"
@@ -99,7 +99,7 @@ void JointVelocityAdapter::update(
     throw std::range_error(ss.str());
   }
 
-  mVelocityHandle.setCommand(finalVelocity);
+  mVelocityHandle.setCommand(commandedVelocity);
 }
 
 //=============================================================================

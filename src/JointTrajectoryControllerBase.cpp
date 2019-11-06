@@ -221,7 +221,7 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
   mActualVelocity = mControlledSkeleton->getVelocities();
   mActualEffort = mControlledSkeleton->getForces();
 
-  if (context && !context->mCompleted.load()) 
+  if (context && !context->mCompleted.load())
   {
     const auto& trajectory = context->mTrajectory;
     const auto timeFromStart = std::min((time - context->mStartTime).toSec(),
@@ -241,13 +241,13 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
 
     // Check goal constraints.
     bool goalConstraintsSatisfied = true;
-    for (const auto& dof : mControlledSkeleton->getDofs()) 
+    for (const auto& dof : mControlledSkeleton->getDofs())
     {
       auto goalIt = mGoalConstraints.find(dof->getName());
-      if (goalIt != mGoalConstraints.end()) 
+      if (goalIt != mGoalConstraints.end())
       {
         std::size_t index = mControlledSkeleton->getIndexOf(dof);
-        if (std::abs(mDesiredPosition[index] - mActualPosition[index]) > (*goalIt).second) 
+        if (std::abs(mDesiredPosition[index] - mActualPosition[index]) > (*goalIt).second)
         {
           goalConstraintsSatisfied = false;
           break;
@@ -259,18 +259,18 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
     bool shouldStopExec = shouldStopExecution(stopReason);
 
     // Terminate the current trajectory.
-    if (timeFromStart >= trajectory->getDuration() && goalConstraintsSatisfied) 
+    if (timeFromStart >= trajectory->getDuration() && goalConstraintsSatisfied)
     {
       context->mCompleted.store(true);
-    } 
-    else if (shouldStopExec || mCancelCurrentTrajectory.load()) 
+    }
+    else if (shouldStopExec || mCancelCurrentTrajectory.load())
     {
       // TODO: if there is no other work that needs done here, we can get rid of
       // the cancel atomic_bool. We do not make the desired velocity and acceleration
       // zero since the trajectory can potentially have been appended with another.
       context->mCompleted.store(true);
 
-      if (shouldStopExec) 
+      if (shouldStopExec)
       {
         mDesiredVelocity.fill(0.0);
         mDesiredAcceleration.fill(0.0);
@@ -295,7 +295,7 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
   mControlledSkeleton->setPositions(mActualPosition);
   mControlledSkeleton->setVelocities(mActualVelocity);
 
-  for (size_t idof = 0; idof < mAdapters.size(); ++idof) 
+  for (size_t idof = 0; idof < mAdapters.size(); ++idof)
   {
     mAdapters[idof]->update(time, period, mActualPosition[idof],
                             mDesiredPosition[idof], mActualVelocity[idof],
@@ -385,7 +385,7 @@ void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle)
 
   Eigen::VectorXd offset(mControlledSpace->getDimension());
   offset = initialTrajectoryPosition - actualSkeletonPosition;
-  
+
   // The offset is a strict multiple of 2*M_PI to disallow any arbitrary
   // jumps in the execution i.e. if the next trajectory is offset from 2pi
   // in its start state, we still expect a smoother transition.
@@ -475,7 +475,6 @@ void JointTrajectoryControllerBase::nonRealtimeCallback(
                         << "' completed successfully.");
         currentTraj->mGoalHandle.setSucceeded();
       }
-
       // reset trajectory upon completion
       mCancelCurrentTrajectory.store(false);
       mAbortCurrentTrajectory.store(false);
@@ -492,7 +491,6 @@ void JointTrajectoryControllerBase::nonRealtimeCallback(
                                               // trajectory if available
     mNextTrajectory.reset();
   }
-
   publishFeedback(event.current_real);
 }
 

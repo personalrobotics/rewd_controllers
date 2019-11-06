@@ -20,7 +20,6 @@ JointAdapter::~JointAdapter()
 //=============================================================================
 void JointAdapter::setDesiredPosition(double desiredPosition)
 {
-  std::cout << "SET DESIRED POSITION\n\n\n" << std::endl;
   mDesiredPosition = desiredPosition;
 }
 
@@ -62,6 +61,8 @@ JointVelocityAdapter::JointVelocityAdapter(
   : mVelocityHandle{effortHandle}
   , mDof{dof}
 {
+  mUpperVelLimit = mDof->getVelocityUpperLimit();
+  mLowerVelLimit = mDof->getVelocityLowerLimit();
 }
 
 //=============================================================================
@@ -87,18 +88,21 @@ void JointVelocityAdapter::update(
   if (std::isnan(pidVelocity))
     throw std::range_error("calculated pidVelocity is NaN");
 
-  if (desiredVelocity + pidVelocity > 5.0)
+  auto commandedVelocity = desiredVelocity + pidVelocity;
+
+  if (commandedVelocity > mUpperVelLimit || commandedVelocity < mLowerVelLimit)
   {
     std::cout << "Desired Position: " << desiredPosition << std::endl;
     std::cout << "Actual Position: " << actualPosition << std::endl;
     std::cout << "Desired Velocity: " << desiredVelocity << std::endl;
     std::cout << "Actual Position: " << actualVelocity << std::endl;
     std::stringstream ss;
-    ss << "Overall velocity " << desiredVelocity + pidVelocity << std::endl;
+    ss << "Overall velocity [" << desiredVelocity + pidVelocity << "] is beyond the velocity"
+      << " limits [" << mLowerVelLimit << ", " << mUpperVelLimit << "]" << std::endl;
     throw std::range_error(ss.str());
   }
 
-  mVelocityHandle.setCommand(desiredVelocity + pidVelocity);
+  mVelocityHandle.setCommand(commandedVelocity);
 }
 
 //=============================================================================

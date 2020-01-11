@@ -2,8 +2,6 @@
 
 set -ex
 
-cd "${HOME}/workspace"
-
-export PACKAGE_NAMES="$(./scripts/internal-get-packages.py distribution.yml ${REPOSITORY})"
-
-./scripts/internal-build.sh ${PACKAGE_NAMES}
+if [ "${USE_CATKIN}" = "ON" ]; then
+  . "${TRAVIS_BUILD_DIR}/.ci/script_catkin.sh"
+fi

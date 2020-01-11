@@ -70,6 +70,9 @@ private:
   hardware_interface::JointHandle mVelocityHandle;
   dart::dynamics::DegreeOfFreedom* mDof;
   control_toolbox::Pid mPid;
+
+  // Storing value from DART on construction
+  double mUpperVelLimit, mLowerVelLimit;
 };
 
 //=============================================================================

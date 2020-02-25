@@ -92,10 +92,8 @@ void JointVelocityAdapter::update(
 
   if (commandedVelocity > mUpperVelLimit || commandedVelocity < mLowerVelLimit)
   {
-    std::cout << "Desired Position: " << desiredPosition << std::endl;
-    std::cout << "Actual Position: " << actualPosition << std::endl;
-    std::cout << "Desired Velocity: " << desiredVelocity << std::endl;
-    std::cout << "Actual Position: " << actualVelocity << std::endl;
+    ROS_ERROR_STREAM("Velocity limit exceeded wtih desired pose " << desiredPosition 
+      << " and actual pose " << actualPosition);
     std::stringstream ss;
     ss << "Overall velocity [" << desiredVelocity + pidVelocity << "] is beyond the velocity"
       << " limits [" << mLowerVelLimit << ", " << mUpperVelLimit << "]" << std::endl;

@@ -252,7 +252,7 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
         std::size_t index = mControlledSkeleton->getIndexOf(dof);
         auto diff = std::abs(mDesiredPosition[index] - mActualPosition[index]);
 
-        // Check for SO2:
+        // Check for SO2
         auto jointSpace = mControlledSpace->getJointSpace(index);
         auto r1Joint = std::dynamic_pointer_cast<const R1Joint>(jointSpace);
         if(!r1Joint) {
@@ -321,9 +321,9 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
       desiredPos = std::fmod(desiredPos, 2.0 * M_PI);
       actualPos = std::fmod(actualPos, 2.0 * M_PI);
       if(desiredPos - actualPos > M_PI) {
-        actualPos += 2*M_PI;
+        desiredPos -= 2*M_PI;
       } else if(desiredPos - actualPos < -M_PI) {
-        actualPos -= 2*M_PI;
+        desiredPos += 2*M_PI;
       }
     }
 

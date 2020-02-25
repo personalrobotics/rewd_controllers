@@ -318,7 +318,7 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time& time,
     auto jointSpace = mControlledSpace->getJointSpace(idof);
     auto r1Joint = std::dynamic_pointer_cast<const R1Joint>(jointSpace);
     if(!r1Joint) {
-      desiredPos = std::fmod(deisredPos, 2.0 * M_PI);
+      desiredPos = std::fmod(desiredPos, 2.0 * M_PI);
       actualPos = std::fmod(actualPos, 2.0 * M_PI);
       if(desiredPos - actualPos > M_PI) {
         actualPos += 2*M_PI;

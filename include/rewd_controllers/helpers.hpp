@@ -17,6 +17,8 @@
 
 #include <pr_hardware_interfaces/CartesianVelocityInterface.h>
 
+#include <pr_hardware_interfaces/CartesianVelocityInterface.h>
+
 namespace rewd_controllers {
 
 //=============================================================================

@@ -78,7 +78,6 @@ void JointVelocityAdapter::update(
     double actualVelocity, double desiredVelocity,
     double /*nominalEffort*/)
 {
-  // TODO: Handle position wrapping on SO(2) joints.
   const auto pidVelocity = mPid.computeCommand(
     desiredPosition - actualPosition,
     desiredVelocity - actualVelocity,
@@ -93,6 +92,8 @@ void JointVelocityAdapter::update(
 
   if (commandedVelocity > mUpperVelLimit || commandedVelocity < mLowerVelLimit)
   {
+    ROS_ERROR_STREAM("Velocity limit exceeded wtih desired pose " << desiredPosition 
+      << " and actual pose " << actualPosition);
     std::stringstream ss;
     ss << "Overall velocity [" << desiredVelocity + pidVelocity << "] is beyond the velocity"
       << " limits [" << mLowerVelLimit << ", " << mUpperVelLimit << "]" << std::endl;

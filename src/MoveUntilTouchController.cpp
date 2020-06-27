@@ -3,30 +3,24 @@
 #include <functional>
 #include <pluginlib/class_list_macros.h>
 
-namespace rewd_controllers
-{
+namespace rewd_controllers {
 //=============================================================================
 MoveUntilTouchController::MoveUntilTouchController()
-    : MultiInterfaceController{true}  // allow_optional_interfaces
-    , JointTrajectoryControllerBase{}
-    , mTaringCompleted{false}
-    , mForceThreshold{0.0}
-    , mTorqueThreshold{0.0}
-{
-}
+    : MultiInterfaceController{true} // allow_optional_interfaces
+      ,
+      JointTrajectoryControllerBase{}, mTaringCompleted{false},
+      mForceThreshold{0.0}, mTorqueThreshold{0.0} {}
 
 //=============================================================================
 MoveUntilTouchController::~MoveUntilTouchController() {}
 
 //=============================================================================
-bool MoveUntilTouchController::init(hardware_interface::RobotHW* robot,
-                                    ros::NodeHandle& nh)
-{
+bool MoveUntilTouchController::init(hardware_interface::RobotHW *robot,
+                                    ros::NodeHandle &nh) {
   // check that doubles are lock-free atomics
   if (!mForceThreshold.is_lock_free()) {
-    ROS_ERROR(
-        "Double atomics not lock-free on this system. Cannot guarantee "
-        "realtime safety.");
+    ROS_ERROR("Double atomics not lock-free on this system. Cannot guarantee "
+              "realtime safety.");
     return false;
   }
 
@@ -72,7 +66,7 @@ bool MoveUntilTouchController::init(hardware_interface::RobotHW* robot,
     mForceTorqueHandle = ft_interface->getHandle(ft_wrench_name);
     ROS_INFO_STREAM("Reading force/torque data from '" << ft_wrench_name
                                                        << "'.");
-  } catch (const hardware_interface::HardwareInterfaceException& e) {
+  } catch (const hardware_interface::HardwareInterfaceException &e) {
     ROS_ERROR_STREAM("Unable to get 'ForceTorqueSensorHandle' for '"
                      << ft_wrench_name << "'.");
     return false;
@@ -87,7 +81,7 @@ bool MoveUntilTouchController::init(hardware_interface::RobotHW* robot,
   try {
     mTareHandle = tare_interface->getHandle(ft_tare_name);
     ROS_INFO_STREAM("Triggering tares on '" << ft_tare_name << "'.");
-  } catch (const hardware_interface::HardwareInterfaceException& e) {
+  } catch (const hardware_interface::HardwareInterfaceException &e) {
     ROS_ERROR_STREAM("Unable to get 'TriggerHandle' for '" << ft_tare_name
                                                            << "'.");
     return false;
@@ -107,8 +101,7 @@ bool MoveUntilTouchController::init(hardware_interface::RobotHW* robot,
 }
 
 //=============================================================================
-void MoveUntilTouchController::starting(const ros::Time& time)
-{
+void MoveUntilTouchController::starting(const ros::Time &time) {
   // start asynchronous tare request
   mTareHandle.trigger();
   // start base trajectory controller
@@ -116,16 +109,14 @@ void MoveUntilTouchController::starting(const ros::Time& time)
 }
 
 //=============================================================================
-void MoveUntilTouchController::stopping(const ros::Time& time)
-{
+void MoveUntilTouchController::stopping(const ros::Time &time) {
   // stop base trajectory controller
   stopController(time);
 }
 
 //=============================================================================
-void MoveUntilTouchController::update(const ros::Time& time,
-                                      const ros::Duration& period)
-{
+void MoveUntilTouchController::update(const ros::Time &time,
+                                      const ros::Duration &period) {
   // check async tare request
   mTaringCompleted.store(mTareHandle.isTriggerComplete());
   // update base trajectory controller
@@ -136,21 +127,20 @@ void MoveUntilTouchController::update(const ros::Time& time,
 bool MoveUntilTouchController::shouldAcceptRequests() { return isRunning(); }
 
 //=============================================================================
-bool MoveUntilTouchController::shouldStopExecution(std::string& message)
-{
+bool MoveUntilTouchController::shouldStopExecution(std::string &message) {
   // inelegent to just terminate any running trajectory,
   // but we must guarantee taring completes before starting
   if (!mTaringCompleted.load()) {
     return true;
   }
 
-  const double* fArray = mForceTorqueHandle.getForce();
+  const double *fArray = mForceTorqueHandle.getForce();
   if (fArray == nullptr) {
     return true;
   }
   Eigen::Map<const Eigen::Vector3d> force{fArray};
 
-  const double* tArray = mForceTorqueHandle.getTorque();
+  const double *tArray = mForceTorqueHandle.getTorque();
   if (tArray == nullptr) {
     return true;
   }
@@ -166,8 +156,8 @@ bool MoveUntilTouchController::shouldStopExecution(std::string& message)
 }
 
 //=============================================================================
-void MoveUntilTouchController::setForceTorqueThreshold(FTThresholdGoalHandle gh)
-{
+void MoveUntilTouchController::setForceTorqueThreshold(
+    FTThresholdGoalHandle gh) {
   const auto goal = gh.getGoal();
   ROS_INFO_STREAM("Setting thresholds: force = " << goal->force_threshold
                                                  << ", torque = "
@@ -218,7 +208,7 @@ void MoveUntilTouchController::setForceTorqueThreshold(FTThresholdGoalHandle gh)
     gh.setSucceeded(result);
   }
 }
-}  // namespace rewd_controllers
+} // namespace rewd_controllers
 
 //=============================================================================
 PLUGINLIB_EXPORT_CLASS(rewd_controllers::MoveUntilTouchController,

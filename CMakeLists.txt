@@ -74,6 +74,25 @@ target_link_libraries("${PROJECT_NAME}"
 )
 
 #==============================================================================
+# Format
+#
+
+list(INSERT CMAKE_MODULE_PATH 0 "${PROJECT_SOURCE_DIR}/cmake")
+include(ClangFormat)
+
+clang_format_setup(VERSION 6.0)
+
+if (CLANG_FORMAT_EXECUTABLE)
+  file(GLOB_RECURSE ALL_SOURCE_FILES
+    LIST_DIRECTORIES false
+    include/*.h include/*.hpp src/*.c src/*.cpp tests/*.cpp tests/*.hpp)
+
+  clang_format_add_sources(${ALL_SOURCE_FILES})
+
+  clang_format_add_targets()
+endif()
+
+#==============================================================================
 # Installation
 #
 install(DIRECTORY "include"

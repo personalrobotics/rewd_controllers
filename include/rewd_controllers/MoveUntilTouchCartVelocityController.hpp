@@ -1,26 +1,24 @@
 #ifndef REWD_CONTROLLERS_MOVEUNTILTOUCHCARTVELOCITY_HPP_
 #define REWD_CONTROLLERS_MOVEUNTILTOUCHCARTVELOCITY_HPP_
 
-#include <memory>
+#include "helpers.hpp"
+#include <actionlib/server/action_server.h>
 #include <atomic>
 #include <controller_interface/multi_interface_controller.h>
 #include <dart/dynamics/dynamics.hpp>
-#include <ros/node_handle.h>
-#include "helpers.hpp"
-#include <actionlib/server/action_server.h>
+#include <memory>
 #include <realtime_tools/realtime_buffer.h>
+#include <ros/node_handle.h>
 
-#include <pr_hardware_interfaces/CartesianVelocityInterface.h>
 #include <pr_control_msgs/SetCartesianVelocityAction.h>
+#include <pr_hardware_interfaces/CartesianVelocityInterface.h>
 
-namespace rewd_controllers
-{
+namespace rewd_controllers {
 class MoveUntilTouchCartVelocityController
-    : public controller_interface::
-          MultiInterfaceController<pr_hardware_interfaces::CartesianVelocityInterface,
-                                   hardware_interface::JointStateInterface,
-                                   hardware_interface::JointModeInterface>
-{
+    : public controller_interface::MultiInterfaceController<
+          pr_hardware_interfaces::CartesianVelocityInterface,
+          hardware_interface::JointStateInterface,
+          hardware_interface::JointModeInterface> {
 public:
   MoveUntilTouchCartVelocityController();
   virtual ~MoveUntilTouchCartVelocityController();
@@ -38,20 +36,20 @@ public:
    * \returns True if initialization was successful and the controller
    * is ready to be started.
    */
-  bool init(hardware_interface::RobotHW* robot, ros::NodeHandle& n);
+  bool init(hardware_interface::RobotHW *robot, ros::NodeHandle &n);
 
   /*!
    * \brief Issues commands to the joint. Should be called at regular intervals
    */
-  void update(const ros::Time& time, const ros::Duration& period);
+  void update(const ros::Time &time, const ros::Duration &period);
 
   /** \brief This is called from within the realtime thread just before the
    * first call to \ref update
    *
    * \param time The current time
    */
-  void starting(const ros::Time& time) override;
-  void stopping(const ros::Time& time) override;
+  void starting(const ros::Time &time) override;
+  void stopping(const ros::Time &time) override;
 
 protected:
   using Action = pr_control_msgs::SetCartesianVelocityAction;
@@ -105,6 +103,6 @@ private:
   JointModes lastMode;
 };
 
-}  // namespace
+} // namespace rewd_controllers
 
 #endif

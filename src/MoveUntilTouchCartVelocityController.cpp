@@ -1,46 +1,43 @@
 #include <rewd_controllers/MoveUntilTouchCartVelocityController.hpp>
 
-#include <hardware_interface/hardware_interface.h>
-#include <pluginlib/class_list_macros.h>
 #include <dart/dynamics/dynamics.hpp>
 #include <dart/utils/urdf/DartLoader.hpp>
+#include <hardware_interface/hardware_interface.h>
+#include <pluginlib/class_list_macros.h>
 
-#include <pr_hardware_interfaces/CartesianVelocityInterface.h>
 #include <pr_control_msgs/SetCartesianVelocityAction.h>
+#include <pr_hardware_interfaces/CartesianVelocityInterface.h>
 
 #define SE3_SIZE 6
 
-namespace rewd_controllers
-{
-namespace
-{
+namespace rewd_controllers {
+namespace {
 //=============================================================================
-std::vector<double> toVector(const Eigen::VectorXd& input)
-{
+std::vector<double> toVector(const Eigen::VectorXd &input) {
   return std::vector<double>{input.data(), input.data() + input.size()};
 }
 
-}  // namespace
+} // namespace
 
 //=============================================================================
 MoveUntilTouchCartVelocityController::MoveUntilTouchCartVelocityController()
-  : MultiInterfaceController(true)  // allow_optional_interfaces
+    : MultiInterfaceController(true) // allow_optional_interfaces
 {}
 
 //=============================================================================
 MoveUntilTouchCartVelocityController::~MoveUntilTouchCartVelocityController() {}
 
 //=============================================================================
-bool MoveUntilTouchCartVelocityController::init(hardware_interface::RobotHW *robot,
-                                         ros::NodeHandle &n)
-{
-  using hardware_interface::JointStateInterface;
+bool MoveUntilTouchCartVelocityController::init(
+    hardware_interface::RobotHW *robot, ros::NodeHandle &n) {
   using hardware_interface::JointModeInterface;
+  using hardware_interface::JointStateInterface;
   using pr_hardware_interfaces::CartesianVelocityInterface;
 
   // Load the URDF as a Skeleton.
   mSkeleton = loadRobotFromParameter(n, "robot_description_parameter");
-  if (!mSkeleton) return false;
+  if (!mSkeleton)
+    return false;
 
   // Have skeleton update from joint state interface
   const auto jointStateInterface = robot->get<JointStateInterface>();
@@ -51,7 +48,6 @@ bool MoveUntilTouchCartVelocityController::init(hardware_interface::RobotHW *rob
 
   mSkeletonUpdater.reset(
       new SkeletonJointStateUpdater{mSkeleton, jointStateInterface});
-
 
   // Load control interfaces and handles
   const auto jointModeInterface = robot->get<JointModeInterface>();
@@ -69,7 +65,8 @@ bool MoveUntilTouchCartVelocityController::init(hardware_interface::RobotHW *rob
 
   const auto cartVelInterface = robot->get<CartesianVelocityInterface>();
   if (!cartVelInterface) {
-    ROS_ERROR("Unable to get CartesianVelocityInterface from RobotHW instance.");
+    ROS_ERROR(
+        "Unable to get CartesianVelocityInterface from RobotHW instance.");
     return false;
   }
 
@@ -90,7 +87,8 @@ bool MoveUntilTouchCartVelocityController::init(hardware_interface::RobotHW *rob
   mActionServer.reset(new actionlib::ActionServer<Action>{
       n, "cart_velocity",
       std::bind(&MoveUntilTouchCartVelocityController::goalCallback, this, _1),
-      std::bind(&MoveUntilTouchCartVelocityController::cancelCallback, this, _1),
+      std::bind(&MoveUntilTouchCartVelocityController::cancelCallback, this,
+                _1),
       false});
   mActionServer->start();
 
@@ -99,24 +97,21 @@ bool MoveUntilTouchCartVelocityController::init(hardware_interface::RobotHW *rob
 }
 
 //=============================================================================
-void MoveUntilTouchCartVelocityController::starting(const ros::Time& time)
-{
+void MoveUntilTouchCartVelocityController::starting(const ros::Time &time) {
   // Set Joint Mode to Other
   lastMode = mJointModeHandle.getMode();
   mJointModeHandle.setMode(JointModes::NOMODE);
 }
 
 //=============================================================================
-void MoveUntilTouchCartVelocityController::stopping(const ros::Time& time)
-{
+void MoveUntilTouchCartVelocityController::stopping(const ros::Time &time) {
   // Return joint mode to what it was before
   mJointModeHandle.setMode(lastMode);
 }
 
 //=============================================================================
 void MoveUntilTouchCartVelocityController::update(const ros::Time &time,
-                                           const ros::Duration &period)
-{
+                                                  const ros::Duration &period) {
   mSkeletonUpdater->update();
 
   Eigen::VectorXd setVelocity;
@@ -127,8 +122,7 @@ void MoveUntilTouchCartVelocityController::update(const ros::Time &time,
   std::shared_ptr<CartVelContext> context;
   mCurrentCartVel.get(context);
 
-  if (context && !context->mCompleted.load())
-  {
+  if (context && !context->mCompleted.load()) {
     // check duration
     ros::Duration runTime = time - context->mStartTime;
     if (runTime >= context->mDuration) {
@@ -150,11 +144,10 @@ void MoveUntilTouchCartVelocityController::update(const ros::Time &time,
 }
 
 //=============================================================================
-void MoveUntilTouchCartVelocityController::goalCallback(GoalHandle goalHandle)
-{
+void MoveUntilTouchCartVelocityController::goalCallback(GoalHandle goalHandle) {
   const auto goal = goalHandle.getGoal();
-  ROS_INFO_STREAM("Received cartesian velocity '"
-                  << goalHandle.getGoalID().id << "'.");
+  ROS_INFO_STREAM("Received cartesian velocity '" << goalHandle.getGoalID().id
+                                                  << "'.");
 
   // Setup the new trajectory.
   const auto newContext = std::make_shared<CartVelContext>();
@@ -180,15 +173,15 @@ void MoveUntilTouchCartVelocityController::goalCallback(GoalHandle goalHandle)
 }
 
 //=============================================================================
-void MoveUntilTouchCartVelocityController::cancelCallback(GoalHandle goalHandle)
-{
+void MoveUntilTouchCartVelocityController::cancelCallback(
+    GoalHandle goalHandle) {
   ROS_INFO_STREAM("Requesting cancelation of velocity '"
                   << goalHandle.getGoalID().id << "'.");
   goalHandle.setAccepted();
   mCurrentCartVel.set(nullptr);
 }
 
-}  // namespace rewd_controllers
+} // namespace rewd_controllers
 
 PLUGINLIB_EXPORT_CLASS(rewd_controllers::MoveUntilTouchCartVelocityController,
                        controller_interface::ControllerBase)

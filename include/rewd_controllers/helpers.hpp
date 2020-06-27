@@ -7,10 +7,13 @@
 #include <dart/dynamics/dynamics.hpp>
 #include <hardware_interface/joint_command_interface.h>
 #include <hardware_interface/joint_state_interface.h>
+#include <hardware_interface/joint_mode_interface.h>
 #include <hardware_interface/robot_hw.h>
 #include <ros/node_handle.h>
 #include "JointAdapter.hpp"
 #include "JointAdapterFactory.hpp"
+
+#include <pr_hardware_interfaces/CartesianVelocityInterface.h>
 
 namespace rewd_controllers {
 

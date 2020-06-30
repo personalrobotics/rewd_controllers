@@ -1,17 +1,10 @@
 #ifndef REWD_CONTROLLERS_MOVEUNTILTOUCHTOPICCONTROLLER_HPP_
 #define REWD_CONTROLLERS_MOVEUNTILTOUCHTOPICCONTROLLER_HPP_
 
-#include <actionlib/client/simple_action_client.h>
-#include <actionlib/server/action_server.h>
-#include <geometry_msgs/WrenchStamped.h>
-#include <hardware_interface/force_torque_sensor_interface.h>
-#include <hardware_interface/joint_command_interface.h>
-#include <mutex>
-#include <pr_control_msgs/SetForceTorqueThresholdAction.h>
-#include <pr_control_msgs/TriggerAction.h>
-#include <pr_hardware_interfaces/TriggerableInterface.h>
 #include <rewd_controllers/JointTrajectoryControllerBase.hpp>
 #include <rewd_controllers/MultiInterfaceController.hpp>
+
+#include <rewd_controllers/FTThresholdServer.hpp>
 
 namespace rewd_controllers {
 
@@ -71,7 +64,7 @@ protected:
 private:
   // \brief Force-Torque Thresholding Server
   std::shared_ptr<FTThresholdServer> mFTThresholdServer;
-  
+
 };
 
 } // namespace rewd_controllers

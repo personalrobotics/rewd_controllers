@@ -6,12 +6,16 @@
 // Default server name
 #define DEFAULT_SERVER "set_forcetorque_threshold" 
 
+#include <actionlib/client/simple_action_client.h>
 #include <actionlib/server/action_server.h>
+#include <geometry_msgs/WrenchStamped.h>
 #include <pr_control_msgs/SetForceTorqueThresholdAction.h>
+#include <pr_control_msgs/TriggerAction.h>
 #include <ros/ros.h>
 
 #include <atomic>
 #include <chrono>
+#include <mutex>
 
 namespace rewd_controllers {
 

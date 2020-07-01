@@ -7,7 +7,7 @@
 
 namespace rewd_controllers {
 
-/// The FTThresholdClient configures the MoveUntilTouch(Topic)Controller's
+/// The FTThresholdClient configures all MoveUntilTouch- controllers'
 /// thresholds.
 /// When those thresholds are exceeded, the controller stops the movement.
 class FTThresholdClient {
@@ -16,16 +16,11 @@ public:
   /// Constructor.
   FTThresholdClient(const std::string &controllerThresholdTopic);
 
-  /// Sets the MoveUntilTouchControllers Thresholds.
-  /// Blocks until the threshold could be set successfully.
-  /// Can be aborted with !ros::ok(), in which case it returns false
-  bool trySetThresholdsRepeatedly(double forceThreshold,
-                                  double torqueThreshold);
-
-  /// Sets the MoveUntilTouchControllers thresholds.
+  /// Sets the MoveUntilTouch- thresholds.
+  /// Note: timeout is ignored if re-taring.
   /// Returns true if the thresholds were set successfully.
   bool setThresholds(double forceThreshold, double torqueThreshold,
-                     double timeout = 3.0);
+                     bool retare, double timeout = 3.0);
 
 private:
   std::unique_ptr<actionlib::SimpleActionClient<

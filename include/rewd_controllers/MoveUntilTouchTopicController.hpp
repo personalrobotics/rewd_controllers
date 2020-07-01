@@ -1,19 +1,10 @@
 #ifndef REWD_CONTROLLERS_MOVEUNTILTOUCHTOPICCONTROLLER_HPP_
 #define REWD_CONTROLLERS_MOVEUNTILTOUCHTOPICCONTROLLER_HPP_
 
-#include <actionlib/client/simple_action_client.h>
-#include <actionlib/server/action_server.h>
-#include <atomic>
-#include <chrono>
-#include <geometry_msgs/WrenchStamped.h>
-#include <hardware_interface/force_torque_sensor_interface.h>
-#include <hardware_interface/joint_command_interface.h>
-#include <mutex>
-#include <pr_control_msgs/SetForceTorqueThresholdAction.h>
-#include <pr_control_msgs/TriggerAction.h>
-#include <pr_hardware_interfaces/TriggerableInterface.h>
 #include <rewd_controllers/JointTrajectoryControllerBase.hpp>
 #include <rewd_controllers/MultiInterfaceController.hpp>
+
+#include <rewd_controllers/FTThresholdServer.hpp>
 
 namespace rewd_controllers {
 
@@ -71,67 +62,9 @@ protected:
   bool shouldStopExecution(std::string &message) override;
 
 private:
-  using SetFTThresholdAction = pr_control_msgs::SetForceTorqueThresholdAction;
-  using FTThresholdActionServer = actionlib::ActionServer<SetFTThresholdAction>;
-  using FTThresholdGoalHandle = FTThresholdActionServer::GoalHandle;
-  using FTThresholdResult = pr_control_msgs::SetForceTorqueThresholdResult;
-  using TareActionClient =
-      actionlib::ActionClient<pr_control_msgs::TriggerAction>;
+  // \brief Force-Torque Thresholding Server
+  std::shared_ptr<FTThresholdServer> mFTThresholdServer;
 
-  // \brief Protects mForce and mTorque from simultaneous access.
-  std::mutex mForceTorqueDataMutex;
-
-  // \brief The latest force of the sensor.
-  Eigen::Vector3d mForce;
-
-  // \brief The latest torque of the sensor.
-  Eigen::Vector3d mTorque;
-
-  // \brief Is true if the taring (or 'calibration') procedure is finished.
-  std::atomic_bool mTaringCompleted;
-
-  // \brief Sensor force limit. Cannot set a threshold higher than that.
-  double mForceLimit;
-
-  // \brief Sensor torque limit. Cannot set a threshold higher than that.
-  double mTorqueLimit;
-
-  // \brief Gets data from the force/torque sensor
-  ros::Subscriber mForceTorqueDataSub;
-
-  // \brief Starts and handles the taring (calibration) process of the sensor
-  std::unique_ptr<TareActionClient> mTareActionClient;
-
-  // \brief Keeps track of the goal status for the mTareActionClient
-  TareActionClient::GoalHandle mTareGoalHandle;
-
-  // \brief ActionServer that enables others to set the force/torque thresholds
-  std::unique_ptr<FTThresholdActionServer> mFTThresholdActionServer;
-
-  // \brief If the force is higher than this threshold, the controller aborts.
-  std::atomic<double> mForceThreshold;
-
-  // \brief If the torque is higher than this threshold, the controller aborts.
-  std::atomic<double> mTorqueThreshold;
-
-  // \brief Keeps track of the last update time
-  std::chrono::time_point<std::chrono::steady_clock>
-      mTimeOfLastSensorDataReceived;
-
-  /**
-   * \brief Callback for pr_control_msgs::SetForceTorqueThresholdAction.
-   */
-  void setForceTorqueThreshold(FTThresholdGoalHandle gh);
-
-  /**
-   * \brief Called whenever a new Force/Torque message arrives on the ros topic
-   */
-  void forceTorqueDataCallback(const geometry_msgs::WrenchStamped &msg);
-
-  /**
-   * \brief Called whenever the status of taring changes
-   */
-  void taringTransitionCallback(const TareActionClient::GoalHandle &goalHandle);
 };
 
 } // namespace rewd_controllers

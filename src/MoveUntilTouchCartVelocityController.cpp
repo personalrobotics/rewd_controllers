@@ -22,7 +22,9 @@ std::vector<double> toVector(const Eigen::VectorXd &input) {
 //=============================================================================
 MoveUntilTouchCartVelocityController::MoveUntilTouchCartVelocityController()
     : MultiInterfaceController(true) // allow_optional_interfaces
-{}
+{
+  mUseFT = false;
+}
 
 //=============================================================================
 MoveUntilTouchCartVelocityController::~MoveUntilTouchCartVelocityController() {}
@@ -33,6 +35,52 @@ bool MoveUntilTouchCartVelocityController::init(
   using hardware_interface::JointModeInterface;
   using hardware_interface::JointStateInterface;
   using pr_hardware_interfaces::CartesianVelocityInterface;
+
+  // Enable force/torque functionality if requested
+  mUseFT = false;
+  n.getParam("enableFT", mUseFT);
+
+  if(mUseFT) {
+    // load name of force/torque sensor handle from paramter
+    std::string ft_wrench_name;
+    if (!n.getParam("forcetorque_wrench_name", ft_wrench_name)) {
+      ROS_ERROR("Failed to load 'forcetorque_wrench_name' parameter.");
+      return false;
+    }
+    // load name of force/torque tare handle from paramter
+    std::string ft_tare_name;
+    if (!n.getParam("forcetorque_tare_name", ft_tare_name)) {
+      ROS_ERROR("Failed to load 'forcetorque_tare_name' parameter.");
+      return false;
+    }
+
+    // load force/torque saturation limits from parameter
+    double forceLimit = 0.0;
+    if (!n.getParam("sensor_force_limit", forceLimit)) {
+      ROS_ERROR("Failed to load 'sensor_force_limit' parameter.");
+      return false;
+    }
+    double torqueLimit = 0.0;
+    if (!n.getParam("sensor_torque_limit", torqueLimit)) {
+      ROS_ERROR("Failed to load 'sensor_torque_limit' parameter.");
+      return false;
+    }
+    if (forceLimit < 0) {
+      ROS_ERROR("sensor_force_limit must be positive or zero");
+      return false;
+    }
+    if (torqueLimit < 0) {
+      ROS_ERROR("sensor_torque_limit must be positive or zero");
+      return false;
+    }
+
+    // Init FT Threshold Server
+    mFTThresholdServer.reset(new FTThresholdServer{n,
+            ft_wrench_name,
+            ft_tare_name,
+            forceLimit,
+            torqueLimit});
+  }
 
   // Load the URDF as a Skeleton.
   mSkeleton = loadRobotFromParameter(n, "robot_description_parameter");
@@ -118,6 +166,13 @@ void MoveUntilTouchCartVelocityController::update(const ros::Time &time,
   setVelocity.resize(SE3_SIZE);
   setVelocity.setZero();
 
+  // Check FT Threshold
+  bool ftThresholdTripped = false;
+  std::string message = "";
+  if(mUseFT) {
+    ftThresholdTripped = mFTThresholdServer->shouldStopExecution(message);
+  }
+
   // Load current command
   std::shared_ptr<CartVelContext> context;
   mCurrentCartVel.get(context);
@@ -132,9 +187,14 @@ void MoveUntilTouchCartVelocityController::update(const ros::Time &time,
       result.error_string = "";
       context->mGoalHandle.setSucceeded(result);
       context->mCompleted.store(true);
-    }
-    // TODO: check FT sensor
-    else {
+    } else if (ftThresholdTripped) {
+      // Aborted run
+      Result result;
+      result.error_code = Result::FORCE_THRESH;
+      result.error_string = message;
+      context->mGoalHandle.setAborted(result);
+      context->mCompleted.store(true);
+    } else {
       setVelocity = context->mDesiredVelocity;
     }
   }

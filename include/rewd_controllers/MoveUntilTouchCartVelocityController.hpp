@@ -13,6 +13,8 @@
 #include <pr_control_msgs/SetCartesianVelocityAction.h>
 #include <pr_hardware_interfaces/CartesianVelocityInterface.h>
 
+#include <rewd_controllers/FTThresholdServer.hpp>
+
 namespace rewd_controllers {
 class MoveUntilTouchCartVelocityController
     : public controller_interface::MultiInterfaceController<
@@ -61,6 +63,10 @@ protected:
   using JointModes = hardware_interface::JointCommandModes;
 
 private:
+  // \brief Force-Torque Thresholding Server
+  std::shared_ptr<FTThresholdServer> mFTThresholdServer;
+  bool mUseFT;
+  
   /** \brief Actionlib callback to accept new Goal.
    */
   void goalCallback(GoalHandle goalHandle);

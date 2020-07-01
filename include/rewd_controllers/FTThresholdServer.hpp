@@ -12,6 +12,7 @@
 #include <pr_control_msgs/SetForceTorqueThresholdAction.h>
 #include <pr_control_msgs/TriggerAction.h>
 #include <ros/ros.h>
+#include <Eigen/Geometry>
 
 #include <atomic>
 #include <chrono>
@@ -49,7 +50,7 @@ private:
   using FTThresholdGoalHandle = FTThresholdActionServer::GoalHandle;
   using FTThresholdResult = pr_control_msgs::SetForceTorqueThresholdResult;
   using TareActionClient =
-      actionlib::ActionClient<pr_control_msgs::TriggerAction>;
+      actionlib::SimpleActionClient<pr_control_msgs::TriggerAction>;
 
   // \brief Protects mForce and mTorque from simultaneous access.
   std::mutex mForceTorqueDataMutex;
@@ -75,9 +76,6 @@ private:
   // \brief Starts and handles the taring (calibration) process of the sensor
   std::unique_ptr<TareActionClient> mTareActionClient;
 
-  // \brief Keeps track of the goal status for the mTareActionClient
-  TareActionClient::GoalHandle mTareGoalHandle;
-
   // \brief ActionServer that enables others to set the force/torque thresholds
   std::unique_ptr<FTThresholdActionServer> mFTThresholdActionServer;
 
@@ -100,11 +98,6 @@ private:
    * \brief Called whenever a new Force/Torque message arrives on the ros topic
    */
   void forceTorqueDataCallback(const geometry_msgs::WrenchStamped &msg);
-
-  /**
-   * \brief Called whenever the status of taring changes
-   */
-  void taringTransitionCallback(const TareActionClient::GoalHandle &goalHandle);
 };
 } // namespace rewd_controllers
 

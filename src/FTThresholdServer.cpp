@@ -6,9 +6,9 @@ namespace rewd_controllers {
 FTThresholdServer::FTThresholdServer(ros::NodeHandle &nh,
                     const std::string &wrenchTopic, 
                     const std::string &tareTopic,
-                    double forceLimit = DEFAULT_MAX,
-                    double torqueLimit = DEFAULT_MAX,
-                    const std::string &serverName = DEFAULT_SERVER)
+                    double forceLimit,
+                    double torqueLimit,
+                    const std::string &serverName)
     : mForceLimit{forceLimit} // allow_optional_interfaces
     , mTorqueLimit{torqueLimit} {
   // check that doubles are lock-free atomics
@@ -105,16 +105,6 @@ void FTThresholdServer::forceTorqueDataCallback(
 }
 
 //=============================================================================
-void FTThresholdServer::taringTransitionCallback(
-    const TareActionClient::GoalHandle &goalHandle) {
-  if (goalHandle.getResult() && goalHandle.getResult()->success) {
-    ROS_INFO("Taring completed!");
-    mTimeOfLastSensorDataReceived = std::chrono::steady_clock::now();
-    mTaringCompleted.store(true);
-  }
-}
-
-//=============================================================================
 void FTThresholdServer::setForceTorqueThreshold(
     FTThresholdGoalHandle gh) {
   const auto goal = gh.getGoal();
@@ -153,12 +143,11 @@ void FTThresholdServer::setForceTorqueThreshold(
     ROS_INFO("Starting Taring");
     pr_control_msgs::TriggerGoal goal;
     mTaringCompleted.store(false);
-    mTareActionClient->sendGoal(
-        goal,
-        boost::bind(&FTThresholdServer::taringTransitionCallback,
-                    this, _1));
     // block until tared
-    mTareActionClient->waitForResult();
+    mTareActionClient->sendGoalAndWait(goal);
+    ROS_INFO("Taring completed!");
+    mTimeOfLastSensorDataReceived = std::chrono::steady_clock::now();
+    mTaringCompleted.store(true);
   }
 
   // check that we are not already taring

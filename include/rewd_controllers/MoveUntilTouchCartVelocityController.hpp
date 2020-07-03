@@ -18,7 +18,7 @@
 namespace rewd_controllers {
 class MoveUntilTouchCartVelocityController
     : public controller_interface::MultiInterfaceController<
-          pr_hardware_interfaces::CartesianVelocityInterface,
+          hardware_interface::VelocityJointInterface,
           hardware_interface::JointStateInterface,
           hardware_interface::JointModeInterface> {
 public:
@@ -95,6 +95,8 @@ private:
   // For position feedback:
   dart::dynamics::SkeletonPtr mSkeleton;
   std::unique_ptr<SkeletonJointStateUpdater> mSkeletonUpdater;
+  dart::dynamics::MetaSkeletonPtr mControlledSkeleton;
+  std::string mEEName;
 
   // Action server variables
   std::unique_ptr<ActionServer> mActionServer;
@@ -104,7 +106,7 @@ private:
   realtime_tools::RealtimeBox<CartVelContextPtr> mCurrentCartVel;
 
   // For communication with robot
-  pr_hardware_interfaces::CartesianVelocityHandle mCartVelHandle;
+  std::vector<hardware_interface::JointHandle> mControlledJointHandles;
   hardware_interface::JointModeHandle mJointModeHandle;
   JointModes lastMode;
 };

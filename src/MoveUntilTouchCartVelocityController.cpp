@@ -6,7 +6,6 @@
 #include <pluginlib/class_list_macros.h>
 
 #include <pr_control_msgs/SetCartesianVelocityAction.h>
-#include <pr_hardware_interfaces/CartesianVelocityInterface.h>
 
 #define SE3_SIZE 6
 
@@ -34,7 +33,7 @@ bool MoveUntilTouchCartVelocityController::init(
     hardware_interface::RobotHW *robot, ros::NodeHandle &n) {
   using hardware_interface::JointModeInterface;
   using hardware_interface::JointStateInterface;
-  using pr_hardware_interfaces::CartesianVelocityInterface;
+  using hardware_interface::VelocityJointInterface;
 
   // Enable force/torque functionality if requested
   mUseFT = false;
@@ -97,6 +96,34 @@ bool MoveUntilTouchCartVelocityController::init(
   mSkeletonUpdater.reset(
       new SkeletonJointStateUpdater{mSkeleton, jointStateInterface});
 
+  // Build up the list of controlled joints.
+  const auto jointParameters = loadJointsFromParameter(n, "joints", "velocity");
+  if (jointParameters.empty())
+    return false;
+
+  ROS_INFO_STREAM("Controlling " << jointParameters.size() << " joints:");
+  for (const auto &param : jointParameters) {
+    ROS_INFO_STREAM("- " << param.mName << " (type: " << param.mType << ")");
+
+    if (param.mType != "velocity") {
+      ROS_ERROR_STREAM("Joint '"
+                       << param.mName
+                       << "' is not velocity-controlled and cannot be "
+                          "used in a cartesian velocity controller");
+      return false;
+    }
+  }
+
+  // Extract the subset of the Skeleton that is being controlled.
+  mControlledSkeleton =
+      getControlledMetaSkeleton(mSkeleton, jointParameters, "Controlled");
+  if (!mControlledSkeleton) {
+    return false;
+  }
+
+  const auto numControlledDofs = mControlledSkeleton->getNumDofs();
+  mControlledJointHandles.resize(numControlledDofs);
+
   // Load control interfaces and handles
   const auto jointModeInterface = robot->get<JointModeInterface>();
   if (!jointModeInterface) {
@@ -110,25 +137,31 @@ bool MoveUntilTouchCartVelocityController::init(
     ROS_ERROR_STREAM("Unable to get joint mode interface for robot");
     return false;
   }
-
-  const auto cartVelInterface = robot->get<CartesianVelocityInterface>();
-  if (!cartVelInterface) {
-    ROS_ERROR(
-        "Unable to get CartesianVelocityInterface from RobotHW instance.");
+  const auto velocityJointInterface = robot->get<VelocityJointInterface>();
+  if (!velocityJointInterface) {
+    ROS_ERROR("Unable to get VelocityJointInterface from RobotHW instance.");
     return false;
   }
 
-  try {
-    mCartVelHandle = cartVelInterface->getHandle("cart_vel");
-  } catch (const hardware_interface::HardwareInterfaceException &e) {
-    ROS_ERROR_STREAM("Unable to get cartesian velocity interface for robot.");
-    return false;
+  for (size_t idof = 0; idof < numControlledDofs; ++idof) {
+    const auto dofName = mControlledSkeleton->getDof(idof)->getName();
+    try {
+      auto handle = velocityJointInterface->getHandle(dofName);
+      mControlledJointHandles[idof] = handle;
+    } catch (const hardware_interface::HardwareInterfaceException &e) {
+      ROS_ERROR_STREAM(
+          "Unable to get interface of type 'VelocityJointInterface' for joint '"
+          << dofName << "'.");
+      return false;
+    }
   }
 
   // init local vars
   mCurrentCartVel.set(nullptr);
-
-  // TODO: Initialize FT sensor
+  if (!n.getParam("ee", mEEName)) {
+    ROS_ERROR_STREAM("Parameter '" << n.getNamespace()
+                                   << "/ee' is required.");
+  }
 
   // Start the action server. This must be last.
   using std::placeholders::_1;
@@ -148,7 +181,7 @@ bool MoveUntilTouchCartVelocityController::init(
 void MoveUntilTouchCartVelocityController::starting(const ros::Time &time) {
   // Set Joint Mode to Other
   lastMode = mJointModeHandle.getMode();
-  mJointModeHandle.setMode(JointModes::NOMODE);
+  mJointModeHandle.setMode(JointModes::MODE_VELOCITY);
 }
 
 //=============================================================================
@@ -200,7 +233,23 @@ void MoveUntilTouchCartVelocityController::update(const ros::Time &time,
   }
 
   // Execute velocity command
-  mCartVelHandle.setCommand(toVector(setVelocity));
+  /* Get full (with orientation) Jacobian of our end-effector */
+  Eigen::VectorXd jointVels(mControlledSkeleton->getNumDofs());
+  jointVels.setZero();
+  if (setVelocity.norm() != 0) {
+    Eigen::MatrixXd J = mSkeleton->getBodyNode(mEEName)->getWorldJacobian();
+    Eigen::MatrixXd JtJ = J.transpose() * J;
+    if (JtJ.determinant() != 0) {
+      jointVels = JtJ.inverse() * J.transpose() * setVelocity;
+    } else {
+      ROS_ERROR_STREAM("Error: at singularity. Cartesian control impossible.");
+    }
+  }
+
+  for (size_t idof = 0; idof < mControlledJointHandles.size(); ++idof) {
+    auto jointHandle = mControlledJointHandles[idof];
+    jointHandle.setCommand(jointVels(idof));
+  }
 }
 
 //=============================================================================
@@ -218,12 +267,12 @@ void MoveUntilTouchCartVelocityController::goalCallback(GoalHandle goalHandle) {
   newContext->mCompleted.store(false);
 
   // Copy over velocity data
-  newContext->mDesiredVelocity(0) = goal->command.linear.x;
-  newContext->mDesiredVelocity(1) = goal->command.linear.y;
-  newContext->mDesiredVelocity(2) = goal->command.linear.z;
-  newContext->mDesiredVelocity(3) = goal->command.angular.x;
-  newContext->mDesiredVelocity(4) = goal->command.angular.y;
-  newContext->mDesiredVelocity(5) = goal->command.angular.z;
+  newContext->mDesiredVelocity(0) = goal->command.angular.x;
+  newContext->mDesiredVelocity(1) = goal->command.angular.y;
+  newContext->mDesiredVelocity(2) = goal->command.angular.z;
+  newContext->mDesiredVelocity(3) = goal->command.linear.x;
+  newContext->mDesiredVelocity(4) = goal->command.linear.y;
+  newContext->mDesiredVelocity(5) = goal->command.linear.z;
 
   // TODO: add velocity checks
 
@@ -237,7 +286,6 @@ void MoveUntilTouchCartVelocityController::cancelCallback(
     GoalHandle goalHandle) {
   ROS_INFO_STREAM("Requesting cancelation of velocity '"
                   << goalHandle.getGoalID().id << "'.");
-  goalHandle.setAccepted();
   mCurrentCartVel.set(nullptr);
 }
 

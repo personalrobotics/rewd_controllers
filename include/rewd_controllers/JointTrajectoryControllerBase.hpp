@@ -5,8 +5,8 @@
 #include <deque>
 #include <memory>
 #include <mutex>
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
 #include <actionlib/server/action_server.h>
 #include <aikido/statespace/CartesianProduct.hpp>
@@ -19,13 +19,12 @@
 #include <rewd_controllers/helpers.hpp>
 #include <ros/node_handle.h>
 
-namespace rewd_controllers
-{
+namespace rewd_controllers {
 
-/// The JointTrajectoryControllerBase uses a bunch of ros parameters as configuration.
-/// It uses the constraints/joint_name/goal parameters to determine whether it has reached its goal.
-class JointTrajectoryControllerBase
-{
+/// The JointTrajectoryControllerBase uses a bunch of ros parameters as
+/// configuration. It uses the constraints/joint_name/goal parameters to
+/// determine whether it has reached its goal.
+class JointTrajectoryControllerBase {
 protected:
   using Action = control_msgs::FollowJointTrajectoryAction;
   using ActionServer = actionlib::ActionServer<Action>;
@@ -50,26 +49,26 @@ protected:
    * \returns True if initialization was successful and the controller
    * is ready to be started.
    */
-  bool initController(hardware_interface::RobotHW* robot, ros::NodeHandle& n);
+  bool initController(hardware_interface::RobotHW *robot, ros::NodeHandle &n);
 
   /** \brief This is called from within the realtime thread just before the
    * first call to \ref update
    *
    * \param time The current time
    */
-  void startController(const ros::Time& time);
+  void startController(const ros::Time &time);
 
   /** \brief This is called from within the realtime thread just after the
    * last call to \ref update
    *
    * \param time The current time
    */
-  void stopController(const ros::Time& time);
+  void stopController(const ros::Time &time);
 
   /**
    * \brief Issues commands to the joint. Should be called at regular intervals
    */
-  void updateStep(const ros::Time& time, const ros::Duration& period);
+  void updateStep(const ros::Time &time, const ros::Duration &period);
 
   /** \brief Whether the controller should accept new service requests. */
   virtual bool shouldAcceptRequests() = 0;
@@ -77,10 +76,11 @@ protected:
   /**
    * \brief Called every update step in the real-time thread to let
    * subclassing controllers specify an early termination condition.
-   * 
-   * \param message If the execution should be stopped, this contains reason for stopping the execution.
+   *
+   * \param message If the execution should be stopped, this contains reason for
+   * stopping the execution.
    */
-  virtual bool shouldStopExecution(std::string& message);
+  virtual bool shouldStopExecution(std::string &message);
 
 private:
   /** \brief Contains all data needed to execute the currently
@@ -110,12 +110,12 @@ private:
   /** \brief Called by timer to manage new, canceled, and completed trajectory
    * requests.
    */
-  void nonRealtimeCallback(const ros::TimerEvent& event);
+  void nonRealtimeCallback(const ros::TimerEvent &event);
 
   /** \brief Helper function to publish feedback on currently executing
    * trajectory in \ref nonRealtimecallback.
    */
-  void publishFeedback(const ros::Time& currentTime);
+  void publishFeedback(const ros::Time &currentTime);
 
   /** \brief Helper function used to remove a cancel request from the list of
    * new trajectory requests in \ref nonRealtimecallback.
@@ -126,7 +126,7 @@ private:
    * \returns True if ghToCancel was properly canceled and should be removed
    * from the queue of cancel requests.
    */
-  bool processCancelRequest(GoalHandle& ghToCancel);
+  bool processCancelRequest(GoalHandle &ghToCancel);
 
   std::unique_ptr<ros::NodeHandle> mNodeHandle;
   JointAdapterFactory mAdapterFactory;
@@ -158,9 +158,8 @@ private:
   Eigen::VectorXd mCurrentTrajectoryOffset;
 
   /// Cartesian product space equivalent to mControlledSpace
-  /// but with all R1 joints instead. 
-  std::shared_ptr<aikido::statespace::CartesianProduct>
-      mCompoundSpace;
+  /// but with all R1 joints instead.
+  std::shared_ptr<aikido::statespace::CartesianProduct> mCompoundSpace;
 
   // TODO: It would be better to use std::atomic<std::shared_ptr<T>> here.
   // However, this is not fully implemented in GCC 4.8.4, shipped with Ubuntu
@@ -170,7 +169,8 @@ private:
   // Difference between canceling and aborting a trajectory:
   // If the higher level code stops the trajectory, it is "canceled".
   // If the controller itself stops the trajectory, it is "aborted".
-  // This information is reflected in the goal handle and therefore accessible to the higher level code.
+  // This information is reflected in the goal handle and therefore accessible
+  // to the higher level code.
   std::atomic_bool mCancelCurrentTrajectory;
   std::atomic_bool mAbortCurrentTrajectory;
   std::string mAbortReason;
@@ -184,6 +184,6 @@ private:
   std::unordered_map<std::string, double> mTrajectoryConstraints;
 };
 
-}  // namespace rewd_controllers
+} // namespace rewd_controllers
 
-#endif  // ifndef REWD_CONTROLLERS_JOINTTRAJECTORYCONTROLLERBASE_HPP_
+#endif // ifndef REWD_CONTROLLERS_JOINTTRAJECTORYCONTROLLERBASE_HPP_

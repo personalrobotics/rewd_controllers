@@ -3,18 +3,16 @@
 #include <functional>
 #include <pluginlib/class_list_macros.h>
 
-static const std::chrono::milliseconds MAX_DELAY = std::chrono::milliseconds(400);
+static const std::chrono::milliseconds MAX_DELAY =
+    std::chrono::milliseconds(400);
 
-namespace rewd_controllers
-{
+namespace rewd_controllers {
 //=============================================================================
 MoveUntilTouchTopicController::MoveUntilTouchTopicController()
-    : MultiInterfaceController{true}  // allow_optional_interfaces
-    , JointTrajectoryControllerBase{}
-    , mTaringCompleted{false}
-    , mForceThreshold{0.0}
-    , mTorqueThreshold{0.0}
-{
+    : MultiInterfaceController{true} // allow_optional_interfaces
+      ,
+      JointTrajectoryControllerBase{}, mTaringCompleted{false},
+      mForceThreshold{0.0}, mTorqueThreshold{0.0} {
   // Do nothing.
 }
 
@@ -24,14 +22,12 @@ MoveUntilTouchTopicController::~MoveUntilTouchTopicController() {
 }
 
 //=============================================================================
-bool MoveUntilTouchTopicController::init(hardware_interface::RobotHW* robot,
-                                    ros::NodeHandle& nh)
-{
+bool MoveUntilTouchTopicController::init(hardware_interface::RobotHW *robot,
+                                         ros::NodeHandle &nh) {
   // check that doubles are lock-free atomics
   if (!mForceThreshold.is_lock_free()) {
-    ROS_ERROR(
-        "Double atomics not lock-free on this system. Cannot guarantee "
-        "realtime safety.");
+    ROS_ERROR("Double atomics not lock-free on this system. Cannot guarantee "
+              "realtime safety.");
     return false;
   }
 
@@ -67,17 +63,20 @@ bool MoveUntilTouchTopicController::init(hardware_interface::RobotHW* robot,
   }
 
   // subscribe to sensor data
-  mForceTorqueDataSub = nh.subscribe(ft_wrench_name, 1, &MoveUntilTouchTopicController::forceTorqueDataCallback, this);
+  mForceTorqueDataSub = nh.subscribe(
+      ft_wrench_name, 1,
+      &MoveUntilTouchTopicController::forceTorqueDataCallback, this);
 
   // action client to kick off taring
-  mTareActionClient = std::unique_ptr<TareActionClient>(new TareActionClient(nh, ft_tare_name));
+  mTareActionClient =
+      std::unique_ptr<TareActionClient>(new TareActionClient(nh, ft_tare_name));
 
   // start action server
   mFTThresholdActionServer.reset(
       new actionlib::ActionServer<SetFTThresholdAction>{
           nh, "set_forcetorque_threshold",
-          std::bind(&MoveUntilTouchTopicController::setForceTorqueThreshold, this,
-                    std::placeholders::_1),
+          std::bind(&MoveUntilTouchTopicController::setForceTorqueThreshold,
+                    this, std::placeholders::_1),
           false});
   mFTThresholdActionServer->start();
 
@@ -86,8 +85,8 @@ bool MoveUntilTouchTopicController::init(hardware_interface::RobotHW* robot,
 }
 
 //=============================================================================
-void MoveUntilTouchTopicController::forceTorqueDataCallback(const geometry_msgs::WrenchStamped& msg)
-{
+void MoveUntilTouchTopicController::forceTorqueDataCallback(
+    const geometry_msgs::WrenchStamped &msg) {
   std::lock_guard<std::mutex> lock(mForceTorqueDataMutex);
   mForce.x() = msg.wrench.force.x;
   mForce.y() = msg.wrench.force.y;
@@ -99,7 +98,8 @@ void MoveUntilTouchTopicController::forceTorqueDataCallback(const geometry_msgs:
 }
 
 //=============================================================================
-void MoveUntilTouchTopicController::taringTransitionCallback(const TareActionClient::GoalHandle& goalHandle) {
+void MoveUntilTouchTopicController::taringTransitionCallback(
+    const TareActionClient::GoalHandle &goalHandle) {
   if (goalHandle.getResult() && goalHandle.getResult()->success) {
     ROS_INFO("Taring completed!");
     mTimeOfLastSensorDataReceived = std::chrono::steady_clock::now();
@@ -108,31 +108,31 @@ void MoveUntilTouchTopicController::taringTransitionCallback(const TareActionCli
 }
 
 //=============================================================================
-void MoveUntilTouchTopicController::starting(const ros::Time& time)
-{
+void MoveUntilTouchTopicController::starting(const ros::Time &time) {
   // start asynchronous tare request
   ROS_INFO("Starting Taring");
   pr_control_msgs::TriggerGoal goal;
-  mTareGoalHandle = mTareActionClient->sendGoal(goal, boost::bind(&MoveUntilTouchTopicController::taringTransitionCallback, this, _1));
+  mTareGoalHandle = mTareActionClient->sendGoal(
+      goal,
+      boost::bind(&MoveUntilTouchTopicController::taringTransitionCallback,
+                  this, _1));
 
   // start base trajectory controller
   startController(time);
 }
 
 //=============================================================================
-void MoveUntilTouchTopicController::stopping(const ros::Time& time)
-{
+void MoveUntilTouchTopicController::stopping(const ros::Time &time) {
   // stop base trajectory controller
   stopController(time);
 }
 
 //=============================================================================
-void MoveUntilTouchTopicController::update(const ros::Time& time,
-                                      const ros::Duration& period)
-{
-  if (mTaringCompleted.load()
-      && (std::chrono::steady_clock::now() - mTimeOfLastSensorDataReceived > MAX_DELAY))
-  {
+void MoveUntilTouchTopicController::update(const ros::Time &time,
+                                           const ros::Duration &period) {
+  if (mTaringCompleted.load() &&
+      (std::chrono::steady_clock::now() - mTimeOfLastSensorDataReceived >
+       MAX_DELAY)) {
     throw std::runtime_error("Lost connection to F/T sensor!");
   }
 
@@ -141,11 +141,12 @@ void MoveUntilTouchTopicController::update(const ros::Time& time,
 }
 
 //=============================================================================
-bool MoveUntilTouchTopicController::shouldAcceptRequests() { return isRunning(); }
+bool MoveUntilTouchTopicController::shouldAcceptRequests() {
+  return isRunning();
+}
 
 //=============================================================================
-bool MoveUntilTouchTopicController::shouldStopExecution(std::string& message)
-{
+bool MoveUntilTouchTopicController::shouldStopExecution(std::string &message) {
   // inelegent to just terminate any running trajectory,
   // but we must guarantee taring completes before starting
   if (!mTaringCompleted.load()) {
@@ -162,17 +163,17 @@ bool MoveUntilTouchTopicController::shouldStopExecution(std::string& message)
 
   if (forceThresholdExceeded) {
     std::stringstream messageStream;
-    messageStream << "Force Threshold exceeded!   Threshold: "
-    << forceThreshold << "   Force: " << mForce.x()
-    << ", " << mForce.y() << ", " << mForce.z();
+    messageStream << "Force Threshold exceeded!   Threshold: " << forceThreshold
+                  << "   Force: " << mForce.x() << ", " << mForce.y() << ", "
+                  << mForce.z();
     message = messageStream.str();
     ROS_WARN(message.c_str());
   }
   if (torqueThresholdExceeded) {
     std::stringstream messageStream;
     messageStream << "Torque Threshold exceeded!   Threshold: "
-    << torqueThreshold << "   Torque: " << mTorque.x()
-    << ", " << mTorque.y() << ", " << mTorque.z();
+                  << torqueThreshold << "   Torque: " << mTorque.x() << ", "
+                  << mTorque.y() << ", " << mTorque.z();
     message = messageStream.str();
     ROS_WARN(message.c_str());
   }
@@ -181,8 +182,8 @@ bool MoveUntilTouchTopicController::shouldStopExecution(std::string& message)
 }
 
 //=============================================================================
-void MoveUntilTouchTopicController::setForceTorqueThreshold(FTThresholdGoalHandle gh)
-{
+void MoveUntilTouchTopicController::setForceTorqueThreshold(
+    FTThresholdGoalHandle gh) {
   const auto goal = gh.getGoal();
   ROS_INFO_STREAM("Setting thresholds: force = " << goal->force_threshold
                                                  << ", torque = "
@@ -234,7 +235,7 @@ void MoveUntilTouchTopicController::setForceTorqueThreshold(FTThresholdGoalHandl
     gh.setSucceeded(result);
   }
 }
-}  // namespace rewd_controllers
+} // namespace rewd_controllers
 
 //=============================================================================
 PLUGINLIB_EXPORT_CLASS(rewd_controllers::MoveUntilTouchTopicController,

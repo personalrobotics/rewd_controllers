@@ -62,8 +62,8 @@ std::unordered_map<std::string, double> loadGoalConstraintsFromParameter(
 ///
 /// Specified by the ROS parameter constraints/<joint>/trajectory.
 std::unordered_map<std::string, double> loadTrajectoryConstraintsFromParameter(
-  const ros::NodeHandle& nodeHandle,
-  const std::vector<JointParameter>& jointParameters);
+    const ros::NodeHandle &nodeHandle,
+    const std::vector<JointParameter> &jointParameters);
 
 dart::dynamics::MetaSkeletonPtr
 getControlledMetaSkeleton(const dart::dynamics::SkeletonPtr &skeleton,

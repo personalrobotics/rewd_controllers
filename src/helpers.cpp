@@ -119,23 +119,24 @@ std::unordered_map<std::string, double> loadGoalConstraintsFromParameter(
   if (goalConstraints.empty()) {
     ROS_WARN("No goal tolerance constraints specified.");
   } else {
-    ROS_INFO_STREAM("Goal tolerance constraints loaded for " << goalConstraints.size() << " joints.");
+    ROS_INFO_STREAM("Goal tolerance constraints loaded for "
+                    << goalConstraints.size() << " joints.");
   }
   return goalConstraints;
 }
 
 //=============================================================================
 std::unordered_map<std::string, double> loadTrajectoryConstraintsFromParameter(
-      const ros::NodeHandle& nodeHandle,
-      const std::vector<JointParameter>& jointParameters)
-{
+    const ros::NodeHandle &nodeHandle,
+    const std::vector<JointParameter> &jointParameters) {
   std::unordered_map<std::string, double> trajConstraints;
 
-  for (const auto& jointParam : jointParameters) {
+  for (const auto &jointParam : jointParameters) {
     std::string jointName = jointParam.mName;
 
     double trajConstraint;
-    if (nodeHandle.getParam("constraints/" + jointName + "/trajectory", trajConstraint)) {
+    if (nodeHandle.getParam("constraints/" + jointName + "/trajectory",
+                            trajConstraint)) {
       trajConstraints[jointName] = trajConstraint;
     }
   }
@@ -143,7 +144,8 @@ std::unordered_map<std::string, double> loadTrajectoryConstraintsFromParameter(
   if (trajConstraints.empty()) {
     ROS_WARN("No trajectory tolerance constraints specified.");
   } else {
-    ROS_INFO_STREAM("Trajectory tolerance constraints loaded for " << trajConstraints.size() << " joints.");
+    ROS_INFO_STREAM("Trajectory tolerance constraints loaded for "
+                    << trajConstraints.size() << " joints.");
   }
   return trajConstraints;
 }

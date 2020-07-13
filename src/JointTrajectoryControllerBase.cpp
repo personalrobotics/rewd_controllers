@@ -245,14 +245,14 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
 
     std::string stopReason;
 
-    // Check goal and trajectory constraints.
-    bool goalConstraintsSatisfied = true;
+    // Check trajectory and goal constraints.
     bool trajConstraintsSatisfied = true;
+    bool goalConstraintsSatisfied = true;
     for (const auto &dof : mControlledSkeleton->getDofs()) {
-      auto goalIt = mGoalConstraints.find(dof->getName());
       auto trajIt = mTrajectoryConstraints.find(dof->getName());
-      if (goalIt != mGoalConstraints.end() ||
-          trajIt != mTrajectoryConstraints.end()) {
+      auto goalIt = mGoalConstraints.find(dof->getName());
+      if (trajIt != mTrajectoryConstraints.end() ||
+          goalIt != mGoalConstraints.end()) {
         std::size_t index = mControlledSkeleton->getIndexOf(dof);
         auto diff = std::abs(mDesiredPosition[index] - mActualPosition[index]);
 
@@ -266,16 +266,16 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
           }
         }
 
-        if (diff > goalIt->second) {
-          goalConstraintsSatisfied = false;
-        }
         if (diff > trajIt->second) {
           trajConstraintsSatisfied = false;
           std::stringstream msg;
           msg << dof->getName() << " violated trajectory constraint: " << diff
               << " > " << trajIt->second;
           stopReason = msg.str();
-	  break;
+          break;
+        }
+        if (diff > goalIt->second) {
+          goalConstraintsSatisfied = false;
         }
       }
     }

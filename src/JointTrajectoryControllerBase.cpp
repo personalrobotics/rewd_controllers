@@ -243,11 +243,16 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
     trajectory->evaluateDerivative(timeFromStart, 1, mDesiredVelocity);
     trajectory->evaluateDerivative(timeFromStart, 2, mDesiredAcceleration);
 
-    // Check goal constraints.
+    std::string stopReason;
+
+    // Check goal and trajectory constraints.
     bool goalConstraintsSatisfied = true;
+    bool trajConstraintsSatisfied = true;
     for (const auto &dof : mControlledSkeleton->getDofs()) {
       auto goalIt = mGoalConstraints.find(dof->getName());
-      if (goalIt != mGoalConstraints.end()) {
+      auto trajIt = mTrajectoryConstraints.find(dof->getName());
+      if (goalIt != mGoalConstraints.end() ||
+          trajIt != mTrajectoryConstraints.end()) {
         std::size_t index = mControlledSkeleton->getIndexOf(dof);
         auto diff = std::abs(mDesiredPosition[index] - mActualPosition[index]);
 
@@ -261,15 +266,22 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
           }
         }
 
-        if (diff > (*goalIt).second) {
+        if (diff > goalIt->second) {
           goalConstraintsSatisfied = false;
-          break;
+        }
+        if (diff > trajIt->second) {
+          trajConstraintsSatisfied = false;
+          std::stringstream msg;
+          msg << dof->getName() << " violated trajectory constraint: " << diff
+              << " > " << trajIt->second;
+          stopReason = msg.str();
+	  break;
         }
       }
     }
 
-    std::string stopReason;
-    bool shouldStopExec = shouldStopExecution(stopReason);
+    bool shouldStopExec =
+        !trajConstraintsSatisfied || shouldStopExecution(stopReason);
 
     // Terminate the current trajectory.
     if (timeFromStart >= trajectory->getDuration() &&
@@ -576,24 +588,4 @@ void JointTrajectoryControllerBase::publishFeedback(
   }
 }
 
-//=============================================================================
-bool JointTrajectoryControllerBase::shouldStopExecution(std::string &message) {
-  // If any trajectory constraints are violated, abort immediately.
-  for (const auto &dof : mControlledSkeleton->getDofs()) {
-    auto it = mTrajectoryConstraints.find(dof->getName());
-    if (it != mTrajectoryConstraints.end()) {
-      std::size_t index = mControlledSkeleton->getIndexOf(dof);
-      auto error = std::abs(mDesiredPosition[index] - mActualPosition[index]);
-      if (error > it->second) {
-        std::stringstream msg;
-        msg << dof->getName() << " violated trajectory constraint: " << error
-            << " > " << it->second;
-        message = msg.str();
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
 } // namespace rewd_controllers

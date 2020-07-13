@@ -7,7 +7,7 @@
 namespace rewd_controllers {
 
 //=============================================================================
-JointAdapter::JointAdapter() : {}
+JointAdapter::JointAdapter() {}
 
 //=============================================================================
 JointAdapter::~JointAdapter() {}

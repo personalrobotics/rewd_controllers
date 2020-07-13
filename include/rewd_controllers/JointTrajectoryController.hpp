@@ -2,20 +2,17 @@
 #define REWD_CONTROLLERS_JOINTTRAJECTORYCONTROLLER_HPP_
 
 #include <hardware_interface/joint_command_interface.h>
-#include <rewd_controllers/MultiInterfaceController.hpp>
 #include <rewd_controllers/JointTrajectoryControllerBase.hpp>
+#include <rewd_controllers/MultiInterfaceController.hpp>
 
-namespace rewd_controllers
-{
+namespace rewd_controllers {
 class JointTrajectoryController final
-    : public MultiInterfaceController<hardware_interface::
-                                          PositionJointInterface,
-                                      hardware_interface::
-                                          VelocityJointInterface,
-                                      hardware_interface::EffortJointInterface,
-                                      hardware_interface::JointStateInterface>,
-      public JointTrajectoryControllerBase
-{
+    : public MultiInterfaceController<
+          hardware_interface::PositionJointInterface,
+          hardware_interface::VelocityJointInterface,
+          hardware_interface::EffortJointInterface,
+          hardware_interface::JointStateInterface>,
+      public JointTrajectoryControllerBase {
 public:
   JointTrajectoryController();
   virtual ~JointTrajectoryController();
@@ -33,20 +30,20 @@ public:
    * \returns True if initialization was successful and the controller
    * is ready to be started.
    */
-  bool init(hardware_interface::RobotHW* robot, ros::NodeHandle& n) override;
+  bool init(hardware_interface::RobotHW *robot, ros::NodeHandle &n) override;
 
   /** \brief This is called from within the realtime thread just before the
    * first call to \ref update
    *
    * \param time The current time
    */
-  void starting(const ros::Time& time) override;
-  void stopping(const ros::Time& time) override;
+  void starting(const ros::Time &time) override;
+  void stopping(const ros::Time &time) override;
 
   /*!
    * \brief Issues commands to the joint. Should be called at regular intervals
    */
-  void update(const ros::Time& time, const ros::Duration& period) override;
+  void update(const ros::Time &time, const ros::Duration &period) override;
 
 protected:
   /** \brief The JointTrajectoryControllerBase should accept new trajectories
@@ -57,6 +54,6 @@ protected:
   bool shouldAcceptRequests() override;
 };
 
-}  // namespace rewd_controllers
+} // namespace rewd_controllers
 
-#endif  // REWD_CONTROLLERS_JOINTTRAJECTORYCONTROLLER_HPP_
+#endif // REWD_CONTROLLERS_JOINTTRAJECTORYCONTROLLER_HPP_

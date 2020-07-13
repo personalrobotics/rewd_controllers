@@ -1,15 +1,14 @@
 #include <rewd_controllers/GravityCompensationController.hpp>
 
-#include <hardware_interface/hardware_interface.h>
-#include <pluginlib/class_list_macros.h>
 #include <dart/dynamics/dynamics.hpp>
 #include <dart/utils/urdf/DartLoader.hpp>
+#include <hardware_interface/hardware_interface.h>
+#include <pluginlib/class_list_macros.h>
 
-namespace rewd_controllers
-{
+namespace rewd_controllers {
 //=============================================================================
 GravityCompensationController::GravityCompensationController()
-  : MultiInterfaceController(true)  // allow_optional_interfaces
+    : MultiInterfaceController(true) // allow_optional_interfaces
 {}
 
 //=============================================================================
@@ -17,14 +16,14 @@ GravityCompensationController::~GravityCompensationController() {}
 
 //=============================================================================
 bool GravityCompensationController::init(hardware_interface::RobotHW *robot,
-                                         ros::NodeHandle &n)
-{
-  using hardware_interface::JointStateInterface;
+                                         ros::NodeHandle &n) {
   using hardware_interface::EffortJointInterface;
+  using hardware_interface::JointStateInterface;
 
   // Build up the list of controlled DOFs.
   const auto jointParameters = loadJointsFromParameter(n, "joints", "effort");
-  if (jointParameters.empty()) return false;
+  if (jointParameters.empty())
+    return false;
 
   ROS_INFO_STREAM("Controlling " << jointParameters.size() << " joints:");
   for (const auto &param : jointParameters) {
@@ -41,12 +40,14 @@ bool GravityCompensationController::init(hardware_interface::RobotHW *robot,
 
   // Load the URDF as a Skeleton.
   mSkeleton = loadRobotFromParameter(n, "robot_description_parameter");
-  if (!mSkeleton) return false;
+  if (!mSkeleton)
+    return false;
 
   // Extract the subset of the Skeleton that is being controlled.
   mControlledSkeleton =
       getControlledMetaSkeleton(mSkeleton, jointParameters, "Controlled");
-  if (!mControlledSkeleton) return false;
+  if (!mControlledSkeleton)
+    return false;
 
   // the full skeleton.
   const auto jointStateInterface = robot->get<JointStateInterface>();
@@ -88,8 +89,7 @@ bool GravityCompensationController::init(hardware_interface::RobotHW *robot,
 
 //=============================================================================
 void GravityCompensationController::update(const ros::Time &time,
-                                           const ros::Duration &period)
-{
+                                           const ros::Duration &period) {
   mSkeletonUpdater->update();
 
   // Compute inverse dynamics torques for the current configuration
@@ -102,7 +102,7 @@ void GravityCompensationController::update(const ros::Time &time,
   }
 }
 
-}  // namespace rewd_controllers
+} // namespace rewd_controllers
 
 PLUGINLIB_EXPORT_CLASS(rewd_controllers::GravityCompensationController,
                        controller_interface::ControllerBase)

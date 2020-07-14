@@ -7,15 +7,10 @@
 namespace rewd_controllers {
 
 //=============================================================================
-JointAdapter::JointAdapter() : mDesiredPosition{0.} {}
+JointAdapter::JointAdapter() {}
 
 //=============================================================================
 JointAdapter::~JointAdapter() {}
-
-//=============================================================================
-void JointAdapter::setDesiredPosition(double desiredPosition) {
-  mDesiredPosition = desiredPosition;
-}
 
 //=============================================================================
 JointPositionAdapter::JointPositionAdapter(

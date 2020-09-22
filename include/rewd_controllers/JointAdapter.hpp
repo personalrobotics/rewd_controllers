@@ -14,8 +14,6 @@ public:
 
   virtual ~JointAdapter();
 
-  virtual void setDesiredPosition(double desiredPosition);
-
   virtual bool initialize(const ros::NodeHandle &nodeHandle) = 0;
 
   virtual void update(const ros::Time &time, const ros::Duration &period,
@@ -24,9 +22,6 @@ public:
                       double nominalEffort) = 0;
 
   virtual void reset() = 0;
-
-protected:
-  double mDesiredPosition;
 };
 
 //=============================================================================

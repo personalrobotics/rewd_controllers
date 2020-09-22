@@ -588,4 +588,10 @@ void JointTrajectoryControllerBase::publishFeedback(
   }
 }
 
+//=============================================================================
+// Default for virtual function is do nothing. DO NOT EDIT
+bool JointTrajectoryControllerBase::shouldStopExecution(std::string &message) {
+  return false;
+}
+
 } // namespace rewd_controllers

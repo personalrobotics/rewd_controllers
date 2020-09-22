@@ -251,32 +251,33 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
     for (const auto &dof : mControlledSkeleton->getDofs()) {
       auto trajIt = mTrajectoryConstraints.find(dof->getName());
       auto goalIt = mGoalConstraints.find(dof->getName());
-      if (trajIt != mTrajectoryConstraints.end() ||
-          goalIt != mGoalConstraints.end()) {
-        std::size_t index = mControlledSkeleton->getIndexOf(dof);
-        auto diff = std::abs(mDesiredPosition[index] - mActualPosition[index]);
 
-        // Check for SO2
-        auto jointSpace = mControlledSpace->getJointSpace(index);
-        auto r1Joint = std::dynamic_pointer_cast<const R1Joint>(jointSpace);
-        if (!r1Joint) {
-          diff = std::fmod(diff, 2.0 * M_PI);
-          if (diff > M_PI) {
-            diff = 2 * M_PI - diff;
-          }
-        }
+      if (trajIt == mTrajectoryConstraints.end() && goalIt == mGoalConstraints.end())
+        continue;
 
-        if (diff > trajIt->second) {
-          trajConstraintsSatisfied = false;
-          std::stringstream msg;
-          msg << dof->getName() << " violated trajectory constraint: " << diff
-              << " > " << trajIt->second;
-          stopReason = msg.str();
-          break;
+      std::size_t index = mControlledSkeleton->getIndexOf(dof);
+      auto diff = std::abs(mDesiredPosition[index] - mActualPosition[index]);
+
+      // Check for SO2
+      auto jointSpace = mControlledSpace->getJointSpace(index);
+      auto r1Joint = std::dynamic_pointer_cast<const R1Joint>(jointSpace);
+      if (!r1Joint) {
+        diff = std::fmod(diff, 2.0 * M_PI);
+        if (diff > M_PI) {
+          diff = 2 * M_PI - diff;
         }
-        if (diff > goalIt->second) {
-          goalConstraintsSatisfied = false;
-        }
+      }
+
+      if (trajIt != mTrajectoryConstraints.end() && diff > trajIt->second) {
+        trajConstraintsSatisfied = false;
+        std::stringstream msg;
+        msg << dof->getName() << " violated trajectory constraint: " << diff
+            << " > " << trajIt->second;
+        stopReason = msg.str();
+        break;
+      }
+      if (goalIt != mGoalConstraints.end() && diff > goalIt->second) {
+        goalConstraintsSatisfied = false;
       }
     }
 

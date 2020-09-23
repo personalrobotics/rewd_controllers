@@ -1,24 +1,24 @@
 #ifndef REWD_CONTROLLERS_FTTHRESHOLDSERVER_HPP
 #define REWD_CONTROLLERS_FTTHRESHOLDSERVER_HPP
 
-// Default force/torque limit
-#define DEFAULT_MAX 50.0
-// Default server name
-#define DEFAULT_SERVER "set_forcetorque_threshold" 
-
+#include <Eigen/Geometry>
 #include <actionlib/client/simple_action_client.h>
 #include <actionlib/server/action_server.h>
 #include <geometry_msgs/WrenchStamped.h>
 #include <pr_control_msgs/SetForceTorqueThresholdAction.h>
 #include <pr_control_msgs/TriggerAction.h>
 #include <ros/ros.h>
-#include <Eigen/Geometry>
 
 #include <atomic>
 #include <chrono>
 #include <mutex>
 
 namespace rewd_controllers {
+
+// Default force/torque limit
+static const double DEFAULT_MAX = 50.0;
+// Default server name
+static const std::string DEFAULT_SERVER = "set_forcetorque_threshold";
 
 /// The FTThresholdClient configures all MoveUntilTouch- controllers'
 /// thresholds.
@@ -27,8 +27,7 @@ class FTThresholdServer {
 
 public:
   /// Constructor.
-  FTThresholdServer(ros::NodeHandle &nh,
-                    const std::string &wrenchTopic, 
+  FTThresholdServer(ros::NodeHandle &nh, const std::string &wrenchTopic,
                     const std::string &tareTopic,
                     double forceLimit = DEFAULT_MAX,
                     double torqueLimit = DEFAULT_MAX,
@@ -44,6 +43,16 @@ public:
    */
   bool shouldStopExecution(std::string &message);
 
+  /**
+   * \brief Call to start internal Action Server
+   */
+  void start();
+
+  /**
+   * \brief Call to stop internal Action Server
+   */
+  void stop();
+
 private:
   using SetFTThresholdAction = pr_control_msgs::SetForceTorqueThresholdAction;
   using FTThresholdActionServer = actionlib::ActionServer<SetFTThresholdAction>;
@@ -51,6 +60,12 @@ private:
   using FTThresholdResult = pr_control_msgs::SetForceTorqueThresholdResult;
   using TareActionClient =
       actionlib::SimpleActionClient<pr_control_msgs::TriggerAction>;
+
+  // \brief Node handle for re-init
+  std::unique_ptr<ros::NodeHandle> mNodeHandle;
+
+  // \brief Server name for re-init
+  std::string mServerName;
 
   // \brief Protects mForce and mTorque from simultaneous access.
   std::mutex mForceTorqueDataMutex;

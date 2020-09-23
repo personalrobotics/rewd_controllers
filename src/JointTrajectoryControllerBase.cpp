@@ -252,7 +252,8 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
       auto trajIt = mTrajectoryConstraints.find(dof->getName());
       auto goalIt = mGoalConstraints.find(dof->getName());
 
-      if (trajIt == mTrajectoryConstraints.end() && goalIt == mGoalConstraints.end())
+      if (trajIt == mTrajectoryConstraints.end() &&
+          goalIt == mGoalConstraints.end())
         continue;
 
       std::size_t index = mControlledSkeleton->getIndexOf(dof);

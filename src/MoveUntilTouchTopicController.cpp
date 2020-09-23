@@ -54,11 +54,8 @@ bool MoveUntilTouchTopicController::init(hardware_interface::RobotHW *robot,
   }
 
   // Init FT Threshold Server
-  mFTThresholdServer.reset(new FTThresholdServer{nh,
-          ft_wrench_name,
-          ft_tare_name,
-          forceLimit,
-          torqueLimit});
+  mFTThresholdServer.reset(new FTThresholdServer{
+      nh, ft_wrench_name, ft_tare_name, forceLimit, torqueLimit});
 
   // initialize base trajectory controller
   return initController(robot, nh);
@@ -68,12 +65,18 @@ bool MoveUntilTouchTopicController::init(hardware_interface::RobotHW *robot,
 void MoveUntilTouchTopicController::starting(const ros::Time &time) {
   // start base trajectory controller
   startController(time);
+
+  // start FTThresholdServer
+  mFTThresholdServer->start();
 }
 
 //=============================================================================
 void MoveUntilTouchTopicController::stopping(const ros::Time &time) {
   // stop base trajectory controller
   stopController(time);
+
+  // stop FTThresholdServer
+  mFTThresholdServer->stop();
 }
 
 //=============================================================================

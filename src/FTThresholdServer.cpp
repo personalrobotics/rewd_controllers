@@ -144,17 +144,17 @@ void FTThresholdServer::setForceTorqueThreshold(FTThresholdGoalHandle gh) {
     return;
   }
 
+  gh.setAccepted();
+
   // check that we are not already taring
   if (!mTaringCompleted.load()) {
     result.success = false;
     result.message =
         "Must wait until taring of force/torque sensor is complete "
         "before setting thresholds or sending trajectories.";
-    gh.setRejected(result);
+    gh.setAborted(result);
     return;
   }
-
-  gh.setAccepted();
 
   // Tare if requested
   if (goal->retare) {

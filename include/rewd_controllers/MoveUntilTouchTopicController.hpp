@@ -64,7 +64,6 @@ protected:
 private:
   // \brief Force-Torque Thresholding Server
   std::shared_ptr<FTThresholdServer> mFTThresholdServer;
-
 };
 
 } // namespace rewd_controllers

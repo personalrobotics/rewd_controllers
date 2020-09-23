@@ -19,8 +19,8 @@ public:
   /// Sets the MoveUntilTouch- thresholds.
   /// Note: timeout is ignored if re-taring.
   /// Returns true if the thresholds were set successfully.
-  bool setThresholds(double forceThreshold, double torqueThreshold,
-                     bool retare, double timeout = 3.0);
+  bool setThresholds(double forceThreshold, double torqueThreshold, bool retare,
+                     double timeout = 3.0);
 
 private:
   std::unique_ptr<actionlib::SimpleActionClient<

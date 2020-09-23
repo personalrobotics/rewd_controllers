@@ -19,8 +19,8 @@ FTThresholdClient::FTThresholdClient(
 
 //=============================================================================
 bool FTThresholdClient::setThresholds(double forceThreshold,
-                                      double torqueThreshold, 
-                                      bool retare, double timeout) {
+                                      double torqueThreshold, bool retare,
+                                      double timeout) {
   pr_control_msgs::SetForceTorqueThresholdGoal goal;
   goal.force_threshold = forceThreshold;
   goal.torque_threshold = torqueThreshold;
@@ -30,7 +30,7 @@ bool FTThresholdClient::setThresholds(double forceThreshold,
   // Ignore timeout if re-taring
   auto duration = retare ? ros::Duration(0.0) : ros::Duration(timeout);
   bool finished_before_timeout =
-        mFTThresholdActionClient->waitForResult(duration);
+      mFTThresholdActionClient->waitForResult(duration);
 
   actionlib::SimpleClientGoalState state = mFTThresholdActionClient->getState();
 

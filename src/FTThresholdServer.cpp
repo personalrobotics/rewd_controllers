@@ -4,36 +4,30 @@ namespace rewd_controllers {
 
 //=============================================================================
 FTThresholdServer::FTThresholdServer(ros::NodeHandle &nh,
-                    const std::string &wrenchTopic, 
-                    const std::string &tareTopic,
-                    double forceLimit,
-                    double torqueLimit,
-                    const std::string &serverName)
-    : mForceLimit{forceLimit} // allow_optional_interfaces
-    , mTorqueLimit{torqueLimit} {
+                                     const std::string &wrenchTopic,
+                                     const std::string &tareTopic,
+                                     double forceLimit, double torqueLimit,
+                                     const std::string &serverName)
+    : mForceLimit{forceLimit}, mTorqueLimit{torqueLimit}, mServerName{
+                                                              serverName} {
+  mNodeHandle.reset(new ros::NodeHandle{nh});
+
   // check that doubles are lock-free atomics
   if (!mForceThreshold.is_lock_free()) {
     ROS_WARN("Double atomics not lock-free on this system. Cannot guarantee "
-              "realtime safety.");
+             "realtime safety.");
   }
 
   // subscribe to sensor data
   mForceTorqueDataSub = nh.subscribe(
-      wrenchTopic, 1,
-      &FTThresholdServer::forceTorqueDataCallback, this);
+      wrenchTopic, 1, &FTThresholdServer::forceTorqueDataCallback, this);
 
   // action client to kick off taring
   mTareActionClient =
       std::unique_ptr<TareActionClient>(new TareActionClient(nh, tareTopic));
 
-  // start action server
-  mFTThresholdActionServer.reset(
-      new actionlib::ActionServer<SetFTThresholdAction>{
-          nh, serverName,
-          std::bind(&FTThresholdServer::setForceTorqueThreshold,
-                    this, std::placeholders::_1),
-          false});
-  mFTThresholdActionServer->start();
+  // initialize action server
+  stop();
 
   // Set initial threshold to sensor limit
   mForceThreshold.store(forceLimit);
@@ -43,6 +37,20 @@ FTThresholdServer::FTThresholdServer(ros::NodeHandle &nh,
   mTaringCompleted.store(true);
   mTimeOfLastSensorDataReceived = std::chrono::steady_clock::now();
 }
+
+//=============================================================================
+void FTThresholdServer::stop() {
+  // Kill Action Server by re-instantiating it
+  mFTThresholdActionServer.reset(
+      new actionlib::ActionServer<SetFTThresholdAction>{
+          *mNodeHandle, mServerName,
+          std::bind(&FTThresholdServer::setForceTorqueThreshold, this,
+                    std::placeholders::_1),
+          false});
+}
+
+//=============================================================================
+void FTThresholdServer::start() { mFTThresholdActionServer->start(); }
 
 //=============================================================================
 // Max F/T sensor wait time
@@ -68,8 +76,10 @@ bool FTThresholdServer::shouldStopExecution(std::string &message) {
   double torqueThreshold = mTorqueThreshold.load();
 
   std::lock_guard<std::mutex> lock(mForceTorqueDataMutex);
-  bool forceThresholdExceeded = (mForce.norm() >= forceThreshold) && (forceThreshold != 0.0);
-  bool torqueThresholdExceeded = (mTorque.norm() >= torqueThreshold) && (torqueThreshold != 0.0);
+  bool forceThresholdExceeded =
+      (forceThreshold != 0.0) && (mForce.norm() >= forceThreshold);
+  bool torqueThresholdExceeded =
+      (torqueThreshold != 0.0) && (mTorque.norm() >= torqueThreshold);
 
   if (forceThresholdExceeded) {
     std::stringstream messageStream;
@@ -105,8 +115,7 @@ void FTThresholdServer::forceTorqueDataCallback(
 }
 
 //=============================================================================
-void FTThresholdServer::setForceTorqueThreshold(
-    FTThresholdGoalHandle gh) {
+void FTThresholdServer::setForceTorqueThreshold(FTThresholdGoalHandle gh) {
   const auto goal = gh.getGoal();
   ROS_INFO_STREAM("Setting thresholds: force = " << goal->force_threshold
                                                  << ", torque = "
@@ -135,10 +144,20 @@ void FTThresholdServer::setForceTorqueThreshold(
     return;
   }
 
+  // check that we are not already taring
+  if (!mTaringCompleted.load()) {
+    result.success = false;
+    result.message =
+        "Must wait until taring of force/torque sensor is complete "
+        "before setting thresholds or sending trajectories.";
+    gh.setRejected(result);
+    return;
+  }
+
   gh.setAccepted();
 
   // Tare if requested
-  if(goal->retare) {
+  if (goal->retare) {
     // start asynchronous tare request
     ROS_INFO("Starting Taring");
     pr_control_msgs::TriggerGoal goal;
@@ -148,17 +167,6 @@ void FTThresholdServer::setForceTorqueThreshold(
     ROS_INFO("Taring completed!");
     mTimeOfLastSensorDataReceived = std::chrono::steady_clock::now();
     mTaringCompleted.store(true);
-  }
-
-  // check that we are not already taring
-  if (!mTaringCompleted.load()) {
-    result.success = false;
-    result.message =
-        "Must wait until taring of force/torque sensor is complete "
-        "before setting thresholds or sending trajectories.";
-    gh.setAccepted();
-    gh.setAborted(result);
-    return;
   }
 
   // Done, store new thresholds

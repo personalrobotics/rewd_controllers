@@ -47,7 +47,21 @@ loadJointsFromParameter(const ros::NodeHandle &nodeHandle,
                         const std::string &jointsParameter,
                         const std::string &defaultType);
 
+/// These constraints specify the maximum final error tolerance for each joint
+/// in order for the trajectory goal to be considered successful. If this
+/// constraint is violated, the goal is aborted.
+///
+/// Specified by the ROS parameter constraints/<joint>/goal.
 std::unordered_map<std::string, double> loadGoalConstraintsFromParameter(
+    const ros::NodeHandle &nodeHandle,
+    const std::vector<JointParameter> &jointParameters);
+
+/// These constraints specify the error tolerance for each joint at any point
+/// during execution for the trajectory goal to be considered successful. If
+/// this constraint is violated, the goal is aborted.
+///
+/// Specified by the ROS parameter constraints/<joint>/trajectory.
+std::unordered_map<std::string, double> loadTrajectoryConstraintsFromParameter(
     const ros::NodeHandle &nodeHandle,
     const std::vector<JointParameter> &jointParameters);
 

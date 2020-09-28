@@ -18,25 +18,19 @@ FTThresholdClient::FTThresholdClient(
 }
 
 //=============================================================================
-bool FTThresholdClient::trySetThresholdsRepeatedly(double forceThreshold,
-                                                   double torqueThreshold) {
-  while (ros::ok()) {
-    if (setThresholds(forceThreshold, torqueThreshold))
-      return true;
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-  }
-  return false;
-}
-
-//=============================================================================
 bool FTThresholdClient::setThresholds(double forceThreshold,
-                                      double torqueThreshold, double timeout) {
+                                      double torqueThreshold, bool retare,
+                                      double timeout) {
   pr_control_msgs::SetForceTorqueThresholdGoal goal;
   goal.force_threshold = forceThreshold;
   goal.torque_threshold = torqueThreshold;
+  goal.retare = retare;
   mFTThresholdActionClient->sendGoal(goal);
+
+  // Ignore timeout if re-taring
+  auto duration = retare ? ros::Duration(0.0) : ros::Duration(timeout);
   bool finished_before_timeout =
-      mFTThresholdActionClient->waitForResult(ros::Duration(timeout));
+      mFTThresholdActionClient->waitForResult(duration);
 
   actionlib::SimpleClientGoalState state = mFTThresholdActionClient->getState();
 

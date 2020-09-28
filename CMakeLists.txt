@@ -66,6 +66,7 @@ add_library("${PROJECT_NAME}" SHARED
   src/MoveUntilTouchController.cpp
   src/MoveUntilTouchTopicController.cpp
   src/FTThresholdClient.cpp
+  src/FTThresholdServer.cpp
 )
 target_link_libraries("${PROJECT_NAME}"
   ${DART_LIBRARIES}

@@ -54,6 +54,8 @@ void FTThresholdServer::start() { mFTThresholdActionServer->start(); }
 
 //=============================================================================
 // Max F/T sensor wait time
+// Arbitrary, can be changed in the future.
+// ATI runs at 120Hz, Gelsight could run as slow as 10Hz
 static const std::chrono::milliseconds MAX_DELAY =
     std::chrono::milliseconds(100);
 

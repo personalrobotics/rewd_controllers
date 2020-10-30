@@ -182,12 +182,18 @@ void MoveUntilTouchCartVelocityController::starting(const ros::Time &time) {
   // Set Joint Mode to Other
   lastMode = mJointModeHandle.getMode();
   mJointModeHandle.setMode(JointModes::MODE_VELOCITY);
+
+  // start FTThresholdServer
+  mFTThresholdServer->start();
 }
 
 //=============================================================================
 void MoveUntilTouchCartVelocityController::stopping(const ros::Time &time) {
   // Return joint mode to what it was before
   mJointModeHandle.setMode(lastMode);
+
+  // stop FTThresholdServer
+  mFTThresholdServer->stop();
 }
 
 //=============================================================================

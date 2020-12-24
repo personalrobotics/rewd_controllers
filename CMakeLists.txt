@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(rewd_controllers)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
 
 include_directories("include")
 
@@ -66,6 +66,7 @@ add_library("${PROJECT_NAME}" SHARED
   src/MoveUntilTouchController.cpp
   src/MoveUntilTouchTopicController.cpp
   src/FTThresholdClient.cpp
+  src/MoveUntilTouchCartVelocityController.cpp
   src/FTThresholdServer.cpp
 )
 target_link_libraries("${PROJECT_NAME}"

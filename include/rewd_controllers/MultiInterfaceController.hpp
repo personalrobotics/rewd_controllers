@@ -201,7 +201,7 @@ public:
    */
   MultiInterfaceController(bool allow_optional_interfaces = false)
       : allow_optional_interfaces_(allow_optional_interfaces) {
-    state_ = CONSTRUCTED;
+    state_ = ControllerState::CONSTRUCTED;
   }
 
   virtual ~MultiInterfaceController() {}
@@ -300,7 +300,7 @@ protected:
                            ros::NodeHandle &controller_nh,
                            ClaimedResources &claimed_resources) {
     // check if construction finished cleanly
-    if (state_ != CONSTRUCTED) {
+    if (state_ != ControllerState::CONSTRUCTED) {
       ROS_ERROR("Cannot initialize this controller because it failed to be "
                 "constructed");
       return false;
@@ -333,7 +333,7 @@ protected:
     // the controller is done when the controller is start()ed
 
     // initialization successful
-    state_ = INITIALIZED;
+    state_ = ControllerState::INITIALIZED;
     return true;
   }
 

@@ -68,4 +68,11 @@
       SetForceTorqueThreshold service is exceeded.
     </description>
   </class>
+  <class name="rewd_controllers/MoveUntilTouchCartVelocityController"
+         type="rewd_controllers::MoveUntilTouchCartVelocityController"
+         base_class_type="controller_interface::ControllerBase">
+    <description>
+      TODO
+    </description>
+  </class>
 </library>

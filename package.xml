@@ -3,7 +3,7 @@
   <name>rewd_controllers</name>
   <version>0.0.0</version>
   <description>The ROS Effort With Dynamics Controllers package</description>
-  <maintainer email="cliddick@cmu.edu">Clint Liddick</maintainer>
+  <maintainer email="ekgordon@cs.uw.edu">Ethan K. Gordon</maintainer>
   <license>BSD</license>
   <url type="repository">https://github.com/personalrobotics/rewd_controllers</url>
   <author email="cliddick@cmu.edu">Clint Liddick</author>

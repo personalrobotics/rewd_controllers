@@ -337,9 +337,18 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
     }
 
     // Call Adapter
-    mAdapters[idof]->update(time, period, actualPos, desiredPos,
+    try {
+      mAdapters[idof]->update(time, period, actualPos, desiredPos,
                             mActualVelocity[idof], mDesiredVelocity[idof],
                             mDesiredEffort[idof]);
+    } catch (std::exception& e) {
+      // Abort Trajectory
+      mDesiredVelocity.fill(0.0);
+      mDesiredAcceleration.fill(0.0);
+
+      mAbortCurrentTrajectory.store(true);
+      mAbortReason = e.what();
+    }
   }
 }
 

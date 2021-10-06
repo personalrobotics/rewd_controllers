@@ -50,7 +50,10 @@ JointVelocityAdapter::JointVelocityAdapter(
 
 //=============================================================================
 bool JointVelocityAdapter::initialize(const ros::NodeHandle &nodeHandle) {
-  return mPid.init(nodeHandle);
+  bool ret = mPid.init(nodeHandle);
+  control_toolbox::Pid::Gains g = mPid.getGains();
+  std::cout << "P GAIN: " << g.p_gain_ << "\n";
+  return ret;
 }
 
 //=============================================================================
@@ -68,7 +71,7 @@ void JointVelocityAdapter::update(const ros::Time & /*time*/,
   if (std::isnan(pidVelocity))
     throw std::range_error("calculated pidVelocity is NaN");
 
-  auto commandedVelocity = desiredVelocity + pidVelocity;
+  auto commandedVelocity = pidVelocity;
 
   if (commandedVelocity > mUpperVelLimit ||
       commandedVelocity < mLowerVelLimit) {

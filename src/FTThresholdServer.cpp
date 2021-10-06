@@ -26,6 +26,9 @@ FTThresholdServer::FTThresholdServer(ros::NodeHandle &nh,
   mTareActionClient =
       std::unique_ptr<TareActionClient>(new TareActionClient(nh, tareTopic));
 
+  // Wait for server
+  mTareActionClient->waitForServer();
+
   // initialize action server
   stop();
 

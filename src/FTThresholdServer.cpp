@@ -35,14 +35,6 @@ FTThresholdServer::FTThresholdServer(ros::NodeHandle &nh,
   // Set initial threshold to sensor limit
   mForceThreshold.store(forceLimit);
   mTorqueThreshold.store(torqueLimit);
-
-  // Initial Taring
-  pr_control_msgs::TriggerGoal goal;
-  mTaringCompleted.store(false);
-  // block until tared
-  mTareActionClient->sendGoalAndWait(goal);
-  ROS_INFO("Taring completed!");
-  mTaringCompleted.store(true);
   mTimeOfLastSensorDataReceived = std::chrono::steady_clock::now();
 }
 
@@ -58,7 +50,17 @@ void FTThresholdServer::stop() {
 }
 
 //=============================================================================
-void FTThresholdServer::start() { mFTThresholdActionServer->start(); }
+void FTThresholdServer::start() {
+  mFTThresholdActionServer->start();
+  
+  // Initial Taring
+  pr_control_msgs::TriggerGoal goal;
+  mTaringCompleted.store(false);
+  // block until tared
+  mTareActionClient->sendGoalAndWait(goal);
+  ROS_INFO("Taring completed!");
+  mTaringCompleted.store(true);
+}
 
 //=============================================================================
 // Max F/T sensor wait time

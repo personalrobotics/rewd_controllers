@@ -26,15 +26,15 @@ FTThresholdServer::FTThresholdServer(ros::NodeHandle &nh,
   mTareActionClient =
       std::unique_ptr<TareActionClient>(new TareActionClient(nh, tareTopic));
 
-  // Wait for server
-  mTareActionClient->waitForServer();
-
   // initialize action server
   stop();
 
   // Set initial threshold to sensor limit
   mForceThreshold.store(forceLimit);
   mTorqueThreshold.store(torqueLimit);
+
+  // Set taring completed to false. Start taring when starting the controller.
+  mTaringCompleted.store(false);
   mTimeOfLastSensorDataReceived = std::chrono::steady_clock::now();
 }
 
@@ -51,6 +51,9 @@ void FTThresholdServer::stop() {
 
 //=============================================================================
 void FTThresholdServer::start() {
+  // Wait for server
+  mTareActionClient->waitForServer();
+
   mFTThresholdActionServer->start();
   
   // Initial Taring

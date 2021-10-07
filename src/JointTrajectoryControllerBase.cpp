@@ -306,6 +306,14 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
     }
   }
 
+  // We should command no movement
+  // If not running trajectory
+  if(!context || context->mCompleted.load()) {
+    mDesiredVelocity.fill(0.0);
+    mDesiredAcceleration.fill(0.0);
+    mDesiredPosition = mActualPosition;
+  }
+
   // Compute inverse dynamics torques from the set point and store them in the
   // skeleton. These values may be queried by the adapters below.
   mControlledSkeleton->setPositions(mDesiredPosition);
@@ -373,7 +381,7 @@ void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle) {
     trajectory = aikido::control::ros::toSplineJointTrajectory(
         mControlledSpace, goal->trajectory,
         mControlledSkeleton->getPositions());
-  } catch (const std::runtime_error &e) {
+  } catch (const std::exception &e) {
     Result result;
     result.error_code = Result::INVALID_GOAL;
     result.error_string = e.what();

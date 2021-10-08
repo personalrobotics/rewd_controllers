@@ -299,19 +299,12 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
       if (shouldStopExec) {
         mDesiredVelocity.fill(0.0);
         mDesiredAcceleration.fill(0.0);
+        mDesiredPosition = mActualPosition;
 
         mAbortCurrentTrajectory.store(true);
         mAbortReason = stopReason;
       }
     }
-  }
-
-  // We should command no movement
-  // If not running trajectory
-  if(!context || context->mCompleted.load()) {
-    mDesiredVelocity.fill(0.0);
-    mDesiredAcceleration.fill(0.0);
-    mDesiredPosition = mActualPosition;
   }
 
   // Compute inverse dynamics torques from the set point and store them in the
@@ -353,6 +346,7 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
       // Abort Trajectory
       mDesiredVelocity.fill(0.0);
       mDesiredAcceleration.fill(0.0);
+      mDesiredPosition = mActualPosition;
 
       mAbortCurrentTrajectory.store(true);
       mAbortReason = e.what();

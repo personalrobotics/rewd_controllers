@@ -17,6 +17,8 @@ namespace rewd_controllers {
 
 // Default force/torque limit
 static const double DEFAULT_MAX = 50.0;
+// Default max F/T sensor wait time
+static const int DEFAULT_WAIT_TIME = 100;
 // Default server name
 static const std::string DEFAULT_SERVER = "set_forcetorque_threshold";
 
@@ -31,6 +33,7 @@ public:
                     const std::string &tareTopic,
                     double forceLimit = DEFAULT_MAX,
                     double torqueLimit = DEFAULT_MAX,
+                    int waitTime = DEFAULT_WAIT_TIME,
                     const std::string &serverName = DEFAULT_SERVER);
 
   /**
@@ -99,6 +102,9 @@ private:
 
   // \brief If the torque is higher than this threshold, the controller aborts.
   std::atomic<double> mTorqueThreshold;
+
+  // \brief Max F/T sensor wait time
+  std::chrono::milliseconds mMaxDelay;
 
   // \brief Keeps track of the last update time
   std::chrono::time_point<std::chrono::steady_clock>

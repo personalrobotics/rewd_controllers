@@ -53,9 +53,16 @@ bool MoveUntilTouchTopicController::init(hardware_interface::RobotHW *robot,
     return false;
   }
 
+  // load max F/T sensor wait time from parameter server
+  int maxDelay = 100;
+  if (!nh.getParam("max_ft_delay", maxDelay)) {
+    ROS_ERROR("Failed to load 'max_ft_delay' parameter.");
+    return false;
+  }
+
   // Init FT Threshold Server
   mFTThresholdServer.reset(new FTThresholdServer{
-      nh, ft_wrench_name, ft_tare_name, forceLimit, torqueLimit});
+      nh, ft_wrench_name, ft_tare_name, forceLimit, torqueLimit, maxDelay});
 
   // initialize base trajectory controller
   return initController(robot, nh);

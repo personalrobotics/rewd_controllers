@@ -50,10 +50,7 @@ JointVelocityAdapter::JointVelocityAdapter(
 
 //=============================================================================
 bool JointVelocityAdapter::initialize(const ros::NodeHandle &nodeHandle) {
-  bool ret = mPid.init(nodeHandle);
-  control_toolbox::Pid::Gains g = mPid.getGains();
-  std::cout << "P GAIN: " << g.p_gain_ << "\n";
-  return ret;
+  return mPid.init(nodeHandle);
 }
 
 //=============================================================================

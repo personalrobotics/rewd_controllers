@@ -68,7 +68,7 @@ void JointVelocityAdapter::update(const ros::Time & /*time*/,
   if (std::isnan(pidVelocity))
     throw std::range_error("calculated pidVelocity is NaN");
 
-  auto commandedVelocity = desiredVelocity + pidVelocity;
+  auto commandedVelocity = pidVelocity;
 
   if (commandedVelocity > mUpperVelLimit ||
       commandedVelocity < mLowerVelLimit) {

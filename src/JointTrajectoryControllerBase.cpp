@@ -299,6 +299,7 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
       if (shouldStopExec) {
         mDesiredVelocity.fill(0.0);
         mDesiredAcceleration.fill(0.0);
+        mDesiredPosition = mActualPosition;
 
         mAbortCurrentTrajectory.store(true);
         mAbortReason = stopReason;
@@ -337,9 +338,19 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
     }
 
     // Call Adapter
-    mAdapters[idof]->update(time, period, actualPos, desiredPos,
+    try {
+      mAdapters[idof]->update(time, period, actualPos, desiredPos,
                             mActualVelocity[idof], mDesiredVelocity[idof],
                             mDesiredEffort[idof]);
+    } catch (std::exception& e) {
+      // Abort Trajectory
+      mDesiredVelocity.fill(0.0);
+      mDesiredAcceleration.fill(0.0);
+      mDesiredPosition = mActualPosition;
+
+      mAbortCurrentTrajectory.store(true);
+      mAbortReason = e.what();
+    }
   }
 }
 
@@ -364,7 +375,7 @@ void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle) {
     trajectory = aikido::control::ros::toSplineJointTrajectory(
         mControlledSpace, goal->trajectory,
         mControlledSkeleton->getPositions());
-  } catch (const std::runtime_error &e) {
+  } catch (const std::exception &e) {
     Result result;
     result.error_code = Result::INVALID_GOAL;
     result.error_string = e.what();

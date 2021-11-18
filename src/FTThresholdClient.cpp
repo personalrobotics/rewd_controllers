@@ -12,7 +12,7 @@ FTThresholdClient::FTThresholdClient(
     const std::string &controllerThresholdTopic) {
   mFTThresholdActionClient = std::unique_ptr<FTThresholdActionClient>(
       new FTThresholdActionClient(controllerThresholdTopic));
-  ROS_INFO("Waiting for FT Threshold Action Server to start...");
+  ROS_INFO_STREAM("Waiting for FT Threshold Action Server to start on topic: " << controllerThresholdTopic);
   mFTThresholdActionClient->waitForServer();
   ROS_INFO("FT Threshold Action Server started.");
 }

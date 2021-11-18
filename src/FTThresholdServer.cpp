@@ -7,6 +7,7 @@ FTThresholdServer::FTThresholdServer(ros::NodeHandle &nh,
                                      const std::string &wrenchTopic,
                                      const std::string &tareTopic,
                                      double forceLimit, double torqueLimit,
+                                     int waitTime,
                                      const std::string &serverName)
     : mForceLimit{forceLimit}, mTorqueLimit{torqueLimit}, mServerName{
                                                               serverName} {
@@ -33,8 +34,12 @@ FTThresholdServer::FTThresholdServer(ros::NodeHandle &nh,
   mForceThreshold.store(forceLimit);
   mTorqueThreshold.store(torqueLimit);
 
-  // Do not require initial taring
-  mTaringCompleted.store(true);
+  // Set taring completed to false. Start taring when starting the controller.
+  mTaringCompleted.store(false);
+
+  // Set max F/T wait time
+  mMaxDelay = std::chrono::milliseconds(waitTime);
+
   mTimeOfLastSensorDataReceived = std::chrono::steady_clock::now();
 }
 
@@ -50,14 +55,20 @@ void FTThresholdServer::stop() {
 }
 
 //=============================================================================
-void FTThresholdServer::start() { mFTThresholdActionServer->start(); }
+void FTThresholdServer::start() {
+  // Wait for server
+  mTareActionClient->waitForServer();
 
-//=============================================================================
-// Max F/T sensor wait time
-// Arbitrary, can be changed in the future.
-// ATI runs at 120Hz, Gelsight could run as slow as 10Hz
-static const std::chrono::milliseconds MAX_DELAY =
-    std::chrono::milliseconds(100);
+  mFTThresholdActionServer->start();
+  
+  // Initial Taring
+  pr_control_msgs::TriggerGoal goal;
+  mTaringCompleted.store(false);
+  // block until tared
+  mTareActionClient->sendGoalAndWait(goal);
+  ROS_INFO("Taring completed!");
+  mTaringCompleted.store(true);
+}
 
 bool FTThresholdServer::shouldStopExecution(std::string &message) {
   // we must guarantee taring completes before moving
@@ -68,7 +79,7 @@ bool FTThresholdServer::shouldStopExecution(std::string &message) {
 
   // Watchdog
   if ((std::chrono::steady_clock::now() - mTimeOfLastSensorDataReceived >
-       MAX_DELAY)) {
+       mMaxDelay)) {
     message = "Lost connection to F/T sensor!";
     ROS_WARN(message.c_str());
     return true;

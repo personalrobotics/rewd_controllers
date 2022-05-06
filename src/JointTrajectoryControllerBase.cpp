@@ -41,6 +41,8 @@ JointTrajectoryControllerBase::JointTrajectoryControllerBase() {
       "velocity");
   mAdapterFactory.registerFactory<EffortJointInterface, JointEffortAdapter>(
       "effort");
+  mAdapterFactory.registerFactory<EffortJointInterface, JointImpedanceAdapter>(
+      "impedance");
 }
 
 //=============================================================================
@@ -66,8 +68,10 @@ bool JointTrajectoryControllerBase::initController(
     ROS_ERROR("Failed to load 'control_type' parameter.");
     return false;
   }
+
+  ROS_INFO_STREAM("Control type is " << control_type.size());
   if (control_type != "position" && control_type != "velocity" &&
-      control_type != "effort") {
+      control_type != "effort" && control_type != "impedance") {
     ROS_ERROR_STREAM("Invalid 'control_type' parameter. Must be 'position', "
                      "'velocity', or 'effort', but is "
                      << control_type);
@@ -90,16 +94,19 @@ bool JointTrajectoryControllerBase::initController(
     return false;
 
   // Check for zero-mass bodies that will be used incorrectly in calculations
-  bool hasZeroMassBody = false;
-  for (auto body : mSkeleton->getBodyNodes()) {
-    if (body->getMass() <= 0.0) {
-      ROS_ERROR_STREAM("Robot link '" << body->getName()
-                                      << "' has mass = " << body->getMass());
-      hasZeroMassBody = true;
-    }
-  }
-  if (hasZeroMassBody)
-    return false; // TODO is this actually a problem?
+  // bool hasZeroMassBody = false;
+  // for (auto body : mSkeleton->getBodyNodes()) {
+  //   if (body->getMass() <= 0.0) {
+  //     ROS_ERROR_STREAM("Robot link '" << body->getName()
+  //                                     << "' has mass = " << body->getMass());
+  //     hasZeroMassBody = true;
+  //   }
+  // }
+  // if (hasZeroMassBody)
+  // {
+  //   // TODO check the other TODO :P
+  //   // return false; // TODO is this actually a problem?
+  // }
 
   // Extract the subset of the Skeleton that is being controlled.
   mControlledSkeleton =
@@ -206,6 +213,9 @@ void JointTrajectoryControllerBase::startController(const ros::Time &time) {
   mAbortCurrentTrajectory.store(false);
 
   mNonRealtimeTimer.start();
+
+
+  ROS_INFO_STREAM("Started Controllers!: " << mDesiredPosition.transpose());
 }
 
 //=============================================================================
@@ -224,24 +234,65 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
 
   // Update the state of the Skeleton.
   mSkeletonUpdater->update();
+  mSkeleton->computeInverseDynamics();
   mActualPosition = mControlledSkeleton->getPositions();
   mActualVelocity = mControlledSkeleton->getVelocities();
   mActualEffort = mControlledSkeleton->getForces();
+  std::cout<<"getForces: "<<mActualEffort.transpose()<<std::endl;
+  mActualEffort = mControlledSkeleton->getCoriolisAndGravityForces();
 
   if (context && !context->mCompleted.load()) {
     const auto &trajectory = context->mTrajectory;
     const auto timeFromStart = std::min((time - context->mStartTime).toSec(),
                                         trajectory->getEndTime());
+    size_t trajectoryLength = 0;
 
-    // Evaluate the trajectory at the current time.
-    trajectory->evaluate(timeFromStart, mDesiredState);
-    mCompoundSpace->logMap(mDesiredState, mDesiredPosition);
+    if(mLazyController)
+    {
+    	if(!context->mStarted.load())
+			{
+				mCurrentRosTrajectoryIndex = 0;
+				context->mStarted.store(true);
+			}
 
-    // Apply offset
-    mDesiredPosition -= mCurrentTrajectoryOffset;
+			if(trajectory == nullptr)
+			{
+				std::cout<<"Trajectory is nullptr. :(("<<std::endl;
+			}
 
-    trajectory->evaluateDerivative(timeFromStart, 1, mDesiredVelocity);
-    trajectory->evaluateDerivative(timeFromStart, 2, mDesiredAcceleration);
+			ROS_INFO_STREAM("Converted to Aikido trajectory with "
+      << trajectory->getNumSegments() << " segments and "
+      << trajectory->getNumDerivatives() << " derivatives.");
+
+
+			double waypoint_timestep = 0.2;
+	    trajectory_msgs::JointTrajectory waypoint_trajectory = aikido::control::ros::toRosJointTrajectory(trajectory, waypoint_timestep);
+	    trajectoryLength = waypoint_trajectory.points.size();
+	    trajectory_msgs::JointTrajectoryPoint waypoint = waypoint_trajectory.points[mCurrentRosTrajectoryIndex];
+
+	    mDesiredPosition = Eigen::Map<Eigen::VectorXd>(waypoint.positions.data(),waypoint.positions.size()); 
+
+	    // Apply offset - Need to confirm
+	    mDesiredPosition -= mCurrentTrajectoryOffset;
+
+	    mDesiredVelocity = Eigen::Map<Eigen::VectorXd>(waypoint.velocities.data(),waypoint.velocities.size());
+	    mDesiredAcceleration = Eigen::Map<Eigen::VectorXd>(waypoint.accelerations.data(),waypoint.accelerations.size()); 
+
+	    std::cout<<"mCurrentRosTrajectoryIndex: "<<mCurrentRosTrajectoryIndex<<" out of "<<trajectoryLength<<std::endl;
+
+    }
+    else
+    {
+	    // Evaluate the trajectory at the current time.
+	    trajectory->evaluate(timeFromStart, mDesiredState);
+	    mCompoundSpace->logMap(mDesiredState, mDesiredPosition);
+
+	    // Apply offset
+	    mDesiredPosition -= mCurrentTrajectoryOffset;
+
+	    trajectory->evaluateDerivative(timeFromStart, 1, mDesiredVelocity);
+	    trajectory->evaluateDerivative(timeFromStart, 2, mDesiredAcceleration);
+	  }
 
     std::string stopReason;
 
@@ -285,18 +336,23 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
     bool shouldStopExec =
         !trajConstraintsSatisfied || shouldStopExecution(stopReason);
 
-    // Terminate the current trajectory.
-    if (timeFromStart >= trajectory->getDuration() &&
-        goalConstraintsSatisfied) {
-      context->mCompleted.store(true);
-    } else if (shouldStopExec || mCancelCurrentTrajectory.load()) {
+    if(mLazyController && goalConstraintsSatisfied)
+  		mCurrentRosTrajectoryIndex++;
+
+	  // Terminate the current trajectory.
+    if( (mLazyController && timeFromStart >= trajectory->getDuration() && mCurrentRosTrajectoryIndex == trajectoryLength)
+    		|| (!mLazyController && timeFromStart >= trajectory->getDuration() && goalConstraintsSatisfied))
+  			context->mCompleted.store(true);
+    else if (shouldStopExec || mCancelCurrentTrajectory.load()) 
+    {
       // TODO: if there is no other work that needs done here, we can get rid of
       // the cancel atomic_bool. We do not make the desired velocity and
       // acceleration zero since the trajectory can potentially have been
       // appended with another.
       context->mCompleted.store(true);
 
-      if (shouldStopExec) {
+      if (shouldStopExec) 
+      {
         mDesiredVelocity.fill(0.0);
         mDesiredAcceleration.fill(0.0);
         mDesiredPosition = mActualPosition;
@@ -321,6 +377,10 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
   mControlledSkeleton->setPositions(mActualPosition);
   mControlledSkeleton->setVelocities(mActualVelocity);
 
+  std::cout<<"mDesiredPosition: "<<mDesiredPosition.transpose()<<std::endl;
+  std::cout<<"mActualPosition: "<<mActualPosition.transpose()<<std::endl;
+  std::cout<<"mActualEffort: "<<mActualEffort.transpose()<<std::endl;
+
   for (size_t idof = 0; idof < mAdapters.size(); ++idof) {
     // Check for SO2
     auto actualPos = mActualPosition[idof];
@@ -339,9 +399,12 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
 
     // Call Adapter
     try {
+      // mAdapters[idof]->update(time, period, actualPos, desiredPos,
+      //                       mActualVelocity[idof], mDesiredVelocity[idof],
+      //                       mDesiredEffort[idof]);
       mAdapters[idof]->update(time, period, actualPos, desiredPos,
                             mActualVelocity[idof], mDesiredVelocity[idof],
-                            mDesiredEffort[idof]);
+                            mActualEffort[idof]);
     } catch (std::exception& e) {
       // Abort Trajectory
       mDesiredVelocity.fill(0.0);
@@ -388,6 +451,11 @@ void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle) {
   ROS_INFO_STREAM("Converted to Aikido trajectory with "
                   << trajectory->getNumSegments() << " segments and "
                   << trajectory->getNumDerivatives() << " derivatives.");
+
+  std::cout<<"Trying to convert back!"<<std::endl;
+  double waypoint_timestep = 0.2;
+	trajectory_msgs::JointTrajectory waypoint_trajectory = aikido::control::ros::toRosJointTrajectory(trajectory, waypoint_timestep);
+	std::cout<<"Converted back successfully!"<<std::endl;
 
   // Infer the start time of the trajectory.
   const auto now = ros::Time::now();

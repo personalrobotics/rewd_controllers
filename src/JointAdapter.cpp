@@ -115,10 +115,73 @@ void JointEffortAdapter::update(const ros::Time & /*time*/,
   if (std::isnan(pidEffort))
     throw std::range_error("calculated pidEffort is NaN");
 
+  ROS_INFO_STREAM("nominalEffort:"<<nominalEffort);
+  ROS_INFO_STREAM("pidEffort:"<<pidEffort);
+  ROS_INFO_STREAM("Sending Effort Command:"<<nominalEffort + pidEffort);
+
   mEffortHandle.setCommand(nominalEffort + pidEffort);
+  // mEffortHandle.setCommand(0.001);
 }
 
 //=============================================================================
 void JointEffortAdapter::reset() { mPid.reset(); }
+
+//=============================================================================
+JointImpedanceAdapter::JointImpedanceAdapter(
+    hardware_interface::JointHandle effortHandle,
+    dart::dynamics::DegreeOfFreedom *dof)
+    : mEffortHandle{effortHandle}, mDof{dof} {}
+
+//=============================================================================
+bool JointImpedanceAdapter::initialize(const ros::NodeHandle &nodeHandle) {
+  
+  ROS_INFO_STREAM("Initializing Impedance Controller!");
+  if (!nodeHandle.getParam("k", mKgain)) {
+    ROS_ERROR("Failed to load 'k' gain parameter.");
+    return false;
+  }
+
+  if (!nodeHandle.getParam("d", mDgain)) {
+    ROS_ERROR("Failed to load 'd' gain parameter.");
+    return false;
+  }
+
+  return true;
+}
+
+//=============================================================================
+void JointImpedanceAdapter::update(const ros::Time & /*time*/,
+                                const ros::Duration &period,
+                                double actualPosition, double desiredPosition,
+                                double actualVelocity, double desiredVelocity,
+                                double nominalEffort) {
+  
+  double extraEffort = mKgain*(desiredPosition-actualPosition)
+                           - mDgain*actualVelocity;
+
+  // if(extraEffort > 2)
+  //   extraEffort = 2;
+  // if(extraEffort < -2)
+  //   extraEffort = -2;
+  double impedanceEffort = extraEffort + nominalEffort;
+  // double impedanceEffort = nominalEffort;
+
+  // ROS_INFO_STREAM("Actual Position:"<<actualPosition);
+  // ROS_INFO_STREAM("Desired Position:"<<desiredPosition);
+  // ROS_INFO_STREAM("Sending GravComp Command:"<<nominalEffort);
+
+  if (std::isnan(nominalEffort))
+    throw std::range_error("nominalEffort is NaN");
+  if (std::isnan(impedanceEffort))
+    throw std::range_error("calculated impedanceEffort is NaN");
+
+  // ROS_INFO_STREAM("Sending Impedance Command:"<<impedanceEffort);
+
+  mEffortHandle.setCommand(impedanceEffort);
+  // mEffortHandle.setCommand(0.0);
+}
+
+//=============================================================================
+void JointImpedanceAdapter::reset() { }
 
 } // namespace rewd_controllers

@@ -90,16 +90,97 @@ bool GravityCompensationController::init(hardware_interface::RobotHW *robot,
 //=============================================================================
 void GravityCompensationController::update(const ros::Time &time,
                                            const ros::Duration &period) {
+
+  Eigen::VectorXd old_efforts;
+  old_efforts = mControlledSkeleton->getForces();
+  std::cout<<"old_efforts: ";
+  for(int i=0; i<old_efforts.size(); i++)
+    std::cout<<old_efforts(i)<<" ";
+  std::cout<<std::endl;
+
   mSkeletonUpdater->update();
+
+  Eigen::VectorXd actual_position, actual_velocity, actual_accelaration, actual_efforts, gravity_forces, desired_gravity_forces;
+  actual_position = mControlledSkeleton->getPositions();
+  actual_velocity = mControlledSkeleton->getVelocities();
+  actual_accelaration = mControlledSkeleton->getAccelerations();
+  actual_efforts = mControlledSkeleton->getForces();
+  gravity_forces = mControlledSkeleton->getCoriolisAndGravityForces();
+
+  Eigen::Vector3d gravity = mSkeleton->getGravity();
+
+  std::cout<<"gravity: ";
+  for(int i=0; i<gravity.size(); i++)
+    std::cout<<gravity(i)<<" ";
+  std::cout<<std::endl;
+
+  std::cout<<"actual_position: ";
+  for(int i=0; i<actual_position.size(); i++)
+    std::cout<<actual_position(i)<<" ";
+  std::cout<<std::endl;
+  std::cout<<"actual_velocity: ";
+  for(int i=0; i<actual_velocity.size(); i++)
+    std::cout<<actual_velocity(i)<<" ";
+  std::cout<<std::endl;
+  std::cout<<"actual_accelaration: ";
+  for(int i=0; i<actual_accelaration.size(); i++)
+    std::cout<<actual_accelaration(i)<<" ";
+  std::cout<<std::endl;
+  std::cout<<"actual_efforts: ";
+  for(int i=0; i<actual_efforts.size(); i++)
+    std::cout<<actual_efforts(i)<<" ";
+  std::cout<<std::endl;
+  std::cout<<"gravity_forces: ";
+  for(int i=0; i<gravity_forces.size(); i++)
+    std::cout<<gravity_forces(i)<<" ";
+  std::cout<<std::endl;
+
+  Eigen::VectorXd external_forces;
+  external_forces = mControlledSkeleton->getExternalForces();
+  std::cout<<"external_forces: ";
+  for(int i=0; i<external_forces.size(); i++)
+    std::cout<<external_forces(i)<<" ";
+  std::cout<<std::endl;
 
   // Compute inverse dynamics torques for the current configuration
   mSkeleton->computeInverseDynamics();
-  mCalculatedForces = mControlledSkeleton->getForces();
 
+  auto sixthBodyNode = mSkeleton->getBodyNode(6);
+  auto fifthBodyNode = mSkeleton->getBodyNode(5);
+
+  std::cout<<"Number of body nodes: "<<mSkeleton->getNumBodyNodes()<<std::endl;
+
+  for(int i=0; i<mSkeleton->getNumBodyNodes(); i++)
+    std::cout<<"Node name: "<<mSkeleton->getBodyNode(i)->getName()<<" Mass:"<<mSkeleton->getBodyNode(i)->getInertia().getMass()<<
+      " Gravity Mode:"<<mSkeleton->getBodyNode(i)->getGravityMode()<<std::endl;
+
+  mCalculatedForces = mControlledSkeleton->getForces();
+  desired_gravity_forces = mControlledSkeleton->getCoriolisAndGravityForces();
+
+  std::cout<<"mCalculatedForces: ";
+  for(int i=0; i<mCalculatedForces.size(); i++)
+    std::cout<<mCalculatedForces(i)<<" ";
+  std::cout<<std::endl;
+
+  std::cout<<"desired_gravity_forces: ";
+  for(int i=0; i<desired_gravity_forces.size(); i++)
+    std::cout<<desired_gravity_forces(i)<<" ";
+  std::cout<<std::endl;
+
+  Eigen::VectorXd desired_external_forces;
+  desired_external_forces = mControlledSkeleton->getExternalForces();
+  std::cout<<"desired_external_forces: ";
+  for(int i=0; i<desired_external_forces.size(); i++)
+    std::cout<<desired_external_forces(i)<<" ";
+  std::cout<<std::endl;
+
+  std::cout<<"Efforts sent: ";
   for (size_t idof = 0; idof < mControlledJointHandles.size(); ++idof) {
+    std::cout<<mCalculatedForces[idof]<<" ";
     auto jointHandle = mControlledJointHandles[idof];
     jointHandle.setCommand(mCalculatedForces[idof]);
   }
+  std::cout<<std::endl;
 }
 
 } // namespace rewd_controllers

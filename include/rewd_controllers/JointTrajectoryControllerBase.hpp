@@ -12,6 +12,8 @@
 #include <aikido/statespace/CartesianProduct.hpp>
 #include <aikido/statespace/dart/MetaSkeletonStateSpace.hpp>
 #include <aikido/trajectory.hpp>
+#include <aikido/common/Spline.hpp>
+#include <aikido/control/ros/Conversions.hpp>
 #include <control_msgs/FollowJointTrajectoryAction.h>
 #include <dart/dynamics/dynamics.hpp>
 #include <realtime_tools/realtime_buffer.h>
@@ -93,9 +95,10 @@ private:
    */
   struct TrajectoryContext {
     ros::Time mStartTime;
-    std::shared_ptr<aikido::trajectory::Trajectory> mTrajectory;
+    std::shared_ptr<aikido::trajectory::Spline> mTrajectory;
     GoalHandle mGoalHandle;
     std::atomic_bool mCompleted;
+    std::atomic_bool mStarted; // doesn't need to be atomic bool?
   };
   using TrajectoryContextPtr = std::shared_ptr<TrajectoryContext>;
 
@@ -156,6 +159,9 @@ private:
   /// Offset that keeps track of the 2*M_PI multiples difference
   /// between end of a trajectory and start of next trajectory.
   Eigen::VectorXd mCurrentTrajectoryOffset;
+
+  bool mLazyController = true;
+  std::size_t mCurrentRosTrajectoryIndex;
 
   /// Cartesian product space equivalent to mControlledSpace
   /// but with all R1 joints instead.

@@ -96,6 +96,7 @@ private:
   struct TrajectoryContext {
     ros::Time mStartTime;
     std::shared_ptr<aikido::trajectory::Spline> mTrajectory;
+    trajectory_msgs::JointTrajectory mRosTrajectory;
     GoalHandle mGoalHandle;
     std::atomic_bool mCompleted;
     std::atomic_bool mStarted; // doesn't need to be atomic bool?
@@ -160,7 +161,7 @@ private:
   /// between end of a trajectory and start of next trajectory.
   Eigen::VectorXd mCurrentTrajectoryOffset;
 
-  bool mLazyController = true;
+  bool mLazyController = false;
   std::size_t mCurrentRosTrajectoryIndex;
 
   /// Cartesian product space equivalent to mControlledSpace

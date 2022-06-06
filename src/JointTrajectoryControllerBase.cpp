@@ -69,6 +69,16 @@ bool JointTrajectoryControllerBase::initController(
     return false;
   }
 
+  std::string is_lazy;
+  if (!n.getParam("is_lazy", is_lazy)) {
+    ROS_ERROR("Failed to load 'is_lazy' parameter.");
+    return false;
+  }
+
+  if(is_lazy == std::string("OKAY"))
+    mLazyController = true;
+
+
   ROS_INFO_STREAM("Control type is " << control_type.size());
   if (control_type != "position" && control_type != "velocity" &&
       control_type != "effort" && control_type != "impedance") {
@@ -228,6 +238,7 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
                                                const ros::Duration &period) {
 
   auto mDesiredState = mCompoundSpace->createState();
+  bool lazyController = mLazyController;
 
   std::shared_ptr<TrajectoryContext> context;
   mCurrentTrajectory.get(context);
@@ -238,16 +249,25 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
   mActualPosition = mControlledSkeleton->getPositions();
   mActualVelocity = mControlledSkeleton->getVelocities();
   mActualEffort = mControlledSkeleton->getForces();
-  std::cout<<"getForces: "<<mActualEffort.transpose()<<std::endl;
+  // std::cout<<"getForces: "<<mActualEffort.transpose()<<std::endl;
   mActualEffort = mControlledSkeleton->getCoriolisAndGravityForces();
 
+  Eigen::VectorXd mTargetPosition;
+  Eigen::VectorXd mTargetVelocity;
+  // Eigen::VectorXd mTargetAcceleration;
+
+  // std::cout<<"1. lazyController: "<<lazyController<<std::endl;
   if (context && !context->mCompleted.load()) {
     const auto &trajectory = context->mTrajectory;
+    trajectory_msgs::JointTrajectory waypoint_trajectory = context->mRosTrajectory;
     const auto timeFromStart = std::min((time - context->mStartTime).toSec(),
                                         trajectory->getEndTime());
     size_t trajectoryLength = 0;
+    size_t trackingIndex = 0;
+    size_t nextIndex = 0;
 
-    if(mLazyController)
+    // std::cout<<"2. lazyController: "<<lazyController<<std::endl;
+    if(lazyController)
     {
     	if(!context->mStarted.load())
 			{
@@ -260,25 +280,47 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
 				std::cout<<"Trajectory is nullptr. :(("<<std::endl;
 			}
 
-			ROS_INFO_STREAM("Converted to Aikido trajectory with "
+			ROS_INFO_STREAM("Lazy Controller: Converted to Aikido trajectory with "
       << trajectory->getNumSegments() << " segments and "
       << trajectory->getNumDerivatives() << " derivatives.");
 
-
-			double waypoint_timestep = 0.2;
-	    trajectory_msgs::JointTrajectory waypoint_trajectory = aikido::control::ros::toRosJointTrajectory(trajectory, waypoint_timestep);
 	    trajectoryLength = waypoint_trajectory.points.size();
-	    trajectory_msgs::JointTrajectoryPoint waypoint = waypoint_trajectory.points[mCurrentRosTrajectoryIndex];
+	    
+      // nextIndex = trajectoryLength-1;
+      // trackingIndex = trajectoryLength-1;
+      nextIndex = std::min(mCurrentRosTrajectoryIndex+1,trajectoryLength-1);
+      trackingIndex = std::min(mCurrentRosTrajectoryIndex+5,trajectoryLength-1);
+      
+      trajectory_msgs::JointTrajectoryPoint next_waypoint = waypoint_trajectory.points[nextIndex];
 
-	    mDesiredPosition = Eigen::Map<Eigen::VectorXd>(waypoint.positions.data(),waypoint.positions.size()); 
+      mDesiredPosition = Eigen::Map<Eigen::VectorXd>(next_waypoint.positions.data(),next_waypoint.positions.size()); 
+
+      // Apply offset - Need to confirm
+      mDesiredPosition -= mCurrentTrajectoryOffset;
+
+      mDesiredVelocity = Eigen::Map<Eigen::VectorXd>(next_waypoint.velocities.data(),next_waypoint.velocities.size());
+      mDesiredAcceleration = Eigen::Map<Eigen::VectorXd>(next_waypoint.accelerations.data(),next_waypoint.accelerations.size()); 
+
+      // std::cout<<"Desired Values set!"<<std::endl;
+
+	    trajectory_msgs::JointTrajectoryPoint target_waypoint = waypoint_trajectory.points[trackingIndex];
+
+      // std::cout<<"3. lazyController: "<<lazyController<<std::endl;
+	    // // std::cout<<"Size of Positions: "<<target_waypoint.positions.size()<<" Velocities: "<<target_waypoint.velocities.size()<<" Accelarations: "<<target_waypoint.accelerations.size()<<std::endl;
+	    mTargetPosition = Eigen::Map<Eigen::VectorXd>(target_waypoint.positions.data(),target_waypoint.positions.size()); 
 
 	    // Apply offset - Need to confirm
-	    mDesiredPosition -= mCurrentTrajectoryOffset;
+	    mTargetPosition -= mCurrentTrajectoryOffset;
 
-	    mDesiredVelocity = Eigen::Map<Eigen::VectorXd>(waypoint.velocities.data(),waypoint.velocities.size());
-	    mDesiredAcceleration = Eigen::Map<Eigen::VectorXd>(waypoint.accelerations.data(),waypoint.accelerations.size()); 
+	    mTargetVelocity = Eigen::Map<Eigen::VectorXd>(target_waypoint.velocities.data(),target_waypoint.velocities.size());
 
-	    std::cout<<"mCurrentRosTrajectoryIndex: "<<mCurrentRosTrajectoryIndex<<" out of "<<trajectoryLength<<std::endl;
+      // std::cout<<"mTargetPosition: "<<mTargetPosition.transpose()<<std::endl;
+      // std::cout<<"mTargetVelocity: "<<mTargetVelocity.transpose()<<std::endl;
+	    // mTargetAcceleration = Eigen::Map<Eigen::VectorXd>(target_waypoint.accelerations.data(),target_waypoint.accelerations.size()); 
+
+     //  std::cout<<"Target Values set!"<<std::endl;
+
+	    // std::cout<<"mCurrentRosTrajectoryIndex: "<<mCurrentRosTrajectoryIndex<<" out of "<<trajectoryLength<<std::endl;
 
     }
     else
@@ -294,6 +336,7 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
 	    trajectory->evaluateDerivative(timeFromStart, 2, mDesiredAcceleration);
 	  }
 
+    // std::cout<<"4. lazyController: "<<lazyController<<std::endl;
     std::string stopReason;
 
     // Check trajectory and goal constraints.
@@ -331,17 +374,41 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
       if (goalIt != mGoalConstraints.end() && diff > goalIt->second) {
         goalConstraintsSatisfied = false;
       }
+      // if (goalIt != mGoalConstraints.end())
+      // { 
+      // 	if(lazyController)
+      // 	{
+	     //  	if(nextIndex == (trajectoryLength-1) && diff > goalIt->second) 
+	     //  	{
+	     //    	goalConstraintsSatisfied = false;
+	     //    }
+	     //    else if(neIndex < (trajectoryLength-1) && diff > 3*goalIt->second)
+	     //    {
+	     //    	goalConstraintsSatisfied = false;
+	     //    }
+	     //  }
+	     //  else if(diff > 3*goalIt->second)
+	     //  {
+      //   	goalConstraintsSatisfied = false;
+      //   }	
+      // }
     }
+
+    // std::cout<<"5. lazyController: "<<lazyController<<std::endl;
 
     bool shouldStopExec =
         !trajConstraintsSatisfied || shouldStopExecution(stopReason);
 
-    if(mLazyController && goalConstraintsSatisfied)
-  		mCurrentRosTrajectoryIndex++;
+    if(lazyController && goalConstraintsSatisfied)
+    {
+  		mCurrentRosTrajectoryIndex = nextIndex;
+    }
+
+    // std::cout<<"6. lazyController: "<<lazyController<<std::endl;
 
 	  // Terminate the current trajectory.
-    if( (mLazyController && timeFromStart >= trajectory->getDuration() && mCurrentRosTrajectoryIndex == trajectoryLength)
-    		|| (!mLazyController && timeFromStart >= trajectory->getDuration() && goalConstraintsSatisfied))
+    if( (lazyController && timeFromStart >= trajectory->getDuration() && mCurrentRosTrajectoryIndex >= (trajectoryLength-1))
+    		|| (!lazyController && timeFromStart >= trajectory->getDuration() && goalConstraintsSatisfied))
   			context->mCompleted.store(true);
     else if (shouldStopExec || mCancelCurrentTrajectory.load()) 
     {
@@ -361,7 +428,21 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
         mAbortReason = stopReason;
       }
     }
+
+    // std::cout<<"7. lazyController: "<<lazyController<<std::endl;
+
+    if(lazyController)
+    {
+      // std::cout<<"8. lazyController: "<<lazyController<<std::endl;
+      mDesiredPosition = mTargetPosition;
+      mDesiredVelocity = mTargetVelocity;
+      // std::cout<<"mDesiredPosition: "<<mDesiredPosition.transpose()<<std::endl;
+      // std::cout<<"mDesiredVelocity: "<<mDesiredVelocity.transpose()<<std::endl; 
+    //   mDesiredAcceleration = mTargetAcceleration;
+    }
   }
+
+  // std::cout<<"9. lazyController: "<<lazyController<<std::endl;
 
   // Compute inverse dynamics torques from the set point and store them in the
   // skeleton. These values may be queried by the adapters below.
@@ -376,10 +457,11 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
   // may be used by the adapters below.
   mControlledSkeleton->setPositions(mActualPosition);
   mControlledSkeleton->setVelocities(mActualVelocity);
-
-  std::cout<<"mDesiredPosition: "<<mDesiredPosition.transpose()<<std::endl;
-  std::cout<<"mActualPosition: "<<mActualPosition.transpose()<<std::endl;
-  std::cout<<"mActualEffort: "<<mActualEffort.transpose()<<std::endl;
+ 
+  // std::cout<<"mDesiredPosition: "<<mDesiredPosition.transpose()<<std::endl;
+  // std::cout<<"mActualPosition: "<<mActualPosition.transpose()<<std::endl;
+  // std::cout<<"mActualEffort: "<<mActualEffort.transpose()<<std::endl;
+  // std::cout<<"mDesiredAcceleration: "<<mDesiredAcceleration.transpose()<<std::endl;
 
   for (size_t idof = 0; idof < mAdapters.size(); ++idof) {
     // Check for SO2
@@ -452,10 +534,10 @@ void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle) {
                   << trajectory->getNumSegments() << " segments and "
                   << trajectory->getNumDerivatives() << " derivatives.");
 
-  std::cout<<"Trying to convert back!"<<std::endl;
-  double waypoint_timestep = 0.2;
-	trajectory_msgs::JointTrajectory waypoint_trajectory = aikido::control::ros::toRosJointTrajectory(trajectory, waypoint_timestep);
-	std::cout<<"Converted back successfully!"<<std::endl;
+ //  std::cout<<"Trying to convert back!"<<std::endl;
+ //  double waypoint_timestep = 0.2;
+	// trajectory_msgs::JointTrajectory waypoint_trajectory = aikido::control::ros::toRosJointTrajectory(trajectory, waypoint_timestep);
+	// std::cout<<"Converted back successfully!"<<std::endl;
 
   // Infer the start time of the trajectory.
   const auto now = ros::Time::now();
@@ -490,6 +572,7 @@ void JointTrajectoryControllerBase::goalCallback(GoalHandle goalHandle) {
   const auto newContext = std::make_shared<TrajectoryContext>();
   newContext->mStartTime = startTime;
   newContext->mTrajectory = trajectory;
+  newContext->mRosTrajectory = goal->trajectory;
   newContext->mGoalHandle = goalHandle;
 
   // Evaluate the trajectory at the current time.

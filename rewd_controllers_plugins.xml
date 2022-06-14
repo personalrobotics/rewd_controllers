@@ -48,11 +48,11 @@
     </description>
   </class>
 
-  <class name="rewd_controllers/MoveUntilTouchTopicController"
-         type="rewd_controllers::MoveUntilTouchTopicController"
+  <class name="rewd_controllers/MoveUntilTouchTopicJointTrajectoryController"
+         type="rewd_controllers::MoveUntilTouchTopicJointTrajectoryController"
          base_class_type="controller_interface::ControllerBase">
     <description>
-      The MoveUntilTouchTopicController is basically the same as the
+      The MoveUntilTouchTopicJointTrajectoryController is basically the same as the
       MoveUntilTouchController, but it communicates with the Force/Torque sensor
       not through hardware interfaces, but rather through ros topics and action
       clients.

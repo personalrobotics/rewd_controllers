@@ -61,10 +61,13 @@ add_library("${PROJECT_NAME}" SHARED
   src/helpers.cpp
   src/JointAdapter.cpp
   src/JointAdapterFactory.cpp
+  src/JointGroupCommandControllerBase.cpp
+  src/JointGroupCommandController.cpp
   src/JointTrajectoryControllerBase.cpp
   src/JointTrajectoryController.cpp
   src/MoveUntilTouchController.cpp
-  src/MoveUntilTouchTopicController.cpp
+  src/MoveUntilTouchTopicJointTrajectoryController.cpp
+  src/MoveUntilTouchTopicJointGroupCommandController.cpp
   src/FTThresholdClient.cpp
   src/FTThresholdServer.cpp
 )

@@ -1,11 +1,11 @@
-#include <rewd_controllers/MoveUntilTouchTopicController.hpp>
+#include <rewd_controllers/MoveUntilTouchTopicJointTrajectoryController.hpp>
 
 #include <functional>
 #include <pluginlib/class_list_macros.h>
 
 namespace rewd_controllers {
 //=============================================================================
-MoveUntilTouchTopicController::MoveUntilTouchTopicController()
+MoveUntilTouchTopicJointTrajectoryController::MoveUntilTouchTopicJointTrajectoryController()
     : MultiInterfaceController{true} // allow_optional_interfaces
       ,
       JointTrajectoryControllerBase{} {
@@ -13,12 +13,12 @@ MoveUntilTouchTopicController::MoveUntilTouchTopicController()
 }
 
 //=============================================================================
-MoveUntilTouchTopicController::~MoveUntilTouchTopicController() {
+MoveUntilTouchTopicJointTrajectoryController::~MoveUntilTouchTopicJointTrajectoryController() {
   // Do nothing.
 }
 
 //=============================================================================
-bool MoveUntilTouchTopicController::init(hardware_interface::RobotHW *robot,
+bool MoveUntilTouchTopicJointTrajectoryController::init(hardware_interface::RobotHW *robot,
                                          ros::NodeHandle &nh) {
   // load name of force/torque sensor handle from paramter
   std::string ft_wrench_name;
@@ -69,7 +69,7 @@ bool MoveUntilTouchTopicController::init(hardware_interface::RobotHW *robot,
 }
 
 //=============================================================================
-void MoveUntilTouchTopicController::starting(const ros::Time &time) {
+void MoveUntilTouchTopicJointTrajectoryController::starting(const ros::Time &time) {
   // start base trajectory controller
   startController(time);
 
@@ -78,7 +78,7 @@ void MoveUntilTouchTopicController::starting(const ros::Time &time) {
 }
 
 //=============================================================================
-void MoveUntilTouchTopicController::stopping(const ros::Time &time) {
+void MoveUntilTouchTopicJointTrajectoryController::stopping(const ros::Time &time) {
   // stop base trajectory controller
   stopController(time);
 
@@ -87,23 +87,23 @@ void MoveUntilTouchTopicController::stopping(const ros::Time &time) {
 }
 
 //=============================================================================
-void MoveUntilTouchTopicController::update(const ros::Time &time,
+void MoveUntilTouchTopicJointTrajectoryController::update(const ros::Time &time,
                                            const ros::Duration &period) {
   // update base trajectory controller
   updateStep(time, period);
 }
 
 //=============================================================================
-bool MoveUntilTouchTopicController::shouldAcceptRequests() {
+bool MoveUntilTouchTopicJointTrajectoryController::shouldAcceptRequests() {
   return isRunning();
 }
 
 //=============================================================================
-bool MoveUntilTouchTopicController::shouldStopExecution(std::string &message) {
+bool MoveUntilTouchTopicJointTrajectoryController::shouldStopExecution(std::string &message) {
   return mFTThresholdServer->shouldStopExecution(message);
 }
 } // namespace rewd_controllers
 
 //=============================================================================
-PLUGINLIB_EXPORT_CLASS(rewd_controllers::MoveUntilTouchTopicController,
+PLUGINLIB_EXPORT_CLASS(rewd_controllers::MoveUntilTouchTopicJointTrajectoryController,
                        controller_interface::ControllerBase)

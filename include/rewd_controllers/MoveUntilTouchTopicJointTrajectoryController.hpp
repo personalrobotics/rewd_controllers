@@ -1,5 +1,5 @@
-#ifndef REWD_CONTROLLERS_MOVEUNTILTOUCHTOPICCONTROLLER_HPP_
-#define REWD_CONTROLLERS_MOVEUNTILTOUCHTOPICCONTROLLER_HPP_
+#ifndef REWD_CONTROLLERS_MoveUntilTouchTopicJointTrajectoryController_HPP_
+#define REWD_CONTROLLERS_MoveUntilTouchTopicJointTrajectoryController_HPP_
 
 #include <rewd_controllers/JointTrajectoryControllerBase.hpp>
 #include <rewd_controllers/MultiInterfaceController.hpp>
@@ -14,7 +14,7 @@ namespace rewd_controllers {
 /// via a hardware interface but rather via a ros topic.
 /// The other difference is, that taring is instigated through an action client
 /// instead of a hardware interface.
-class MoveUntilTouchTopicController final
+class MoveUntilTouchTopicJointTrajectoryController final
     : public MultiInterfaceController<
           hardware_interface::PositionJointInterface,
           hardware_interface::VelocityJointInterface,
@@ -23,8 +23,8 @@ class MoveUntilTouchTopicController final
       public JointTrajectoryControllerBase {
 
 public:
-  MoveUntilTouchTopicController();
-  ~MoveUntilTouchTopicController();
+  MoveUntilTouchTopicJointTrajectoryController();
+  ~MoveUntilTouchTopicJointTrajectoryController();
 
   // Documentation inherited
   bool init(hardware_interface::RobotHW *robot, ros::NodeHandle &n) override;
@@ -68,4 +68,4 @@ private:
 
 } // namespace rewd_controllers
 
-#endif // REWD_CONTROLLERS_MOVEUNTILTOUCHTOPICCONTROLLER_HPP_
+#endif // REWD_CONTROLLERS_MoveUntilTouchTopicJointTrajectoryController_HPP_

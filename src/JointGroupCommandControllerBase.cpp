@@ -366,16 +366,16 @@ void JointGroupCommandControllerBase::goalCallback(GoalHandle gh)
   rt_goal->preallocated_feedback_->joint_names = mJointNames;
   mCommandsBuffer.writeFromNonRT(new_command);
 
-  // Accept new goal
+    // Accept new goal
   preemptActiveGoal();
   gh.setAccepted();
   mRTActiveGoal = rt_goal;
 
   // Setup goal status checking timer
-  mGoalDurationTimer = mNodeHandle->createTimer(mActionMonitorPeriod,
+  mGoalHandleTimer = mNodeHandle->createTimer(mActionMonitorPeriod,
                                                     &RealtimeGoalHandle::runNonRealtime,
                                                     rt_goal);
-  mGoalDurationTimer.start();
+  mGoalHandleTimer.start();
 
   // Setup goal timeout
   if (gh.getGoal()->command.time_from_start > ros::Duration()) {

@@ -235,11 +235,13 @@ void JointGroupCommandControllerBase::updateStep(const ros::Time &time,
   mActualEffort = mControlledSkeleton->getForces();
 
   std::string stopReason;
-  bool executeDefaultCommand = mExecuteDefaultCommand.load() || shouldStopExecution(stopReason);
-  
-  if(executeDefaultCommand)
-  {
+  bool shouldStopExec = shouldStopExecution(stopReason);
+
+  if(shouldStopExec)
     preemptActiveGoal();
+  
+  if(shouldStopExec || mExecuteDefaultCommand.load())
+  {
     std::cout<<"Controller halted due to: "<<stopReason<<std::endl;
     mDesiredPosition = mActualPosition;
     mDesiredVelocity.setZero();

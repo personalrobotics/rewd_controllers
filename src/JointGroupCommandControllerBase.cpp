@@ -264,7 +264,9 @@ void JointGroupCommandControllerBase::updateStep(const ros::Time &time,
   {
     mControlledSkeleton->setPositions(mActualPosition);
     mControlledSkeleton->setVelocities(mActualVelocity);
-    mControlledSkeleton->setAccelerations(mDesiredAcceleration); // set this to Zero
+    Eigen::VectorXd zeros(mControlledSkeleton->getNumDofs());
+    zeros.setZero();
+    mControlledSkeleton->setAccelerations(zeros); 
     mSkeleton->computeInverseDynamics();
     mDesiredEffort += mControlledSkeleton->getCoriolisAndGravityForces(); // also add friction forces?
   }

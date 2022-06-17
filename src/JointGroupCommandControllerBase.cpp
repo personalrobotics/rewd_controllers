@@ -91,7 +91,7 @@ bool JointGroupCommandControllerBase::initController(hardware_interface::RobotHW
     return false;
   }
   if (control_type != "position" && control_type != "velocity" &&
-      control_type != "effort" && control_type != "forward_effort") {
+      control_type != "effort" && control_type != "effort_forward") {
     ROS_ERROR_STREAM("Invalid 'control_type' parameter. Must be 'position', "
                      "'velocity', or 'effort', but is "
                      << control_type);
@@ -113,17 +113,17 @@ bool JointGroupCommandControllerBase::initController(hardware_interface::RobotHW
   if (!mSkeleton)
     return false;
 
-  // Check for zero-mass bodies that will be used incorrectly in calculations
-  bool hasZeroMassBody = false;
-  for (auto body : mSkeleton->getBodyNodes()) {
-    if (body->getMass() <= 0.0) {
-      ROS_ERROR_STREAM("Robot link '" << body->getName()
-                                      << "' has mass = " << body->getMass());
-      hasZeroMassBody = true;
-    }
-  }
-  if (hasZeroMassBody)
-    return false; // TODO is this actually a problem?
+  // // Check for zero-mass bodies that will be used incorrectly in calculations
+  // bool hasZeroMassBody = false;
+  // for (auto body : mSkeleton->getBodyNodes()) {
+  //   if (body->getMass() <= 0.0) {
+  //     ROS_ERROR_STREAM("Robot link '" << body->getName()
+  //                                     << "' has mass = " << body->getMass());
+  //     hasZeroMassBody = true;
+  //   }
+  // }
+  // if (hasZeroMassBody)
+  //   return false; // TODO is this actually a problem?
 
   // Extract the subset of the Skeleton that is being controlled.
   mControlledSkeleton =
@@ -240,11 +240,14 @@ void JointGroupCommandControllerBase::updateStep(const ros::Time &time,
   bool shouldStopExec = shouldStopExecution(stopReason);
 
   if(shouldStopExec)
+  {
+    std::cout<<"Controller halted due to: "<<stopReason<<std::endl;
     preemptActiveGoal();
+    mExecuteDefaultCommand = true;
+  }
   
   if(shouldStopExec || mExecuteDefaultCommand.load())
   {
-    std::cout<<"Controller halted due to: "<<stopReason<<std::endl;
     mDesiredPosition = mActualPosition;
     mDesiredVelocity.setZero();
     mDesiredAcceleration.setZero();
@@ -252,16 +255,25 @@ void JointGroupCommandControllerBase::updateStep(const ros::Time &time,
   }
   else
   {
+    std::cout<<"Reading from RT Buffer... "<<std::endl;
     trajectory_msgs::JointTrajectoryPoint command = *mCommandsBuffer.readFromRT(); // Rajat check: should this be by reference?
+    std::cout<<"... Read. :| "<<std::endl;
   
+    std::cout<<"Efforts Size: "<<command.effort.size()<<std::endl;
+    std::cout<<"Positions Size: "<<command.positions.size()<<std::endl;
+    std::cout<<"Velocities Size: "<<command.velocities.size()<<std::endl;
+    std::cout<<"Accelerations Size: "<<command.accelerations.size()<<std::endl;
+
     for (const auto &dof : mControlledSkeleton->getDofs()) 
     {
-        std::size_t index = mControlledSkeleton->getIndexOf(dof);
-        mDesiredPosition[index] = command.positions[index];
-        mDesiredVelocity[index] = command.velocities[index];
-        mDesiredAcceleration[index] = command.accelerations[index];
-        mDesiredEffort[index] = command.effort[index];
+      // Rajat ToDo: Find better method
+      std::size_t index = mControlledSkeleton->getIndexOf(dof);
+      mDesiredPosition[index] = (command.positions.size() == 0) ? 0.0 : command.positions[index];
+      mDesiredVelocity[index] = (command.velocities.size() == 0) ? 0.0 : command.velocities[index];
+      mDesiredAcceleration[index] = (command.accelerations.size() == 0) ? 0.0 : command.accelerations[index];
+      mDesiredEffort[index] = (command.effort.size() == 0) ? 0.0 : command.effort[index];
     }
+    std::cout<<"Out. :) "<<std::endl;
   }
 
   if(mCompensateEffort)
@@ -279,6 +291,8 @@ void JointGroupCommandControllerBase::updateStep(const ros::Time &time,
   // may be used by the adapters below.
   mControlledSkeleton->setPositions(mActualPosition);
   mControlledSkeleton->setVelocities(mActualVelocity);
+
+  std::cout<<"mDesiredEffort: "<<mDesiredEffort.transpose()<<std::endl;
 
   for (size_t idof = 0; idof < mAdapters.size(); ++idof) {
     // Check for SO2
@@ -350,6 +364,7 @@ void JointGroupCommandControllerBase::commandCallback(const trajectory_msgs::Joi
 
 void JointGroupCommandControllerBase::goalCallback(GoalHandle gh)
 {
+  std::cout<<"Joint group command controller: Recieved new goal!"<<std::endl;
   ROS_DEBUG_STREAM_NAMED(mName,"Received new action goal");
   pr_control_msgs::JointGroupCommandResult result;
 

@@ -241,10 +241,10 @@ void JointGroupCommandControllerBase::updateStep(const ros::Time &time,
   {
     preemptActiveGoal();
     std::cout<<"Controller halted due to: "<<stopReason<<std::endl;
-    mDesiredPosition[index] = mActualPosition;
-    mDesiredVelocity[index].setZero();
-    mDesiredAcceleration[index].setZero();
-    mDesiredEffort[index].setZero();
+    mDesiredPosition = mActualPosition;
+    mDesiredVelocity.setZero();
+    mDesiredAcceleration.setZero();
+    mDesiredEffort.setZero();
   }
   else
   {

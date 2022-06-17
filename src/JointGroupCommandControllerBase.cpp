@@ -201,13 +201,8 @@ bool JointGroupCommandControllerBase::initController(hardware_interface::RobotHW
 
 //=============================================================================
 void JointGroupCommandControllerBase::startController(const ros::Time &time) {
-  mSkeletonUpdater->update();
 
-  // Rajat doubt: Isn't this useless?
-  // Hold the current position.
-  mDesiredPosition = mControlledSkeleton->getPositions();
-  mDesiredVelocity.setZero();
-  mDesiredAcceleration.setZero();
+  mExecuteDefaultCommand = true;
 
   ROS_DEBUG_STREAM(
       "Initialized desired position: " << mDesiredPosition.transpose());
@@ -233,34 +228,45 @@ void JointGroupCommandControllerBase::stopController(const ros::Time &time) {
 void JointGroupCommandControllerBase::updateStep(const ros::Time &time,
                                                const ros::Duration &period) {
 
-  trajectory_msgs::JointTrajectoryPoint command = *mCommandsBuffer.readFromRT(); // Rajat check: should this be by reference?
-
-  // Update the state of the Skeleton.
+    // Update the state of the Skeleton.
   mSkeletonUpdater->update();
   mActualPosition = mControlledSkeleton->getPositions();
   mActualVelocity = mControlledSkeleton->getVelocities();
   mActualEffort = mControlledSkeleton->getForces();
 
-  for (const auto &dof : mControlledSkeleton->getDofs()) 
+  std::string stopReason;
+  bool executeDefaultCommand = mExecuteDefaultCommand.load() || shouldStopExecution(stopReason);
+  
+  if(executeDefaultCommand)
   {
-      std::size_t index = mControlledSkeleton->getIndexOf(dof);
-      mDesiredPosition[index] = command.positions[index];
-      mDesiredVelocity[index] = command.velocities[index];
-      mDesiredAcceleration[index] = command.accelerations[index];
-      mDesiredEffort[index] = command.effort[index];
+    preemptActiveGoal();
+    std::cout<<"Controller halted due to: "<<stopReason<<std::endl;
+    mDesiredPosition[index] = mActualPosition;
+    mDesiredVelocity[index].setZero();
+    mDesiredAcceleration[index].setZero();
+    mDesiredEffort[index].setZero();
+  }
+  else
+  {
+    trajectory_msgs::JointTrajectoryPoint command = *mCommandsBuffer.readFromRT(); // Rajat check: should this be by reference?
+  
+    for (const auto &dof : mControlledSkeleton->getDofs()) 
+    {
+        std::size_t index = mControlledSkeleton->getIndexOf(dof);
+        mDesiredPosition[index] = command.positions[index];
+        mDesiredVelocity[index] = command.velocities[index];
+        mDesiredAcceleration[index] = command.accelerations[index];
+        mDesiredEffort[index] = command.effort[index];
+    }
   }
 
-  if(!mForwardController)
+  if(mCompensateEffort)
   {
-    // Compute inverse dynamics torques from the set point and store them in the
-    // skeleton. These values may be queried by the adapters below.
-    mControlledSkeleton->setPositions(mDesiredPosition);
-    mControlledSkeleton->setVelocities(mDesiredVelocity);
-    mControlledSkeleton->setAccelerations(mDesiredAcceleration);
-
+    mControlledSkeleton->setPositions(mActualPosition);
+    mControlledSkeleton->setVelocities(mActualVelocity);
+    mControlledSkeleton->setAccelerations(mDesiredAcceleration); // set this to Zero
     mSkeleton->computeInverseDynamics();
-    mDesiredEffort = mControlledSkeleton->getForces();
-
+    mDesiredEffort += mControlledSkeleton->getCoriolisAndGravityForces(); // also add friction forces?
   }
 
   // Restore the state of the Skeleton from JointState interfaces. These values
@@ -294,6 +300,7 @@ void JointGroupCommandControllerBase::updateStep(const ros::Time &time,
     } catch (std::exception& e) {
       // Abort Command
       // Rajat ToDo
+      mExecuteDefaultCommand = true;
     }
   }
 
@@ -370,6 +377,7 @@ void JointGroupCommandControllerBase::goalCallback(GoalHandle gh)
   preemptActiveGoal();
   gh.setAccepted();
   mRTActiveGoal = rt_goal;
+  mExecuteDefaultCommand = false;
 
   // Setup goal status checking timer
   mGoalHandleTimer = mNodeHandle->createTimer(mActionMonitorPeriod,
@@ -396,8 +404,7 @@ void JointGroupCommandControllerBase::timeoutCallback(const ros::TimerEvent& eve
     ROS_DEBUG_NAMED(mName, "Active action goal reached requested timeout.");
 
     // Give sub-classes option to update mDefaultCommand
-    updateDefaultCommand();
-    mCommandsBuffer.writeFromNonRT(mDefaultCommand);
+    mExecuteDefaultCommand = true;
 
     // Marks the current goal as succeeded
     mRTActiveGoal.reset();
@@ -415,8 +422,7 @@ void JointGroupCommandControllerBase::cancelCallback(GoalHandle gh)
     ROS_DEBUG_NAMED(mName, "Canceling active action goal because cancel callback recieved from actionlib.");
 
     // Give sub-classes option to update mDefaultCommand
-    updateDefaultCommand();
-    mCommandsBuffer.writeFromNonRT(mDefaultCommand);
+    mExecuteDefaultCommand = true;
 
     preemptActiveGoal();
   }
@@ -444,23 +450,6 @@ void JointGroupCommandControllerBase::setActionFeedback(const ros::Time& time)
   }
 
   current_active_goal->setFeedback( current_active_goal->preallocated_feedback_ );
-}
-
-void JointGroupCommandControllerBase::updateDefaultCommand()
-{
-  mDefaultCommand.positions.clear();
-  mDefaultCommand.velocities.clear();
-  mDefaultCommand.accelerations.clear();
-  mDefaultCommand.effort.clear();
-
-  for (const auto &dof : mControlledSkeleton->getDofs()) 
-  {
-      std::size_t index = mControlledSkeleton->getIndexOf(dof);
-      mDefaultCommand.positions.push_back(mActualPosition[index]);
-      mDefaultCommand.velocities.push_back(mActualVelocity[index]);
-      // Rajat ToDo: Have default accelarations as well?
-      mDefaultCommand.effort.push_back(mActualEffort[index]);
-  }
 }
 
 //=============================================================================

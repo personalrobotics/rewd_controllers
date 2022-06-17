@@ -50,7 +50,7 @@ protected:
   using RealtimeGoalHandlePtr = boost::shared_ptr<RealtimeGoalHandle>;
 
   realtime_tools::RealtimeBuffer<trajectory_msgs::JointTrajectoryPoint> mCommandsBuffer;
-  trajectory_msgs::JointTrajectoryPoint mDefaultCommand; // Defaults to 0 on init, can override in starting()
+  std::atomic_bool mExecuteDefaultCommand;
 
   std::string                                    mName;               ///< Controller name.
   std::vector< std::string >                     mJointNames;         ///< Controlled joint names
@@ -71,7 +71,7 @@ protected:
   Eigen::VectorXd mActualVelocity;
   Eigen::VectorXd mActualEffort;
 
-  bool mForwardController = false;
+  bool mCompensateEffort = true;
 
   ros::Subscriber    mSubCommand;
   std::unique_ptr<ActionServer> mActionServer;
@@ -84,9 +84,6 @@ protected:
   void timeoutCallback(const ros::TimerEvent& event);
   void preemptActiveGoal();
   void commandCallback(const trajectory_msgs::JointTrajectoryPointConstPtr& msg);
-
-  // Defaults to no change in default command
-  void updateDefaultCommand();
 
 private:
   /**

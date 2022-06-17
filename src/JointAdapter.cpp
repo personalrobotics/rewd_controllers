@@ -121,4 +121,29 @@ void JointEffortAdapter::update(const ros::Time & /*time*/,
 //=============================================================================
 void JointEffortAdapter::reset() { mPid.reset(); }
 
+//=============================================================================
+JointEffortForwardAdapter::JointEffortForwardAdapter(
+    hardware_interface::JointHandle effortHandle,
+    dart::dynamics::DegreeOfFreedom *dof)
+    : mEffortHandle{effortHandle}, mDof{dof} {}
+
+//=============================================================================
+bool JointEffortForwardAdapter::initialize(const ros::NodeHandle &nodeHandle) {
+  return true;
+}
+
+//=============================================================================
+void JointEffortForwardAdapter::update(const ros::Time & /*time*/,
+                                                          const ros::Duration &period,
+                                                          double /*actualPosition*/, double /*desiredPosition*/,
+                                                          double /*actualVelocity*/, double /*desiredVelocity*/,
+                                                          double nominalEffort) {
+  mEffortHandle.setCommand(nominalEffort);
+}
+
+//=============================================================================
+void JointEffortForwardAdapter::reset() {
+  // Do nothing.
+}
+
 } // namespace rewd_controllers

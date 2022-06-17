@@ -74,6 +74,8 @@ JointGroupCommandControllerBase::JointGroupCommandControllerBase() {
       "velocity");
   mAdapterFactory.registerFactory<EffortJointInterface, JointEffortAdapter>(
       "effort");
+  mAdapterFactory.registerFactory<EffortJointInterface, JointEffortForwardAdapter>(
+      "effort_forward");
 }
 
 bool JointGroupCommandControllerBase::initController(hardware_interface::RobotHW *robot, ros::NodeHandle &n) {
@@ -89,7 +91,7 @@ bool JointGroupCommandControllerBase::initController(hardware_interface::RobotHW
     return false;
   }
   if (control_type != "position" && control_type != "velocity" &&
-      control_type != "effort") {
+      control_type != "effort" && control_type != "forward_effort") {
     ROS_ERROR_STREAM("Invalid 'control_type' parameter. Must be 'position', "
                      "'velocity', or 'effort', but is "
                      << control_type);

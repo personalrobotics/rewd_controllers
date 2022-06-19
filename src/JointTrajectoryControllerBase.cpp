@@ -307,14 +307,18 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
     }
   }
 
-  // Compute inverse dynamics torques from the set point and store them in the
-  // skeleton. These values may be queried by the adapters below.
-  mControlledSkeleton->setPositions(mDesiredPosition);
-  mControlledSkeleton->setVelocities(mDesiredVelocity);
-  mControlledSkeleton->setAccelerations(mDesiredAcceleration);
+  mDesiredEffort.setZero();
 
-  mSkeleton->computeInverseDynamics();
-  mDesiredEffort = mControlledSkeleton->getForces();
+  if(mCompensateEffort)
+  {
+    mControlledSkeleton->setPositions(mActualPosition);
+    mControlledSkeleton->setVelocities(mActualVelocity);
+    Eigen::VectorXd zeros(mControlledSkeleton->getNumDofs());
+    zeros.setZero();
+    mControlledSkeleton->setAccelerations(zeros); 
+    mSkeleton->computeInverseDynamics();
+    mDesiredEffort += mControlledSkeleton->getCoriolisAndGravityForces(); // also add friction forces?
+  }
 
   // Restore the state of the Skeleton from JointState interfaces. These values
   // may be used by the adapters below.

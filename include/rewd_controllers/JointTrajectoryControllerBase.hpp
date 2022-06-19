@@ -145,6 +145,8 @@ private:
   Eigen::VectorXd mActualVelocity;
   Eigen::VectorXd mActualEffort;
 
+  bool mCompensateEffort = true;
+
   std::unique_ptr<ActionServer> mActionServer;
   ros::Timer mNonRealtimeTimer;
 

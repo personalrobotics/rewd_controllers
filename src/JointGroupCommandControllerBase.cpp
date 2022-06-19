@@ -346,6 +346,7 @@ void JointGroupCommandControllerBase::commandCallback(const trajectory_msgs::Joi
 
   mCommandsBuffer.writeFromNonRT(*msg);
   preemptActiveGoal();
+  mExecuteDefaultCommand = false;
 }
 
 void JointGroupCommandControllerBase::goalCallback(GoalHandle gh)

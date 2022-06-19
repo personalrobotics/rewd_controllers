@@ -68,4 +68,12 @@
       SetForceTorqueThreshold service is exceeded.
     </description>
   </class>
+
+  <class name="rewd_controllers/MoveUntilTouchTopicJointGroupCommandController"
+         type="rewd_controllers::MoveUntilTouchTopicJointGroupCommandController"
+         base_class_type="controller_interface::ControllerBase">
+    <description>
+      Rajat ToDo
+    </description>
+  </class>
 </library>

@@ -89,17 +89,17 @@ bool JointTrajectoryControllerBase::initController(
   if (!mSkeleton)
     return false;
 
-  // Check for zero-mass bodies that will be used incorrectly in calculations
-  bool hasZeroMassBody = false;
-  for (auto body : mSkeleton->getBodyNodes()) {
-    if (body->getMass() <= 0.0) {
-      ROS_ERROR_STREAM("Robot link '" << body->getName()
-                                      << "' has mass = " << body->getMass());
-      hasZeroMassBody = true;
-    }
-  }
-  if (hasZeroMassBody)
-    return false; // TODO is this actually a problem?
+  // // Check for zero-mass bodies that will be used incorrectly in calculations
+  // bool hasZeroMassBody = false;
+  // for (auto body : mSkeleton->getBodyNodes()) {
+  //   if (body->getMass() <= 0.0) {
+  //     ROS_ERROR_STREAM("Robot link '" << body->getName()
+  //                                     << "' has mass = " << body->getMass());
+  //     hasZeroMassBody = true;
+  //   }
+  // }
+  // if (hasZeroMassBody)
+  //   return false; // TODO is this actually a problem?
 
   // Extract the subset of the Skeleton that is being controlled.
   mControlledSkeleton =

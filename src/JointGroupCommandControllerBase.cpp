@@ -74,7 +74,7 @@ JointGroupCommandControllerBase::JointGroupCommandControllerBase() {
       "velocity");
   mAdapterFactory.registerFactory<EffortJointInterface, JointEffortAdapter>(
       "effort");
-  mAdapterFactory.registerFactory<EffortJointInterface, JointEffortForwardAdapter>(
+  mAdapterFactory.registerFactory<EffortJointInterface, JointForwardEffortAdapter>(
       "effort_forward");
   mAdapterFactory.registerFactory<EffortJointInterface, JointVelocityEffortAdapter>(
       "velocity_effort");

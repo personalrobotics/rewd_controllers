@@ -122,18 +122,18 @@ void JointEffortAdapter::update(const ros::Time & /*time*/,
 void JointEffortAdapter::reset() { mPid.reset(); }
 
 //=============================================================================
-JointEffortForwardAdapter::JointEffortForwardAdapter(
+JointForwardEffortAdapter::JointForwardEffortAdapter(
     hardware_interface::JointHandle effortHandle,
     dart::dynamics::DegreeOfFreedom *dof)
     : mEffortHandle{effortHandle}, mDof{dof} {}
 
 //=============================================================================
-bool JointEffortForwardAdapter::initialize(const ros::NodeHandle &nodeHandle) {
+bool JointForwardEffortAdapter::initialize(const ros::NodeHandle &nodeHandle) {
   return true;
 }
 
 //=============================================================================
-void JointEffortForwardAdapter::update(const ros::Time & /*time*/,
+void JointForwardEffortAdapter::update(const ros::Time & /*time*/,
                                   const ros::Duration &period,
                                   double /*actualPosition*/, double /*desiredPosition*/,
                                   double /*actualVelocity*/, double /*desiredVelocity*/,
@@ -142,7 +142,7 @@ void JointEffortForwardAdapter::update(const ros::Time & /*time*/,
 }
 
 //=============================================================================
-void JointEffortForwardAdapter::reset() {
+void JointForwardEffortAdapter::reset() {
   // Do nothing.
 }
 

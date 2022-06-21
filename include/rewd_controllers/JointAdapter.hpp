@@ -90,9 +90,9 @@ private:
 };
 
 //=============================================================================
-class JointEffortForwardAdapter : public JointAdapter {
+class JointForwardEffortAdapter : public JointAdapter {
 public:
-  JointEffortForwardAdapter(hardware_interface::JointHandle effortHandle,
+  JointForwardEffortAdapter(hardware_interface::JointHandle effortHandle,
                      dart::dynamics::DegreeOfFreedom *dof);
 
   bool initialize(const ros::NodeHandle &nodeHandle) override;

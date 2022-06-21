@@ -109,6 +109,27 @@ private:
   dart::dynamics::DegreeOfFreedom *mDof;
 };
 
+//=============================================================================
+class JointVelocityEffortAdapter : public JointAdapter {
+public:
+  JointVelocityEffortAdapter(hardware_interface::JointHandle effortHandle,
+                            dart::dynamics::DegreeOfFreedom *dof);
+
+  bool initialize(const ros::NodeHandle &nodeHandle) override;
+
+  void update(const ros::Time &time, const ros::Duration &period,
+              double actualPosition, double desiredPosition,
+              double actualVelocity, double desiredVelocity,
+              double nominalEffort) override;
+
+  void reset() override;
+
+private:
+  hardware_interface::JointHandle mEffortHandle;
+  dart::dynamics::DegreeOfFreedom *mDof;
+  control_toolbox::Pid mPid;
+};
+
 
 } // namespace rewd_controllers
 

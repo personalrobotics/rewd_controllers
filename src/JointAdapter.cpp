@@ -134,10 +134,10 @@ bool JointEffortForwardAdapter::initialize(const ros::NodeHandle &nodeHandle) {
 
 //=============================================================================
 void JointEffortForwardAdapter::update(const ros::Time & /*time*/,
-                                                          const ros::Duration &period,
-                                                          double /*actualPosition*/, double /*desiredPosition*/,
-                                                          double /*actualVelocity*/, double /*desiredVelocity*/,
-                                                          double nominalEffort) {
+                                  const ros::Duration &period,
+                                  double /*actualPosition*/, double /*desiredPosition*/,
+                                  double /*actualVelocity*/, double /*desiredVelocity*/,
+                                  double nominalEffort) {
   mEffortHandle.setCommand(nominalEffort);
 }
 
@@ -145,5 +145,37 @@ void JointEffortForwardAdapter::update(const ros::Time & /*time*/,
 void JointEffortForwardAdapter::reset() {
   // Do nothing.
 }
+
+//=============================================================================
+JointVelocityEffortAdapter::JointVelocityEffortAdapter(
+    hardware_interface::JointHandle effortHandle,
+    dart::dynamics::DegreeOfFreedom *dof)
+    : mEffortHandle{effortHandle}, mDof{dof} {}
+
+//=============================================================================
+bool JointVelocityEffortAdapter::initialize(const ros::NodeHandle &nodeHandle) {
+  return mPid.init(nodeHandle);
+}
+
+//=============================================================================
+void JointVelocityEffortAdapter::update(const ros::Time & /*time*/,
+                                const ros::Duration &period,
+                                double /*actualPosition*/, double /*desiredPosition*/,
+                                double actualVelocity, double desiredVelocity,
+                                double nominalEffort) {
+  const auto pidEffort =
+    mPid.computeCommand(desiredVelocity - actualVelocity, period);
+
+  if (std::isnan(nominalEffort))
+    throw std::range_error("nominalEffort is NaN");
+  if (std::isnan(pidEffort))
+    throw std::range_error("calculated pidEffort is NaN");
+
+  mEffortHandle.setCommand(nominalEffort + pidEffort);
+}
+
+//=============================================================================
+void JointVelocityEffortAdapter::reset() { mPid.reset(); }
+
 
 } // namespace rewd_controllers

@@ -72,6 +72,8 @@ protected:
   Eigen::VectorXd mActualEffort;
 
   bool mCompensateEffort = true;
+  ExtendedJointPosition* mExtendedJoints;
+  Eigen::MatrixXd mJointStiffnessMatrix;
 
   ros::Subscriber    mSubCommand;
   std::unique_ptr<ActionServer> mActionServer;

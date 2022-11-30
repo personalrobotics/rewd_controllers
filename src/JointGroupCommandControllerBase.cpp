@@ -76,6 +76,8 @@ JointGroupCommandControllerBase::JointGroupCommandControllerBase() {
       "effort");
   mAdapterFactory.registerFactory<EffortJointInterface, JointForwardEffortAdapter>(
       "effort_forward");
+  mAdapterFactory.registerFactory<EffortJointInterface, JointCompliantAdapter>(
+      "effort_compliant");
   mAdapterFactory.registerFactory<EffortJointInterface, JointVelocityEffortAdapter>(
       "velocity_effort");
 }
@@ -200,6 +202,15 @@ bool JointGroupCommandControllerBase::initController(hardware_interface::RobotHW
                                       false));
   mActionServer->start();
 
+  mExtendedJoints = new ExtendedJointPosition(numControlledDofs, 3 * M_PI / 2);
+
+  // Initialize joint stiffness matrix
+  mJointStiffnessMatrix.resize(numControlledDofs, numControlledDofs);
+  mJointStiffnessMatrix.setZero();
+  Eigen::VectorXd joint_stiffness_vec(7);
+  joint_stiffness_vec << 100,100,100,100,80,80,80;
+  mJointStiffnessMatrix.diagonal() = joint_stiffness_vec;
+
   return true;
 }
 
@@ -280,13 +291,32 @@ void JointGroupCommandControllerBase::updateStep(const ros::Time &time,
 
   if(mCompensateEffort)
   {
-    mControlledSkeleton->setPositions(mActualPosition);
-    mControlledSkeleton->setVelocities(mActualVelocity);
+    // mControlledSkeleton->setPositions(mActualPosition);
+    // mControlledSkeleton->setVelocities(mActualVelocity);
+    // mControlledSkeleton->setAccelerations(zeros); 
+    // mSkeleton->computeInverseDynamics();
+    // mDesiredEffort += mControlledSkeleton->getCoriolisAndGravityForces();
+
+    // use quasi-estimated gravity compensation
+    int iteration = 2;
+    int dof = mControlledSkeleton->getDofs()
+    Eigen::VectorXd qs_estimate_link_pos(dof);
+    qs_estimate_link_pos = mActualPosition;
     Eigen::VectorXd zeros(mControlledSkeleton->getNumDofs());
     zeros.setZero();
+    for (int i=0; i<iteration; i++)
+    {
+      mControlledSkeleton->setPositions(qs_estimate_link_pos);
+      mControlledSkeleton->setVelocities(Eigen::VectorXd::Zero(dof));
+      mControlledSkeleton->setAccelerations(zeros); 
+      mSkeleton->computeInverseDynamics();
+      qs_estimate_link_pos = mActualPosition - mJointStiffnessMatrix.inverse()*(mControlledSkeleton->getCoriolisAndGravityForces());
+    }
+    mControlledSkeleton->setPositions(qs_estimate_link_pos);
+    mControlledSkeleton->setVelocities(Eigen::VectorXd::Zero(dof));
     mControlledSkeleton->setAccelerations(zeros); 
     mSkeleton->computeInverseDynamics();
-    mDesiredEffort += mControlledSkeleton->getCoriolisAndGravityForces(); // also add friction forces?
+    mDesiredEffort += mControlledSkeleton->getCoriolisAndGravityForces();
   }
 
   // Restore the state of the Skeleton from JointState interfaces. These values

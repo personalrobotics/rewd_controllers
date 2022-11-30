@@ -74,6 +74,38 @@ ros::NodeHandle
 createDefaultAdapterNodeHandle(const ros::NodeHandle &parentNodeHandle,
                                const dart::dynamics::DegreeOfFreedom *dof);
 
+//Get Extended joint position
+class ExtendedJointPosition
+{
+private:
+  unsigned int numberOfInput;
+  double threshold_of_change;
+
+  Eigen::MatrixXd init_q;
+  Eigen::MatrixXd extended_q;
+  Eigen::MatrixXd previous_sensor_q;
+  
+  Eigen::Matrix<double, 7, 1> init_q;
+  Eigen::Matrix<double, 7, 1> extended_q;
+  Eigen::Matrix<double, 7, 1> previous_sensor_q;
+public:
+    // Set to 7 and 3PI/2
+  ExtendedJointPosition(unsigned int numberOfInput_args, double threshold_of_change_args);
+
+  void initializeExtendedJointPosition(const Matrix<double, 7, 1> init_q_args);
+
+  double normalizeJointPosition(double input);
+
+  Eigen::VectorXd normalizeJointPosition(const VectorXd& input);
+
+  void estimateExtendedJoint(const VectorXd& current_sensor_q);
+
+  Eigen::VectorXd getExtendedJoint()
+  {
+      return extended_q;
+  }
+};
+
 } // namespace rewd_controllers
 
 #endif // ifndef REWD_CONTROLLERS_HELPERS_HPP_

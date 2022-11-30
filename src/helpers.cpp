@@ -267,11 +267,15 @@ ExtendedJointPosition::ExtendedJointPosition(unsigned int numberOfInput_args, do
   previous_sensor_q.resize(numberOfInput, 1);
 }
 
-void ExtendedJointPosition::initializeExtendedJointPosition(const MatrixXd& init_q_args)
+void ExtendedJointPosition::initializeExtendedJointPosition(const Eigen::MatrixXd& init_q_args)
 {
-  init_q = normalizeJointPosition(init_q_args);
-  extended_q = init_q;
-  previous_sensor_q = init_q;
+  if (is_initialized == false)
+  {
+    init_q = normalizeJointPosition(init_q_args);
+    extended_q = init_q;
+    previous_sensor_q = init_q;
+    is_initialized = true;
+  }
 }
 
 double ExtendedJointPosition::normalizeJointPosition(double input)
@@ -293,34 +297,34 @@ double ExtendedJointPosition::normalizeJointPosition(double input)
   return input;
 }
 
-Eigen::VectorXd ExtendedJointPosition::normalizeJointPosition(const VectorXd& input)
+Eigen::VectorXd ExtendedJointPosition::normalizeJointPosition(const Eigen::VectorXd& input)
 {
   Eigen::VectorXd output = input;
   for (int i = 0; i < numberOfInput; ++i) {
-      output[i] = NormalizeJointPosition(input[i]);
+      output[i] = normalizeJointPosition(input[i]);
   }
   return output;
 }
 
-void ExtendedJointPosition::estimateExtendedJoint(const VectorXd& current_sensor_q)
+void ExtendedJointPosition::estimateExtendedJoint(const Eigen::VectorXd& current_sensor_q)
 {
   for (int i = 0; i < numberOfInput; ++i) {
-    if (abs(current_sensor_q[i] - previous_sensor_q[i]) >= threshold_of_change)
+    if (abs(current_sensor_q[i] - previous_sensor_q(i)) >= threshold_of_change)
     {
-      extended_q[i] += normalizeJointPosition(current_sensor_q[i]) - normalizeJointPosition(previous_sensor_q[i]);
+      extended_q(i) += normalizeJointPosition(current_sensor_q[i]) - normalizeJointPosition(previous_sensor_q(i));
     }
     else
     {
       int howMuchRotate;
-      if (extended_q[i] >= 0)
+      if (extended_q(i) >= 0)
       {
-        howMuchRotate = static_cast<int>(extended_q[i] / (2*M_PI));
+        howMuchRotate = static_cast<int>(extended_q(i) / (2*M_PI));
       }
       else
       {
-        howMuchRotate = static_cast<int>(extended_q[i] / (2*M_PI)) - 1;
+        howMuchRotate = static_cast<int>(extended_q(i) / (2*M_PI)) - 1;
       }
-      extended_q[i] = (double)howMuchRotate * (2*M_PI) + current_sensor_q[i];
+      extended_q(i) = (double)howMuchRotate * (2*M_PI) + current_sensor_q[i];
     }
   }
   previous_sensor_q = current_sensor_q;

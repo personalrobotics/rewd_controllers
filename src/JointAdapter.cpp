@@ -167,29 +167,14 @@ void JointCompliantAdapter::update(const ros::Time & /*time*/,
   const auto pidEffort =
       mPid.computeCommand(desiredPosition - actualPosition,
                           desiredVelocity - actualVelocity, period);
+  std::cout << "pidEffort: " << pidEffort << std::endl;
   if (std::isnan(nominalEffort))
     throw std::range_error("nominalEffort is NaN");
   if (std::isnan(pidEffort))
     throw std::range_error("calculated pidEffort is NaN");
+  float tau_task = nominalEffort + pidEffort;
 
-  //compute quasi-static estimate of the link side position
-  //input value is motor side angle theta not link side angle(q);
-  //Number of iteration can be modified by edit int i ( recommend is 1 or 2 for real time computing)
-
-  int iteration = 2; // number of iteration
-  Eigen::VectorXd qs_estimate_link_pos(7);
-  qs_estimate_link_pos = theta;
-
-  for (int i=0; i<iteration; i++)
-  {
-    dyn->run(qs_estimate_link_pos,Eigen::VectorXd::Zero(7));
-    qs_estimate_link_pos = theta - joint_stiffness_matrix_.inverse()*(dyn->get_gravity());
-  }
-  dyn->run(qs_estimate_link_pos,Eigen::VectorXd::Zero(7));
-
-  return dyn->get_gravity();
-
-  mEffortHandle.setCommand(nominalEffort);
+  mEffortHandle.setCommand(nominalEffort + pidEffort);
 }
 
 //=============================================================================

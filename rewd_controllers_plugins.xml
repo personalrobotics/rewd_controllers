@@ -76,4 +76,12 @@
       Rajat ToDo
     </description>
   </class>
+
+  <class name="rewd_controllers/JointGroupCommandController"
+         type="rewd_controllers::JointGroupCommandController"
+         base_class_type="controller_interface::ControllerBase">
+    <description>
+      TODO: Add description
+    </description>
+  </class>
 </library>

@@ -5,6 +5,7 @@
 #include <hardware_interface/joint_command_interface.h>
 #include <realtime_tools/realtime_box.h>
 #include <ros/time.h>
+#include <rewd_controllers/helpers.hpp>
 
 namespace rewd_controllers {
 
@@ -19,7 +20,7 @@ public:
   virtual void update(const ros::Time &time, const ros::Duration &period,
                       double actualPosition, double desiredPosition,
                       double actualVelocity, double desiredVelocity,
-                      double nominalEffort) = 0;
+                      double actualEffort, double nominalEffort) override;
 
   virtual void reset() = 0;
 };
@@ -35,7 +36,7 @@ public:
   void update(const ros::Time &time, const ros::Duration &period,
               double actualPosition, double desiredPosition,
               double actualVelocity, double desiredVelocity,
-              double nominalEffort) override;
+              double actualEffort, double nominalEffort) override;
 
   void reset() override;
 
@@ -55,8 +56,7 @@ public:
   void update(const ros::Time &time, const ros::Duration &period,
               double actualPosition, double desiredPosition,
               double actualVelocity, double desiredVelocity,
-              double nominalEffort) override;
-
+              double actualEffort, double nominalEffort) override;
   void reset() override;
 
 private:
@@ -79,7 +79,7 @@ public:
   void update(const ros::Time &time, const ros::Duration &period,
               double actualPosition, double desiredPosition,
               double actualVelocity, double desiredVelocity,
-              double nominalEffort) override;
+              double actualEffort, double nominalEffort) override;
 
   void reset() override;
 
@@ -100,7 +100,7 @@ public:
   void update(const ros::Time &time, const ros::Duration &period,
               double actualPosition, double desiredPosition,
               double actualVelocity, double desiredVelocity,
-              double nominalEffort) override;
+              double actualEffort, double nominalEffort) override;
 
   void reset() override;
 
@@ -108,6 +108,20 @@ private:
   hardware_interface::JointHandle mEffortHandle;
   dart::dynamics::DegreeOfFreedom *mDof;
   control_toolbox::Pid mPid;
+  Eigen::VectorXd nominal_theta_dot_prev_;
+  Eigen::VectorXd nominal_theta_prev_;
+
+  //DYNAMIC PARAMETER OF KINOVA GEN3
+  Eigen::MatrixXd joint_stiffness_matrix_;
+  Eigen::MatrixXd rotor_inertia_matrix_;
+
+  //Initial position & orientation
+  Eigen::Vector3d init_position;
+  Eigen::Matrix3d init_orientation;
+  Eigen::VectorXd init_q;
+  Eigen::VectorXd init_dq;
+
+  ExtendedJointPosition* mExtendedJoints;
 };
 
 //=============================================================================
@@ -121,7 +135,7 @@ public:
   void update(const ros::Time &time, const ros::Duration &period,
               double actualPosition, double desiredPosition,
               double actualVelocity, double desiredVelocity,
-              double nominalEffort) override;
+              double actualEffort, double nominalEffort) override;
 
   void reset() override;
 
@@ -141,7 +155,7 @@ public:
   void update(const ros::Time &time, const ros::Duration &period,
               double actualPosition, double desiredPosition,
               double actualVelocity, double desiredVelocity,
-              double nominalEffort) override;
+              double actualEffort, double nominalEffort) override;
 
   void reset() override;
 

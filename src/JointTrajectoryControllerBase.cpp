@@ -345,7 +345,7 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
     try {
       mAdapters[idof]->update(time, period, actualPos, desiredPos,
                             mActualVelocity[idof], mDesiredVelocity[idof],
-                            mDesiredEffort[idof]);
+                            mActualEffort[idof], mDesiredEffort[idof]);
     } catch (std::exception& e) {
       // Abort Trajectory
       mDesiredVelocity.fill(0.0);

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(rewd_controllers)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 include_directories("include")
 
@@ -30,6 +30,21 @@ include_directories(SYSTEM ${aikido_INCLUDE_DIRS})
 find_package(DART 6.6.2 REQUIRED COMPONENTS utils utils-urdf optimizer-nlopt CONFIG)
 include_directories(SYSTEM ${DART_INCLUDE_DIRS})
 
+# find_package (Eigen3 3.3 REQUIRED NO_MODULE)
+# find_library(
+#         LUCADYN
+#         NAMES libluca_dyn.a
+#         HINTS thirdParty/lucadynamics/lib
+#         REQUIRED
+# )
+
+# find_library(
+#         TINYXML
+#         NAMES  libtinyxml.a
+#         HINTS thirdParty/lucadynamics/lib
+#         REQUIRED
+# )
+# link_libraries(Eigen3::Eigen ${LUCADYN} ${TINYXML})
 #==============================================================================
 # Catkin Configuration
 #
@@ -81,20 +96,20 @@ target_link_libraries("${PROJECT_NAME}"
 # Format
 #
 
-list(INSERT CMAKE_MODULE_PATH 0 "${PROJECT_SOURCE_DIR}/cmake")
-include(ClangFormat)
+# list(INSERT CMAKE_MODULE_PATH 0 "${PROJECT_SOURCE_DIR}/cmake")
+# include(ClangFormat)
 
-clang_format_setup(VERSION 6.0)
+# clang_format_setup(VERSION 6.0)
 
-if (CLANG_FORMAT_EXECUTABLE)
-  file(GLOB_RECURSE ALL_SOURCE_FILES
-    LIST_DIRECTORIES false
-    include/*.h include/*.hpp src/*.c src/*.cpp tests/*.cpp tests/*.hpp)
+# if (CLANG_FORMAT_EXECUTABLE)
+#   file(GLOB_RECURSE ALL_SOURCE_FILES
+#     LIST_DIRECTORIES false
+#     include/*.h include/*.hpp src/*.c src/*.cpp tests/*.cpp tests/*.hpp)
 
-  clang_format_add_sources(${ALL_SOURCE_FILES})
+#   clang_format_add_sources(${ALL_SOURCE_FILES})
 
-  clang_format_add_targets()
-endif()
+#   clang_format_add_targets()
+# endif()
 
 #==============================================================================
 # Installation

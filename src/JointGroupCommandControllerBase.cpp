@@ -171,6 +171,23 @@ bool JointGroupCommandControllerBase::initController(hardware_interface::RobotHW
   mDesiredAcceleration.resize(numControlledDofs);
   mDesiredEffort.resize(numControlledDofs);
 
+  mExtendedJoints = new ExtendedJointPosition(numControlledDofs, 3 * M_PI / 2);
+
+  // Initialize joint stiffness matrix
+  mJointStiffnessMatrix.resize(numControlledDofs, numControlledDofs);
+  mJointStiffnessMatrix.setZero();
+  Eigen::VectorXd joint_stiffness_vec(numControlledDofs);
+  // joint_stiffness_vec << 3000,3000,3000,3000,2000,2000,2000;
+  joint_stiffness_vec << 100,100,100,100,80,80,80;
+  mJointStiffnessMatrix.diagonal() = joint_stiffness_vec;
+
+  // std::cout << __LINE__ << std::endl;
+  // std::cout << __LINE__ << std::endl;
+  // std::cout << __LINE__ << std::endl;
+  // std::cout << __LINE__ << std::endl;
+  // boost::shared_ptr<luca_dynamics::model> urdf_model(luca_dynamics::create_model_from_urdf("/home/rishabh/kinova_controller/Controller/Models/kinova.urdf"));
+  // dyn = boost::make_shared<luca_dynamics::luca_dynamics>(urdf_model);
+
   mName = internal::getLeafNamespace(n);
 
   // Initialize controlled joints
@@ -201,16 +218,6 @@ bool JointGroupCommandControllerBase::initController(hardware_interface::RobotHW
                                       boost::bind(&JointGroupCommandControllerBase::cancelCallback, this, _1),
                                       false));
   mActionServer->start();
-
-  mExtendedJoints = new ExtendedJointPosition(numControlledDofs, 3 * M_PI / 2);
-
-  // Initialize joint stiffness matrix
-  mJointStiffnessMatrix.resize(numControlledDofs, numControlledDofs);
-  mJointStiffnessMatrix.setZero();
-  Eigen::VectorXd joint_stiffness_vec(numControlledDofs);
-  // joint_stiffness_vec << 3000,3000,3000,3000,2000,2000,2000;
-  joint_stiffness_vec << 100,100,100,100,80,80,80;
-  mJointStiffnessMatrix.diagonal() = joint_stiffness_vec;
 
   return true;
 }
@@ -298,10 +305,11 @@ void JointGroupCommandControllerBase::updateStep(const ros::Time &time,
     zeros.setZero();
     mControlledSkeleton->setAccelerations(zeros); 
     mSkeleton->computeInverseDynamics();
+    mDesiredEffort = mControlledSkeleton->getGravityForces();
     // mDesiredEffort += mControlledSkeleton->getCoriolisForces();
-    mDesiredEffort += mControlledSkeleton->getCoriolisAndGravityForces();
+    // // mDesiredEffort += mControlledSkeleton->getCoriolisAndGravityForces();
 
-    // use quasi-estimated gravity compensation
+    // // use quasi-estimated gravity compensation
     // int iteration = 2;
     // int dof = mControlledSkeleton->getDofs().size();
     // Eigen::VectorXd qs_estimate_link_pos(dof), theta(dof);
@@ -321,9 +329,25 @@ void JointGroupCommandControllerBase::updateStep(const ros::Time &time,
     // }
     // mControlledSkeleton->setPositions(qs_estimate_link_pos);
     // mControlledSkeleton->setVelocities(Eigen::VectorXd::Zero(dof));
-    // mControlledSkeleton->setAccelerations(zeros); 
+    // mControlledSkeleton->setAccelerations(zeros);
     // mSkeleton->computeInverseDynamics();
-    // mDesiredEffort += mControlledSkeleton->getGravityForces();
+    // mDesiredEffort = mControlledSkeleton->getGravityForces();
+
+    // int iteration = 2; // number of iteration
+    // int dof = mControlledSkeleton->getDofs().size();
+    // mExtendedJoints->initializeExtendedJointPosition(mActualPosition);
+    // mExtendedJoints->estimateExtendedJoint(mActualPosition);
+    // Eigen::VectorXd qs_estimate_link_pos(dof), theta(dof);
+    // theta = mExtendedJoints->getExtendedJoint();
+    // qs_estimate_link_pos = theta;
+
+    // for (int i=0; i<iteration; i++)
+    // {
+    //     dyn->run(qs_estimate_link_pos, Eigen::VectorXd::Zero(7));
+    //     qs_estimate_link_pos = theta - mJointStiffnessMatrix.inverse()*(dyn->get_gravity());
+    // }
+    // dyn->run(qs_estimate_link_pos,Eigen::VectorXd::Zero(7));
+    // mDesiredEffort += dyn->get_gravity();
   }
 
   // Restore the state of the Skeleton from JointState interfaces. These values
@@ -331,7 +355,7 @@ void JointGroupCommandControllerBase::updateStep(const ros::Time &time,
   mControlledSkeleton->setPositions(mActualPosition);
   mControlledSkeleton->setVelocities(mActualVelocity);
 
-  std::cout<<"mDesiredEffort: "<<mDesiredEffort.transpose()<<std::endl;
+  // std::cout<<"mDesiredEffort: "<<mDesiredEffort.transpose()<<std::endl;
 
   for (size_t idof = 0; idof < mAdapters.size(); ++idof) {
     // Check for SO2
@@ -355,7 +379,7 @@ void JointGroupCommandControllerBase::updateStep(const ros::Time &time,
     try {
       mAdapters[idof]->update(time, period, actualPos, desiredPos,
                             mActualVelocity[idof], mDesiredVelocity[idof],
-                            mDesiredEffort[idof]);
+                            mActualEffort[idof], mDesiredEffort[idof], idof);
     } catch (std::exception& e) {
       // Abort Command
       // Rajat ToDo
@@ -399,6 +423,7 @@ void JointGroupCommandControllerBase::commandCallback(const trajectory_msgs::Joi
 
   mCommandsBuffer.writeFromNonRT(*msg);
   preemptActiveGoal();
+  mExecuteDefaultCommand = false;
 }
 
 void JointGroupCommandControllerBase::goalCallback(GoalHandle gh)

@@ -25,7 +25,11 @@
 #include <realtime_tools/realtime_buffer.h>
 #include <realtime_tools/realtime_server_goal_handle.h>
 #include <rewd_controllers/helpers.hpp>
+#include <rewd_controllers/JointAdapter.hpp>
+#include <rewd_controllers/JointAdapterFactory.hpp>
 #include <ros/node_handle.h>
+// #include "rewd_controllers/luca_dynamics/luca_dynamics.hpp"
+// #include "rewd_controllers/luca_dynamics/model.hpp"
 
 
 namespace rewd_controllers {
@@ -70,6 +74,7 @@ protected:
   Eigen::VectorXd mActualPosition;
   Eigen::VectorXd mActualVelocity;
   Eigen::VectorXd mActualEffort;
+  // boost::shared_ptr<luca_dynamics::luca_dynamics> dyn;
 
   bool mCompensateEffort = true;
   ExtendedJointPosition* mExtendedJoints;

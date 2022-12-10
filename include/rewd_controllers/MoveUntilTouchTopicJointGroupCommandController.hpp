@@ -1,6 +1,7 @@
 #ifndef REWD_CONTROLLERS_MoveUntilTouchTopicJointGroupCommandController_HPP_
 #define REWD_CONTROLLERS_MoveUntilTouchTopicJointGroupCommandController_HPP_
 
+#include <rewd_controllers/JointAdapterFactory.hpp>
 #include <rewd_controllers/JointGroupCommandControllerBase.hpp>
 #include <rewd_controllers/MultiInterfaceController.hpp>
 

@@ -1,7 +1,7 @@
 #ifndef REWD_CONTROLLERS__GRAVITY_COMPENSATION_CONTROLLER_H
 #define REWD_CONTROLLERS__GRAVITY_COMPENSATION_CONTROLLER_H
 
-#include "helpers.hpp"
+#include "JointAdapterFactory.hpp"
 #include <controller_interface/multi_interface_controller.h>
 #include <dart/dynamics/dynamics.hpp>
 #include <memory>

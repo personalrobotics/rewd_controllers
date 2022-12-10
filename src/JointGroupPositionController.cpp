@@ -108,6 +108,7 @@ void JointGroupPositionController::update(const ros::Time &time,
   const auto desiredVelocity = 0.;
 
   mDesiredPosition = *mDesiredPositionBuffer.readFromRT();
+  double actualEffort = 0;
 
   // Compute inverse dynamics torques and store them in the skeleton. These
   // values may be queried by the adapters invoked below.
@@ -120,7 +121,7 @@ void JointGroupPositionController::update(const ros::Time &time,
     mAdapters[idof]->update(
         time, period, mControlledSkeleton->getPosition(idof),
         mDesiredPosition[idof], mControlledSkeleton->getVelocity(idof),
-        desiredVelocity, mControlledSkeleton->getForce(idof));
+        desiredVelocity, actualEffort, mControlledSkeleton->getForce(idof), idof);
   }
 }
 

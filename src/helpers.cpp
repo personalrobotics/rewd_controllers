@@ -278,6 +278,17 @@ void ExtendedJointPosition::initializeExtendedJointPosition(const Eigen::MatrixX
   }
 }
 
+void ExtendedJointPosition::initializeExtendedJointPosition(const double init_q_args, int dof)
+{
+  // if (is_initialized == false)
+  // {
+    init_q(0) = normalizeJointPosition(init_q_args);
+    extended_q(0) = init_q(0);
+    previous_sensor_q(0) = init_q(0);
+    is_initialized = true;
+  // }
+}
+
 double ExtendedJointPosition::normalizeJointPosition(double input)
 {
   /*
@@ -330,9 +341,41 @@ void ExtendedJointPosition::estimateExtendedJoint(const Eigen::VectorXd& current
   previous_sensor_q = current_sensor_q;
 }
 
+void ExtendedJointPosition::estimateExtendedJoint(const double current_sensor_q, int dof)
+{
+  // for (int i = 0; i < numberOfInput; ++i) {
+  // std::cout << "Extended_q: " << extended_q << " Current_sensor_q: " << current_sensor_q << std::endl;
+  if (abs(current_sensor_q - previous_sensor_q(0)) >= threshold_of_change)
+  {
+    // std::cout << "Threshold exceedeed" << std::endl;
+    extended_q(0) += normalizeJointPosition(current_sensor_q) - normalizeJointPosition(previous_sensor_q(0));
+  }
+  else
+  {
+    int howMuchRotate;
+    if (extended_q(0) >= 0)
+    {
+      howMuchRotate = static_cast<int>(extended_q(0) / (2*M_PI));
+    }
+    else
+    {
+      howMuchRotate = static_cast<int>(extended_q(0) / (2*M_PI)) - 1;
+    }
+    // std::cout << "howMuchRotate: " << howMuchRotate << std::endl;
+    extended_q(0) = (double)howMuchRotate * (2*M_PI) + current_sensor_q;
+  }
+  // }
+  previous_sensor_q(0) = current_sensor_q;
+}
+
 Eigen::VectorXd ExtendedJointPosition::getExtendedJoint()
 {
   return extended_q;
+}
+
+double ExtendedJointPosition::getExtendedJoint(int dof)
+{
+  return extended_q(0);
 }
 
 } // namespace rewd_controllers

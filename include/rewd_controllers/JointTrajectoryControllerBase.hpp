@@ -17,6 +17,8 @@
 #include <realtime_tools/realtime_buffer.h>
 #include <realtime_tools/realtime_server_goal_handle.h>
 #include <rewd_controllers/helpers.hpp>
+#include <rewd_controllers/JointAdapter.hpp>
+#include <rewd_controllers/JointAdapterFactory.hpp>
 #include <ros/node_handle.h>
 
 namespace rewd_controllers {

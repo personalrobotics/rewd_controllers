@@ -2,6 +2,7 @@
 #define REWD_CONTROLLERS_JOINTGROUPPOSITIONCONTROLLER_HPP_
 
 #include "helpers.hpp"
+#include "JointAdapterFactory.hpp"
 #include <controller_interface/multi_interface_controller.h>
 #include <dart/dynamics/dynamics.hpp>
 #include <memory>

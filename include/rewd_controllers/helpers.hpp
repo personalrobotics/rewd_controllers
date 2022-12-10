@@ -1,7 +1,5 @@
 #ifndef REWD_CONTROLLERS_HELPERS_HPP_
 #define REWD_CONTROLLERS_HELPERS_HPP_
-#include "JointAdapter.hpp"
-#include "JointAdapterFactory.hpp"
 #include <dart/dynamics/dynamics.hpp>
 #include <hardware_interface/joint_command_interface.h>
 #include <hardware_interface/joint_state_interface.h>
@@ -92,13 +90,19 @@ public:
 
   void initializeExtendedJointPosition(const Eigen::MatrixXd& init_q_args);
 
+  void initializeExtendedJointPosition(const double init_q_args, int dof);
+
   double normalizeJointPosition(double input);
 
   Eigen::VectorXd normalizeJointPosition(const Eigen::VectorXd& input);
 
   void estimateExtendedJoint(const Eigen::VectorXd& current_sensor_q);
 
+  void estimateExtendedJoint(const double current_sensor_q, int dof);
+
   Eigen::VectorXd getExtendedJoint();
+
+  double getExtendedJoint(int dof);
 };
 
 } // namespace rewd_controllers

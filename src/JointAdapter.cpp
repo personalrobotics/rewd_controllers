@@ -31,7 +31,8 @@ void JointPositionAdapter::update(const ros::Time & /*time*/,
                                   double /*actualVelocity*/,
                                   double /*desiredVelocity*/,
                                   double /*actualEffort*/,
-                                  double /*nominalEffort*/) {
+                                  double /*nominalEffort*/,
+                                  int /*dof*/) {
   mPositionHandle.setCommand(desiredPosition);
 }
 
@@ -60,7 +61,8 @@ void JointVelocityAdapter::update(const ros::Time & /*time*/,
                                   double actualPosition, double desiredPosition,
                                   double actualVelocity, double desiredVelocity,
                                   double /*actualEffort*/,
-                                  double /*nominalEffort*/) {
+                                  double /*nominalEffort*/,
+                                  int /*dof*/) {
   const auto pidVelocity =
       mPid.computeCommand(desiredPosition - actualPosition,
                           desiredVelocity - actualVelocity, period);
@@ -108,7 +110,8 @@ void JointEffortAdapter::update(const ros::Time & /*time*/,
                                 double actualPosition, double desiredPosition,
                                 double actualVelocity, double desiredVelocity,
                                 double /*actualEffort*/,
-                                double nominalEffort) {
+                                double nominalEffort,
+                                int /*dof*/) {
   // TODO: Handle position wrapping on SO(2) joints.
   const auto pidEffort =
       mPid.computeCommand(desiredPosition - actualPosition,
@@ -142,7 +145,8 @@ void JointForwardEffortAdapter::update(const ros::Time & /*time*/,
                                   double /*actualPosition*/, double /*desiredPosition*/,
                                   double /*actualVelocity*/, double /*desiredVelocity*/,
                                   double /*actualEffort*/,
-                                  double nominalEffort) {
+                                  double nominalEffort,
+                                  int /*dof*/) {
   mEffortHandle.setCommand(nominalEffort);
 }
 
@@ -156,7 +160,22 @@ JointCompliantAdapter::JointCompliantAdapter(
     hardware_interface::JointHandle effortHandle,
     dart::dynamics::DegreeOfFreedom *dof)
     : mEffortHandle{effortHandle}, mDof{dof} {
-  mExtendedJoints = new ExtendedJointPosition(numControlledDofs, 3 * M_PI / 2);
+  mExtendedJoints = new ExtendedJointPosition(1, 3 * M_PI / 2);
+
+  mJointStiffnessMatrix.resize(7, 7);
+  mJointStiffnessMatrix.setZero();
+  Eigen::VectorXd joint_stiffness_vec(7);
+  // joint_stiffness_vec << 3000,3000,3000,3000,2000,2000,2000;
+  joint_stiffness_vec << 300, 300, 300, 300, 100, 100, 100;
+  // joint_stiffness_vec << 100,100,100,100,80,80,80;
+  mJointStiffnessMatrix.diagonal() = joint_stiffness_vec;
+
+  mRotorInertiaMatrix.resize(7, 7);
+  mRotorInertiaMatrix.setZero();
+  Eigen::VectorXd rotor_inertia_vec(7);
+  // joint_stiffness_vec << 3000,3000,3000,3000,2000,2000,2000;
+  rotor_inertia_vec << 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.05;
+  mRotorInertiaMatrix.diagonal() = rotor_inertia_vec;
 }
 
 //=============================================================================
@@ -169,26 +188,43 @@ void JointCompliantAdapter::update(const ros::Time & /*time*/,
                                 const ros::Duration &period,
                                 double actualPosition, double desiredPosition,
                                 double actualVelocity, double desiredVelocity,
-                                double actualEffort, double nominalEffort) {
+                                double actualEffort, double nominalEffort, int dof) {
   // TODO: Handle position wrapping on SO(2) joints.
   // TODO: Convert all calculations to per-joint
-  std::cout << "pidEffort: " << pidEffort << std::endl;
+  // k, d, l, lp, stiffness, rotor_inertia
+  // if (dof != 6 && dof != 5 && dof != 4 && dof != 0) {
+  //   mEffortHandle.setCommand(nominalEffort);
+  //   return;
+  // }
+  if (!is_initialized){
+    mLastDesiredPosition = desiredPosition;
+    is_initialized = true;
+    mExtendedJoints->initializeExtendedJointPosition(desiredPosition, dof);
+    mExtendedJoints->estimateExtendedJoint(desiredPosition, dof);
+    nominal_theta_prev_ = mExtendedJoints->getExtendedJoint(dof);
+    nominal_theta_dot_prev_ = actualVelocity;
+    mDesiredPosition = mExtendedJoints->getExtendedJoint(dof);
+    // mDesiredVelocity = 0.;
+    mDesiredVelocity = desiredVelocity;
+  }
+
+  std::cout << "Joint: " << dof << " Desired Position: " << desiredPosition << std::endl;
+  if (std::abs(desiredPosition - mLastDesiredPosition) > 0.000001 && actualPosition != desiredPosition) {
+    mLastDesiredPosition = desiredPosition;
+    mExtendedJoints->initializeExtendedJointPosition(desiredPosition, dof);
+    mExtendedJoints->estimateExtendedJoint(desiredPosition, dof);
+    nominal_theta_prev_ = mExtendedJoints->getExtendedJoint(dof);
+    nominal_theta_dot_prev_ = actualVelocity;
+    mDesiredPosition = mExtendedJoints->getExtendedJoint(dof);
+    // mDesiredVelocity = 0.;
+    mDesiredVelocity = desiredVelocity;
+  }
+  
   if (std::isnan(nominalEffort))
     throw std::range_error("nominalEffort is NaN");
-  if (std::isnan(pidEffort))
-    throw std::range_error("calculated pidEffort is NaN");
+
   // TODO: Check sign
   actualEffort = -actualEffort;
-
-  // float tau_task = nominalEffort + pidEffort;
-
-  Eigen::MatrixXd joint_k_mat(7,7), joint_d_mat(7,7);
-  // stiffness
-  joint_k_mat.setZero();
-  // think of this as something that affects the speed of return to the desired position
-  joint_d_mat.setZero();
-  joint_k_mat.diagonal() << 50, 50, 50, 50, 50, 50, 50;
-  joint_d_mat.diagonal() << 2, 2, 2, 2, 2, 2, 2;
 
   // FO Parameters
   Eigen::MatrixXd L(7,7), Lp(7,7);
@@ -198,47 +234,60 @@ void JointCompliantAdapter::update(const ros::Time & /*time*/,
   L.diagonal() << 160, 160, 160, 160, 100, 100, 100;
   Lp.diagonal() << 10, 10, 10, 10, 7.5, 7.5, 7.5;
 
-  Eigen::VectorXd q(7), dq(7), theta(7), dtheta(7);
-  mExtendedJoints->initializeExtendedJointPosition(mActualPosition);
-  mExtendedJoints->estimateExtendedJoint(mActualPosition);
-  theta = mExtendedJoints->getExtendedJoint();
+  // Eigen::VectorXd q(7), dq(7), 
+  double theta, dtheta;
+  // std::cout << "Desired Position: " << mDesiredPosition << " actual position: " << actualPosition << std::endl;
+  mExtendedJoints->estimateExtendedJoint(actualPosition, dof);
+  theta = mExtendedJoints->getExtendedJoint(dof);
 
-  Eigen::VectorXd theta_d(7), dtheta_d(7);
+  double theta_d, dtheta_d;
   // TODO: Convert this to 1 / stiffness for the given joint
-  theta_d = desiredPosition + joint_stiffness_matrix_.inverse()*gravity;
+  theta_d = mDesiredPosition + nominalEffort / mJointStiffnessMatrix.coeff(dof, dof);
   dtheta_d = desiredVelocity;
 
   //compute joint torque
   double tau_d, tau_task;
-  tau_task = -joint_k_mat*(nominal_theta_prev_-theta_d) - joint_d_mat*(nominal_theta_dot_prev_ - dtheta_d) + nominalEffort;
+  tau_task = mPid.computeCommand(theta_d - nominal_theta_prev_,
+                           dtheta_d - nominal_theta_dot_prev_, period) + nominalEffort;
+  // tau_task = -joint_k_mat.coeff(dof, dof) *(nominal_theta_prev_-theta_d) - joint_d_mat.coeff(dof, dof) *(nominal_theta_dot_prev_ - dtheta_d) + nominalEffort;
   // TODO: Use mPID object for computation
   // const auto pidEffort =
   //     mPid.computeCommand(desiredPosition - actualPosition,
   //                         desiredVelocity - actualVelocity, period);
   // tau_task = nominalEffort - pidEffort;
+  
   // For Friction Observer
   double step_time;
   step_time = 0.001;
 
   //this function update nominal plant theta
-  Eigen::VectorXd nominal_theta(7),nominal_theta_dot(7),nominal_theta_ddot(7); //nomianl plant
+  double nominal_theta, nominal_theta_dot, nominal_theta_ddot; //nomianl plant
 
   //nominal motor plant dynamics
-  nominal_theta_ddot = rotor_inertia_matrix_.inverse()*(tau_task-tau_J);
-  nominal_theta_dot = nominal_theta_dot_prev_ + nominal_theta_ddot*step_time;
-  nominal_theta = nominal_theta_prev_ + nominal_theta_dot*step_time;
-
+  nominal_theta_ddot = (tau_task - actualEffort) / mRotorInertiaMatrix.coeff(dof, dof);
+  // std::cout << "nominal_theta_ddot: " << nominal_theta_ddot << std::endl;
+  nominal_theta_dot = nominal_theta_dot_prev_ + nominal_theta_ddot * step_time;
+  nominal_theta = nominal_theta_prev_ + nominal_theta_dot * step_time;
   //update nominal theta
   nominal_theta_prev_ = nominal_theta;
   nominal_theta_dot_prev_ = nominal_theta_dot;
 
   // PD Friction observer
-  Eigen::VectorXd nominal_friction(7);
+  double nominal_friction;
   // Eigen::VectorXd nominal_friction_2(7);
 
-  nominal_friction = rotor_inertia_matrix_*L*((nominal_theta_dot_prev_ - actualVelocity) + Lp*(nominal_theta_prev_ - theta));
-
+  nominal_friction = mRotorInertiaMatrix.coeff(dof, dof)*L.coeff(dof, dof)*((nominal_theta_dot_prev_ - actualVelocity) + Lp.coeff(dof, dof)*(nominal_theta_prev_ - theta));
   tau_d = tau_task + nominal_friction;
+  // std::cout << "==================================" << std::endl;
+  // std::cout << "Joint: " << dof << "\nactualEffort: " << actualEffort << "\ngravity: " << nominalEffort << "\ntau_task: " << tau_task << "\nnominal_friction: " << nominal_friction << std::endl;
+  // std::cout << " total: " << tau_d << std::endl;
+  // std::cout << "----------------------------------" << std::endl;
+  // std::cout << "\nNominal_theta_dot_prev_: " << nominal_theta_dot_prev_ << "\nactualVelocity: " << actualVelocity << "\nNominal_theta_prev_: " << nominal_theta_prev_ << "\ntheta: " << theta << std::endl;
+  // std::cout << "==================================" << std::endl;
+  tau_d = tau_task + nominal_friction;
+  // tau_d = nominal_friction + nominalEffort;
+  // std::cout << "tau_d: " << tau_d << std::endl;
+  // mEffortHandle.setCommand(nominalEffort);
   mEffortHandle.setCommand(tau_d);
 }
 
@@ -263,7 +312,8 @@ void JointVelocityEffortAdapter::update(const ros::Time & /*time*/,
                                 double /*actualPosition*/, double /*desiredPosition*/,
                                 double actualVelocity, double desiredVelocity,
                                 double /*actualEffort*/,
-                                double nominalEffort) {
+                                double nominalEffort,
+                                int /*dof*/) {
   const auto pidEffort =
     mPid.computeCommand(desiredVelocity - actualVelocity, period);
 

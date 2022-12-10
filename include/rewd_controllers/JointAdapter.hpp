@@ -20,7 +20,7 @@ public:
   virtual void update(const ros::Time &time, const ros::Duration &period,
                       double actualPosition, double desiredPosition,
                       double actualVelocity, double desiredVelocity,
-                      double actualEffort, double nominalEffort) override;
+                      double actualEffort, double nominalEffort, int dof) = 0;
 
   virtual void reset() = 0;
 };
@@ -36,7 +36,7 @@ public:
   void update(const ros::Time &time, const ros::Duration &period,
               double actualPosition, double desiredPosition,
               double actualVelocity, double desiredVelocity,
-              double actualEffort, double nominalEffort) override;
+              double actualEffort, double nominalEffort, int dof) override;
 
   void reset() override;
 
@@ -56,7 +56,7 @@ public:
   void update(const ros::Time &time, const ros::Duration &period,
               double actualPosition, double desiredPosition,
               double actualVelocity, double desiredVelocity,
-              double actualEffort, double nominalEffort) override;
+              double actualEffort, double nominalEffort, int dof) override;
   void reset() override;
 
 private:
@@ -79,7 +79,7 @@ public:
   void update(const ros::Time &time, const ros::Duration &period,
               double actualPosition, double desiredPosition,
               double actualVelocity, double desiredVelocity,
-              double actualEffort, double nominalEffort) override;
+              double actualEffort, double nominalEffort, int dof) override;
 
   void reset() override;
 
@@ -100,7 +100,7 @@ public:
   void update(const ros::Time &time, const ros::Duration &period,
               double actualPosition, double desiredPosition,
               double actualVelocity, double desiredVelocity,
-              double actualEffort, double nominalEffort) override;
+              double actualEffort, double nominalEffort, int dof) override;
 
   void reset() override;
 
@@ -108,12 +108,17 @@ private:
   hardware_interface::JointHandle mEffortHandle;
   dart::dynamics::DegreeOfFreedom *mDof;
   control_toolbox::Pid mPid;
-  Eigen::VectorXd nominal_theta_dot_prev_;
-  Eigen::VectorXd nominal_theta_prev_;
+  double nominal_theta_dot_prev_;
+  double nominal_theta_prev_;
+  bool is_initialized = false;
 
   //DYNAMIC PARAMETER OF KINOVA GEN3
-  Eigen::MatrixXd joint_stiffness_matrix_;
-  Eigen::MatrixXd rotor_inertia_matrix_;
+  Eigen::MatrixXd mJointStiffnessMatrix;
+  Eigen::MatrixXd mRotorInertiaMatrix;
+  double mDesiredPosition;
+  double mLastDesiredPosition;
+  double mDesiredVelocity;
+  double mLastDesiredVelocity;
 
   //Initial position & orientation
   Eigen::Vector3d init_position;
@@ -135,7 +140,7 @@ public:
   void update(const ros::Time &time, const ros::Duration &period,
               double actualPosition, double desiredPosition,
               double actualVelocity, double desiredVelocity,
-              double actualEffort, double nominalEffort) override;
+              double actualEffort, double nominalEffort, int dof) override;
 
   void reset() override;
 
@@ -155,7 +160,7 @@ public:
   void update(const ros::Time &time, const ros::Duration &period,
               double actualPosition, double desiredPosition,
               double actualVelocity, double desiredVelocity,
-              double actualEffort, double nominalEffort) override;
+              double actualEffort, double nominalEffort, int dof) override;
 
   void reset() override;
 

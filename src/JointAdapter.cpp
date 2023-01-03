@@ -166,7 +166,7 @@ JointCompliantAdapter::JointCompliantAdapter(
   mJointStiffnessMatrix.setZero();
   Eigen::VectorXd joint_stiffness_vec(7);
   // joint_stiffness_vec << 3000,3000,3000,3000,2000,2000,2000;
-  joint_stiffness_vec << 300, 300, 300, 300, 100, 100, 100;
+  joint_stiffness_vec << 7000, 7000, 7000, 7000, 5000, 5000, 7000;
   // joint_stiffness_vec << 100,100,100,100,80,80,80;
   mJointStiffnessMatrix.diagonal() = joint_stiffness_vec;
 
@@ -174,7 +174,7 @@ JointCompliantAdapter::JointCompliantAdapter(
   mRotorInertiaMatrix.setZero();
   Eigen::VectorXd rotor_inertia_vec(7);
   // joint_stiffness_vec << 3000,3000,3000,3000,2000,2000,2000;
-  rotor_inertia_vec << 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.05;
+  rotor_inertia_vec << 0.3, 0.3, 0.3, 0.3, 0.18, 0.18, 0.2;
   mRotorInertiaMatrix.diagonal() = rotor_inertia_vec;
 }
 
@@ -208,13 +208,14 @@ void JointCompliantAdapter::update(const ros::Time & /*time*/,
     mDesiredVelocity = desiredVelocity;
   }
 
-  std::cout << "Joint: " << dof << " Desired Position: " << desiredPosition << std::endl;
-  if (std::abs(desiredPosition - mLastDesiredPosition) > 0.000001 && actualPosition != desiredPosition) {
+  // std::cout << "Joint: " << dof << " Desired Position: " << desiredPosition << std::endl;
+  // if (std::abs(desiredPosition - mLastDesiredPosition) > 0.000001 && actualPosition != desiredPosition) {
+  if (desiredPosition != mLastDesiredPosition && actualPosition != desiredPosition){
     mLastDesiredPosition = desiredPosition;
-    mExtendedJoints->initializeExtendedJointPosition(desiredPosition, dof);
+    // mExtendedJoints->initializeExtendedJointPosition(desiredPosition, dof);
     mExtendedJoints->estimateExtendedJoint(desiredPosition, dof);
-    nominal_theta_prev_ = mExtendedJoints->getExtendedJoint(dof);
-    nominal_theta_dot_prev_ = actualVelocity;
+    // nominal_theta_prev_ = mExtendedJoints->getExtendedJoint(dof);
+    // nominal_theta_dot_prev_ = actualVelocity;
     mDesiredPosition = mExtendedJoints->getExtendedJoint(dof);
     // mDesiredVelocity = 0.;
     mDesiredVelocity = desiredVelocity;
@@ -243,7 +244,7 @@ void JointCompliantAdapter::update(const ros::Time & /*time*/,
   double theta_d, dtheta_d;
   // TODO: Convert this to 1 / stiffness for the given joint
   theta_d = mDesiredPosition + nominalEffort / mJointStiffnessMatrix.coeff(dof, dof);
-  dtheta_d = desiredVelocity;
+  dtheta_d = mDesiredVelocity;
 
   //compute joint torque
   double tau_d, tau_task;
@@ -284,7 +285,6 @@ void JointCompliantAdapter::update(const ros::Time & /*time*/,
   // std::cout << "----------------------------------" << std::endl;
   // std::cout << "\nNominal_theta_dot_prev_: " << nominal_theta_dot_prev_ << "\nactualVelocity: " << actualVelocity << "\nNominal_theta_prev_: " << nominal_theta_prev_ << "\ntheta: " << theta << std::endl;
   // std::cout << "==================================" << std::endl;
-  tau_d = tau_task + nominal_friction;
   // tau_d = nominal_friction + nominalEffort;
   // std::cout << "tau_d: " << tau_d << std::endl;
   // mEffortHandle.setCommand(nominalEffort);

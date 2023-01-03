@@ -276,14 +276,14 @@ void JointGroupCommandControllerBase::updateStep(const ros::Time &time,
   }
   else
   {
-    std::cout<<"Reading from RT Buffer... "<<std::endl;
+    // std::cout<<"Reading from RT Buffer... "<<std::endl;
     trajectory_msgs::JointTrajectoryPoint command = *mCommandsBuffer.readFromRT(); // Rajat check: should this be by reference?
-    std::cout<<"... Read. :| "<<std::endl;
+    // std::cout<<"... Read. :| "<<std::endl;
   
-    std::cout<<"Efforts Size: "<<command.effort.size()<<std::endl;
-    std::cout<<"Positions Size: "<<command.positions.size()<<std::endl;
-    std::cout<<"Velocities Size: "<<command.velocities.size()<<std::endl;
-    std::cout<<"Accelerations Size: "<<command.accelerations.size()<<std::endl;
+    // std::cout<<"Efforts Size: "<<command.effort.size()<<std::endl;
+    // std::cout<<"Positions Size: "<<command.positions.size()<<std::endl;
+    // std::cout<<"Velocities Size: "<<command.velocities.size()<<std::endl;
+    // std::cout<<"Accelerations Size: "<<command.accelerations.size()<<std::endl;
 
     for (const auto &dof : mControlledSkeleton->getDofs()) 
     {
@@ -294,18 +294,34 @@ void JointGroupCommandControllerBase::updateStep(const ros::Time &time,
       mDesiredAcceleration[index] = (command.accelerations.size() == 0) ? 0.0 : command.accelerations[index];
       mDesiredEffort[index] = (command.effort.size() == 0) ? 0.0 : command.effort[index];
     }
-    std::cout<<"Out. :) "<<std::endl;
+    // std::cout<<"Out. :) "<<std::endl;
   }
 
   if(mCompensateEffort)
   {
-    mControlledSkeleton->setPositions(mActualPosition);
-    mControlledSkeleton->setVelocities(mActualVelocity);
     Eigen::VectorXd zeros(mControlledSkeleton->getNumDofs());
     zeros.setZero();
+
+    // if (mDesiredPosition != mActualPosition)
+    // {
+      // if ((mDesiredPosition - mExtendedJoints->mLastDesiredPosition) != Eigen::VectorXd::Zero(mControlledSkeleton->getNumDofs()))
+    //   {
+    //     std::cout << "Desired Position: " << mDesiredPosition.transpose() << std::endl;
+    //     mExtendedJoints->mLastDesiredPosition = mDesiredPosition;
+    //   }
+    // }
+    mExtendedJoints->is_initialized = false;
+    mExtendedJoints->initializeExtendedJointPosition(mDesiredPosition);
+    mExtendedJoints->estimateExtendedJoint(mExtendedJoints->mLastDesiredPosition);
+    Eigen::VectorXd theta;
+    theta = mExtendedJoints->getExtendedJoint();
+
+    mControlledSkeleton->setPositions(theta);
+    mControlledSkeleton->setVelocities(zeros);
     mControlledSkeleton->setAccelerations(zeros); 
     mSkeleton->computeInverseDynamics();
     mDesiredEffort = mControlledSkeleton->getGravityForces();
+    // mDesiredPosition = mExtendedJoints->mLastDesiredPosition;
     // mDesiredEffort += mControlledSkeleton->getCoriolisForces();
     // // mDesiredEffort += mControlledSkeleton->getCoriolisAndGravityForces();
 

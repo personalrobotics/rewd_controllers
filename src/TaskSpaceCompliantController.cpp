@@ -295,6 +295,49 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 		mSkeleton->computeInverseDynamics();
 		mGravity = mControlledSkeleton->getGravityForces();
 
+		//compute quasi-static estimate of the link side position
+	    //input value is motor side angle theta not link side angle(q);
+	    //Number of iteration can be modified by edit int i ( recommend is 1 or 2 for real time computing)
+
+	    Eigen::VectorXd luca_quasi_gravity(6);
+	    {
+
+		    int iteration = 2; // number of iteration
+		    Eigen::VectorXd qs_estimate_link_pos(6);
+		    qs_estimate_link_pos = mActualTheta;
+
+		    for (int i=0; i<iteration; i++)
+		    {
+		        dyn->run(qs_estimate_link_pos,Eigen::VectorXd::Zero(6));
+		        qs_estimate_link_pos = mActualTheta - mJointStiffnessMatrix.inverse()*(dyn->get_gravity());
+		    }
+		    dyn->run(qs_estimate_link_pos,Eigen::VectorXd::Zero(6));
+		    luca_quasi_gravity = dyn->get_gravity();
+		}
+
+		Eigen::VectorXd dart_quasi_gravity(6);
+	    {
+
+		    int iteration = 2; // number of iteration
+		    Eigen::VectorXd qs_estimate_link_pos(6);
+		    qs_estimate_link_pos = mActualTheta;
+
+		    for (int i=0; i<iteration; i++)
+		    {
+		    	mControlledSkeleton->setPositions(qs_estimate_link_pos);
+				mControlledSkeleton->setVelocities(mZeros);
+				mSkeleton->computeInverseDynamics();
+		        qs_estimate_link_pos = mActualTheta - mJointStiffnessMatrix.inverse()*(mControlledSkeleton->getGravityForces());
+		    }
+		    mControlledSkeleton->setPositions(qs_estimate_link_pos);
+			mControlledSkeleton->setVelocities(mZeros);
+			mSkeleton->computeInverseDynamics();
+	        dart_quasi_gravity = mControlledSkeleton->getGravityForces();
+		}
+
+		std::cout<<"luca_quasi_gravity: "<<luca_quasi_gravity.transpose()<<std::endl;
+		std::cout<<"dart_quasi_gravity: "<<dart_quasi_gravity.transpose()<<std::endl;
+
 		// Restore the state of the Skeleton from JointState interfaces. These values
 		// may be used by the adapters below.
 		mControlledSkeleton->setPositions(mActualPosition);
@@ -430,7 +473,7 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 	std::cout<<"LUCA Jacobian: "<<luca_nominal_jacobian<<std::endl;
 	std::cout<<"\n---\n";
 
-	// tau_task = nominal_jacobian.transpose() * (-mTaskKMatrix * error - mTaskDMatrix * (nominal_jacobian * mNominalThetaDotPrev)) + mGravity;
+	// mTaskEffort = dart_nominal_jacobian.transpose() * (-mTaskKMatrix * dart_error - mTaskDMatrix * (dart_nominal_jacobian * mNominalThetaDotPrev)) + mGravity;
 
 
 	double step_time;

@@ -172,7 +172,6 @@ JointCompliantAdapter::JointCompliantAdapter(
   // Used by Rishabh
   // joint_stiffness_vec << 7000, 7000, 7000, 5000, 5000, 7000;
 
-
   // joint_stiffness_vec << 100,100,100,100,80,80,80;
   mJointStiffnessMatrix.diagonal() = joint_stiffness_vec;
 
@@ -223,7 +222,6 @@ void JointCompliantAdapter::update(const ros::Time & /*time*/,
   // std::cout << "Joint: " << dof << " Desired Position: " << desiredPosition << std::endl;
   // if (std::abs(desiredPosition - mLastDesiredPosition) > 0.000001 && actualPosition != desiredPosition) {
   if (desiredPosition != mLastDesiredPosition && actualPosition != desiredPosition){
-    std::cout << "This part is executed!" << std::endl;
     mLastDesiredPosition = desiredPosition;
     // mExtendedJoints->initializeExtendedJointPosition(desiredPosition, dof);
     mExtendedJoints->estimateExtendedJoint(desiredPosition, dof);

@@ -304,8 +304,7 @@ void JointGroupCommandControllerBase::updateStep(const ros::Time &time,
 
     // if (mDesiredPosition != mActualPosition)
     // {
-    //   if ((mDesiredPosition - mExtendedJoints->mLastDesiredPosition).norm() > 0.01)
-    //   // if ((mDesiredPosition - mExtendedJoints->mLastDesiredPosition) != Eigen::VectorXd::Zero(mControlledSkeleton->getNumDofs()))
+    //   if ((mDesiredPosition - mExtendedJoints->mLastDesiredPosition) != Eigen::VectorXd::Zero(mControlledSkeleton->getNumDofs()))
     //   {
     //     std::cout << "Desired Position: " << mDesiredPosition.transpose() << std::endl;
     //     mExtendedJoints->mLastDesiredPosition = mDesiredPosition;

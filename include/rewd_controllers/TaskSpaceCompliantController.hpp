@@ -105,6 +105,9 @@ private:
   Eigen::MatrixXd mJointKMatrix;
   Eigen::MatrixXd mJointDMatrix;
 
+  Eigen::MatrixXd mTaskKMatrix;
+  Eigen::MatrixXd mTaskDMatrix;
+
   long long int mCount;
 
   std::unique_ptr<SkeletonJointStateUpdater> mSkeletonUpdater;
@@ -135,6 +138,7 @@ private:
 
   Eigen::VectorXd mZeros;
   Eigen::VectorXd mGravity;
+  Eigen::VectorXd mQuasiGravity;
   Eigen::VectorXd mNominalFriction;
 
   Eigen::VectorXd mActualPosition;

@@ -132,14 +132,10 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 		}
 	}
 
-	mEENode = mSkeleton->getBodyNode(std::string("end_effector_link"));
-
-	ROS_INFO_STREAM("1");
+	mEENode = mSkeleton->getBodyNode(std::string("ft_sensor"));
 
 	mExtendedJoints = new ExtendedJointPosition(numControlledDofs, 3 * M_PI / 2);
 	mExtendedJointsGravity = new ExtendedJointPosition(numControlledDofs, 3 * M_PI / 2);
-
-	ROS_INFO_STREAM("2");
 
 	mCount = 0;  
 
@@ -147,8 +143,6 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 	mJointStiffnessMatrix.setZero();
 	mJointStiffnessMatrix.diagonal() << 8000,8000,8000,7000,7000,7000;
 
-		ROS_INFO_STREAM("3");
-	
 	mRotorInertiaMatrix.resize(numControlledDofs, numControlledDofs);
 	mRotorInertiaMatrix.setZero();
 	mRotorInertiaMatrix.diagonal() << 0.4, 0.4, 0.4, 0.2, 0.2, 0.2;
@@ -169,16 +163,19 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 	mJointDMatrix.setZero();
 	mJointDMatrix.diagonal() << 8,8,8,6,6,6;
 
+	mTaskKMatrix.resize(6, 6);
+	mTaskKMatrix.setZero();
+	mTaskKMatrix.diagonal() << 200,200,200,150,150,150;
 
-		ROS_INFO_STREAM("4");
+	mTaskDMatrix.resize(6, 6);
+	mTaskDMatrix.setZero();
+	mTaskDMatrix.diagonal() << 60,60,60,40,40,40;
 
 	// Initialize buffers to avoid dynamic memory allocation at runtime.
 	mDesiredPosition.resize(numControlledDofs);
 	mDesiredVelocity.resize(numControlledDofs);
 	mZeros.resize(numControlledDofs);
 	mZeros.setZero();
-
-		ROS_INFO_STREAM("5");
 
 	mName = internal::getLeafNamespace(n);
 
@@ -299,44 +296,21 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 	    //input value is motor side angle theta not link side angle(q);
 	    //Number of iteration can be modified by edit int i ( recommend is 1 or 2 for real time computing)
 
-	    Eigen::VectorXd luca_quasi_gravity(6);
+	    int iteration = 2; // number of iteration
+	    Eigen::VectorXd qs_estimate_link_pos(6);
+	    qs_estimate_link_pos = mActualTheta;
+
+	    for (int i=0; i<iteration; i++)
 	    {
-
-		    int iteration = 2; // number of iteration
-		    Eigen::VectorXd qs_estimate_link_pos(6);
-		    qs_estimate_link_pos = mActualTheta;
-
-		    for (int i=0; i<iteration; i++)
-		    {
-		        dyn->run(qs_estimate_link_pos,Eigen::VectorXd::Zero(6));
-		        qs_estimate_link_pos = mActualTheta - mJointStiffnessMatrix.inverse()*(dyn->get_gravity());
-		    }
-		    dyn->run(qs_estimate_link_pos,Eigen::VectorXd::Zero(6));
-		    luca_quasi_gravity = dyn->get_gravity();
-		}
-
-		Eigen::VectorXd dart_quasi_gravity(6);
-	    {
-
-		    int iteration = 2; // number of iteration
-		    Eigen::VectorXd qs_estimate_link_pos(6);
-		    qs_estimate_link_pos = mActualTheta;
-
-		    for (int i=0; i<iteration; i++)
-		    {
-		    	mControlledSkeleton->setPositions(qs_estimate_link_pos);
-				mControlledSkeleton->setVelocities(mZeros);
-				mSkeleton->computeInverseDynamics();
-		        qs_estimate_link_pos = mActualTheta - mJointStiffnessMatrix.inverse()*(mControlledSkeleton->getGravityForces());
-		    }
-		    mControlledSkeleton->setPositions(qs_estimate_link_pos);
+	    	mControlledSkeleton->setPositions(qs_estimate_link_pos);
 			mControlledSkeleton->setVelocities(mZeros);
 			mSkeleton->computeInverseDynamics();
-	        dart_quasi_gravity = mControlledSkeleton->getGravityForces();
-		}
-
-		std::cout<<"luca_quasi_gravity: "<<luca_quasi_gravity.transpose()<<std::endl;
-		std::cout<<"dart_quasi_gravity: "<<dart_quasi_gravity.transpose()<<std::endl;
+	        qs_estimate_link_pos = mActualTheta - mJointStiffnessMatrix.inverse()*(mControlledSkeleton->getGravityForces());
+	    }
+	    mControlledSkeleton->setPositions(qs_estimate_link_pos);
+		mControlledSkeleton->setVelocities(mZeros);
+		mSkeleton->computeInverseDynamics();
+        mQuasiGravity = mControlledSkeleton->getGravityForces();
 
 		// Restore the state of the Skeleton from JointState interfaces. These values
 		// may be used by the adapters below.
@@ -372,7 +346,6 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 	
 	mTaskEffort = -mJointKMatrix*(mNominalThetaPrev-mDesiredTheta) - mJointDMatrix*(mNominalThetaDotPrev - mDesiredThetaDot) + mGravity;
 
-
 	//Compute error
 	Eigen::VectorXd dart_error(6);   
 	Eigen::MatrixXd dart_nominal_jacobian(6, 6); // change to numControlledDofs
@@ -390,25 +363,26 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 
 		Eigen::Quaterniond nominal_ee_quat(mNominalEETransform.linear());
 		
-		// Get Jacobian relative only to controlled joints
-		Eigen::MatrixXd dart_nominal_jacobian_incorrect(6, 6);
+		// Get Jacobian relative only to controlled joints -- Rajat ToDo: Check with Ethan
+		Eigen::MatrixXd dart_nominal_jacobian_flipped(6, 6);
 		Eigen::MatrixXd fullJ = mEENode->getWorldJacobian();
 		std::cout<<"\n"<<"Full Jacobian: "<<fullJ<<"\n\n";
 		auto fullDofs = mEENode->getDependentDofs();
+		std::cout<<"fullDofs.size(): "<<fullDofs.size()<<std::endl;
 		for (size_t fullIndex = 0; fullIndex < fullDofs.size(); fullIndex++)
 		{
 			auto it = std::find(mDofs.begin(), mDofs.end(), fullDofs[fullIndex]);
 			if (it != mDofs.end())
 			{
 				int index = it - mDofs.begin();
-				dart_nominal_jacobian_incorrect.col(index) = fullJ.col(fullIndex);
+				dart_nominal_jacobian_flipped.col(index) = fullJ.col(fullIndex);
 			}
 		}
 
 		for(int i=0; i<3; i++)
 		{
-			dart_nominal_jacobian.row(i) = dart_nominal_jacobian_incorrect.row(i+3);
-			dart_nominal_jacobian.row(i+3) = dart_nominal_jacobian_incorrect.row(i);
+			dart_nominal_jacobian.row(i) = dart_nominal_jacobian_flipped.row(i+3);
+			dart_nominal_jacobian.row(i+3) = dart_nominal_jacobian_flipped.row(i);
 		}
 
 		dart_error.head(3) << mNominalEETransform.translation() - mDesiredEETransform.translation(); // positional error
@@ -430,51 +404,9 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 		mControlledSkeleton->setVelocities(mActualVelocity);
 	}
 
-	Eigen::VectorXd luca_error(6);   
-	Eigen::MatrixXd luca_nominal_jacobian(6, 6); // change to numControlledDofs
-	{
-		//compute nominal jacobian
-		dyn->run(mTrueDesiredPosition, mZeros);
-		Eigen::Affine3d ee_htm_d =  dyn->get_Homogeneous(0);
+	// std::cout<<"\n"<<"Nominal Jacobian: "<<dart_nominal_jacobian<<"\n\n";
 
-		//compute nominal jacobian
-		dyn->run(mNominalThetaPrev, mNominalThetaDotPrev);
-
-		//Get End-effector jacobian w.r.t world frame
-		Eigen::Affine3d nominal_ee_htm = dyn->get_Homogeneous(0);
-		Eigen::Matrix3d nominal_ee_rot = nominal_ee_htm.rotation();
-		Eigen::Quaterniond nominal_ee_quat(nominal_ee_htm.linear());
-		Eigen::Vector3d nominal_ee_pos = nominal_ee_htm.translation();
-
-		Eigen::MatrixXd gen_rot_mat(6,6);
-		gen_rot_mat.setZero();
-		gen_rot_mat.topLeftCorner(3,3) = nominal_ee_rot;
-		gen_rot_mat.bottomRightCorner(3,3) = nominal_ee_rot;
-		// std::cout<<"\nLuca jacobian before rotation: "<<dyn->get_Jtcp(0)<<"\n\n"	;
-		luca_nominal_jacobian = gen_rot_mat * dyn->get_Jtcp(0);
-
-		luca_error.head(3) << nominal_ee_pos - ee_htm_d.translation(); // positional error
-
-		Eigen::Quaterniond ee_quat_d(ee_htm_d.linear());
-
-		if (ee_quat_d.coeffs().dot(nominal_ee_quat.coeffs()) < 0.0) 
-		{
-				nominal_ee_quat.coeffs() << -nominal_ee_quat.coeffs();
-		}
-		Eigen::Quaterniond error_qtn(nominal_ee_quat.inverse() * ee_quat_d);
-		luca_error.tail(3) << error_qtn.x(), error_qtn.y(), error_qtn.z();
-		luca_error.tail(3) << -nominal_ee_htm.linear() * luca_error.tail(3);
-	}
-
-	std::cout<<"DART Error: "<<dart_error.transpose()<<std::endl;
-	std::cout<<"LUCA Error: "<<luca_error.transpose()<<std::endl;
-
-	std::cout<<"DART Jacobian: "<<dart_nominal_jacobian<<std::endl;
-	std::cout<<"LUCA Jacobian: "<<luca_nominal_jacobian<<std::endl;
-	std::cout<<"\n---\n";
-
-	// mTaskEffort = dart_nominal_jacobian.transpose() * (-mTaskKMatrix * dart_error - mTaskDMatrix * (dart_nominal_jacobian * mNominalThetaDotPrev)) + mGravity;
-
+	mTaskEffort = dart_nominal_jacobian.transpose() * (-mTaskKMatrix * dart_error - mTaskDMatrix * (dart_nominal_jacobian * mNominalThetaDotPrev)) + mQuasiGravity;
 
 	double step_time;
 	step_time = 0.001;

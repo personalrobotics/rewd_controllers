@@ -27,6 +27,10 @@
 #include <dart/dynamics/dynamics.hpp>
 #include <rewd_controllers/helpers.hpp>
 
+#include "luca_dynamics/luca_dynamics.hpp"
+#include "luca_dynamics/model.hpp"
+
+
 namespace rewd_controllers {
 class TaskSpaceCompliantController
     : public controller_interface::MultiInterfaceController<
@@ -84,6 +88,8 @@ private:
   std::unique_ptr<ros::NodeHandle> mNodeHandle;
   dart::dynamics::SkeletonPtr mSkeleton;
   dart::dynamics::MetaSkeletonPtr mControlledSkeleton;
+  std::vector<dart::dynamics::DegreeOfFreedom*> mDofs;
+  dart::dynamics::BodyNode* mEENode;
 
   std::vector<hardware_interface::JointHandle> mControlledJointHandles;
   
@@ -138,11 +144,18 @@ private:
   ExtendedJointPosition* mExtendedJoints;
   ExtendedJointPosition* mExtendedJointsGravity;
 
+  Eigen::Isometry3d mActualEETransform;
+  Eigen::Isometry3d mDesiredEETransform;
+  Eigen::Isometry3d mNominalEETransform;
+
   ros::Subscriber    mSubCommand;
   std::unique_ptr<ActionServer> mActionServer;
   ros::Timer         mGoalHandleTimer;
   ros::Timer         mGoalDurationTimer;
   ros::Duration      mActionMonitorPeriod;
+
+  boost::shared_ptr<luca_dynamics::model> urdf_model;
+  boost::shared_ptr<luca_dynamics::luca_dynamics> dyn; 
 
   void goalCallback(GoalHandle gh);
   void cancelCallback(GoalHandle gh);

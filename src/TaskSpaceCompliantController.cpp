@@ -30,489 +30,601 @@ namespace internal
 
 inline std::string getLeafNamespace(const ros::NodeHandle& nh)
 {
-  const std::string complete_ns = nh.getNamespace();
-  std::size_t id   = complete_ns.find_last_of("/");
-  return complete_ns.substr(id + 1);
+	const std::string complete_ns = nh.getNamespace();
+	std::size_t id   = complete_ns.find_last_of("/");
+	return complete_ns.substr(id + 1);
 }
 
 } // namespace
 
 TaskSpaceCompliantController::TaskSpaceCompliantController() 
-    : MultiInterfaceController(true) // allow_optional_interfaces
+		: MultiInterfaceController(true) // allow_optional_interfaces
+		, urdf_model(luca_dynamics::create_model_from_urdf("/home/rkjenamani/controller_ws/src/compliant-controller/models/kinova.urdf"))
+		, dyn(new luca_dynamics::luca_dynamics(urdf_model))
 {}
 
 //=============================================================================
-TaskSpaceCompliantController::~TaskSpaceCompliantController() {}
+TaskSpaceCompliantController::~TaskSpaceCompliantController() 
+{} 
 
 bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros::NodeHandle &n) {
 
-  using hardware_interface::EffortJointInterface;
-  using hardware_interface::JointStateInterface;
+	using hardware_interface::EffortJointInterface;
+	using hardware_interface::JointStateInterface;
 
-  mNodeHandle.reset(new ros::NodeHandle{n});
+	mNodeHandle.reset(new ros::NodeHandle{n});
 
-  // Build up the list of controlled DOFs.
-  const auto jointParameters = loadJointsFromParameter(n, "joints", "effort");
-  if (jointParameters.empty())
-    return false;
+	// Build up the list of controlled DOFs.
+	const auto jointParameters = loadJointsFromParameter(n, "joints", "effort");
+	if (jointParameters.empty())
+		return false;
 
-  ROS_INFO_STREAM("Controlling " << jointParameters.size() << " joints:");
-  for (const auto &param : jointParameters) {
-    ROS_INFO_STREAM("- " << param.mName << " (type: " << param.mType << ")");
+	ROS_INFO_STREAM("Controlling " << jointParameters.size() << " joints:");
+	for (const auto &param : jointParameters) {
+		ROS_INFO_STREAM("- " << param.mName << " (type: " << param.mType << ")");
 
-    if (param.mType != "effort") {
-      ROS_ERROR_STREAM("Joint '"
-                       << param.mName
-                       << "' is not effort-controlled and cannot be "
-                          "used in a gravity compensation controller");
-      return false;
-    }
-  }
+		if (param.mType != "effort") {
+			ROS_ERROR_STREAM("Joint '"
+											 << param.mName
+											 << "' is not effort-controlled and cannot be "
+													"used in a gravity compensation controller");
+			return false;
+		}
+	}
 
-  // Load the URDF as a Skeleton.
-  mSkeleton = loadRobotFromParameter(n, "robot_description_parameter");
-  if (!mSkeleton)
-    return false;
+	// Load the URDF as a Skeleton.
+	mSkeleton = loadRobotFromParameter(n, "robot_description_parameter");
+	if (!mSkeleton)
+		return false;
 
-  // // Check for zero-mass bodies that will be used incorrectly in calculations
-  // bool hasZeroMassBody = false;
-  // for (auto body : mSkeleton->getBodyNodes()) {
-  //   if (body->getMass() <= 0.0) {
-  //     ROS_ERROR_STREAM("Robot link '" << body->getName()
-  //                                     << "' has mass = " << body->getMass());
-  //     hasZeroMassBody = true;
-  //   }
-  // }
-  // if (hasZeroMassBody)
-  //   return false; // TODO is this actually a problem?
+	// // Check for zero-mass bodies that will be used incorrectly in calculations
+	// bool hasZeroMassBody = false;
+	// for (auto body : mSkeleton->getBodyNodes()) {
+	//   if (body->getMass() <= 0.0) {
+	//     ROS_ERROR_STREAM("Robot link '" << body->getName()
+	//                                     << "' has mass = " << body->getMass());
+	//     hasZeroMassBody = true;
+	//   }
+	// }
+	// if (hasZeroMassBody)
+	//   return false; // TODO is this actually a problem?
 
-  // Extract the subset of the Skeleton that is being controlled.
-  mControlledSkeleton =
-      getControlledMetaSkeleton(mSkeleton, jointParameters, "Controlled");
-  if (!mControlledSkeleton)
-    return false;
+	// Extract the subset of the Skeleton that is being controlled.
+	mControlledSkeleton =
+			getControlledMetaSkeleton(mSkeleton, jointParameters, "Controlled");
+	if (!mControlledSkeleton)
+		return false;
 
-  // the full skeleton.
-  const auto jointStateInterface = robot->get<JointStateInterface>();
-  if (!jointStateInterface) {
-    ROS_ERROR("Unable to get JointStateInterface from RobotHW instance.");
-    return false;
-  }
+	// the full skeleton.
+	const auto jointStateInterface = robot->get<JointStateInterface>();
+	if (!jointStateInterface) {
+		ROS_ERROR("Unable to get JointStateInterface from RobotHW instance.");
+		return false;
+	}
 
-  mSkeletonUpdater.reset(
-      new SkeletonJointStateUpdater{mSkeleton, jointStateInterface});
+	mSkeletonUpdater.reset(
+			new SkeletonJointStateUpdater{mSkeleton, jointStateInterface});
 
-  const auto numControlledDofs = mControlledSkeleton->getNumDofs();
+	const auto numControlledDofs = mControlledSkeleton->getNumDofs();
 
-  ROS_INFO_STREAM("numControlledDofs: " << (int)numControlledDofs);
+	ROS_INFO_STREAM("numControlledDofs: " << (int)numControlledDofs);
 
-  mControlledJointHandles.resize(numControlledDofs);
+	mControlledJointHandles.resize(numControlledDofs);
+	mDofs.resize(numControlledDofs);
 
-  const auto effortJointInterface = robot->get<EffortJointInterface>();
-  if (!effortJointInterface) {
-    ROS_ERROR("Unable to get EffortJointInterface from RobotHW instance.");
-    return false;
-  }
+	const auto effortJointInterface = robot->get<EffortJointInterface>();
+	if (!effortJointInterface) {
+		ROS_ERROR("Unable to get EffortJointInterface from RobotHW instance.");
+		return false;
+	}
 
-  for (size_t idof = 0; idof < numControlledDofs; ++idof) {
-    const auto dofName = mControlledSkeleton->getDof(idof)->getName();
-    try {
-      auto handle = effortJointInterface->getHandle(dofName);
-      mControlledJointHandles[idof] = handle;
-    } catch (const hardware_interface::HardwareInterfaceException &e) {
-      ROS_ERROR_STREAM(
-          "Unable to get interface of type 'EffortJointInterface' for joint '"
-          << dofName << "'.");
-      return false;
-    }
-  }
+	for (size_t idof = 0; idof < numControlledDofs; ++idof) {
+		const auto dofName = mControlledSkeleton->getDof(idof)->getName();
+		mDofs[idof] = mControlledSkeleton->getDof(idof);
+		try {
+			auto handle = effortJointInterface->getHandle(dofName);
+			mControlledJointHandles[idof] = handle;
+		} catch (const hardware_interface::HardwareInterfaceException &e) {
+			ROS_ERROR_STREAM(
+					"Unable to get interface of type 'EffortJointInterface' for joint '"
+					<< dofName << "'.");
+			return false;
+		}
+	}
 
-  ROS_INFO_STREAM("1");
+	mEENode = mSkeleton->getBodyNode(std::string("end_effector_link"));
 
-  mExtendedJoints = new ExtendedJointPosition(numControlledDofs, 3 * M_PI / 2);
-  mExtendedJointsGravity = new ExtendedJointPosition(numControlledDofs, 3 * M_PI / 2);
+	ROS_INFO_STREAM("1");
 
-  ROS_INFO_STREAM("2");
+	mExtendedJoints = new ExtendedJointPosition(numControlledDofs, 3 * M_PI / 2);
+	mExtendedJointsGravity = new ExtendedJointPosition(numControlledDofs, 3 * M_PI / 2);
 
-  mCount = 0;  
+	ROS_INFO_STREAM("2");
 
-  mJointStiffnessMatrix.resize(numControlledDofs, numControlledDofs);
-  mJointStiffnessMatrix.setZero();
-  mJointStiffnessMatrix.diagonal() << 8000,8000,8000,7000,7000,7000;
+	mCount = 0;  
 
-    ROS_INFO_STREAM("3");
-  
-  mRotorInertiaMatrix.resize(numControlledDofs, numControlledDofs);
-  mRotorInertiaMatrix.setZero();
-  mRotorInertiaMatrix.diagonal() << 0.4, 0.4, 0.4, 0.2, 0.2, 0.2;
+	mJointStiffnessMatrix.resize(numControlledDofs, numControlledDofs);
+	mJointStiffnessMatrix.setZero();
+	mJointStiffnessMatrix.diagonal() << 8000,8000,8000,7000,7000,7000;
 
-  mFrictionL.resize(numControlledDofs, numControlledDofs);
-  mFrictionL.setZero();
-  mFrictionL.diagonal() << 160, 160, 160, 100, 100, 100;
+		ROS_INFO_STREAM("3");
+	
+	mRotorInertiaMatrix.resize(numControlledDofs, numControlledDofs);
+	mRotorInertiaMatrix.setZero();
+	mRotorInertiaMatrix.diagonal() << 0.4, 0.4, 0.4, 0.2, 0.2, 0.2;
 
-  mFrictionLp.resize(numControlledDofs, numControlledDofs);
-  mFrictionLp.setZero();
-  mFrictionLp.diagonal() << 10, 10, 10, 7.5, 7.5, 7.5;
+	mFrictionL.resize(numControlledDofs, numControlledDofs);
+	mFrictionL.setZero();
+	mFrictionL.diagonal() << 160, 160, 160, 100, 100, 100;
 
-  mJointKMatrix.resize(numControlledDofs, numControlledDofs);
-  mJointKMatrix.setZero();
-  mJointKMatrix.diagonal() << 80,80,80,60,60,60;
+	mFrictionLp.resize(numControlledDofs, numControlledDofs);
+	mFrictionLp.setZero();
+	mFrictionLp.diagonal() << 10, 10, 10, 7.5, 7.5, 7.5;
 
-  mJointDMatrix.resize(numControlledDofs, numControlledDofs);
-  mJointDMatrix.setZero();
-  mJointDMatrix.diagonal() << 8,8,8,6,6,6;
+	mJointKMatrix.resize(numControlledDofs, numControlledDofs);
+	mJointKMatrix.setZero();
+	mJointKMatrix.diagonal() << 80,80,80,60,60,60;
+
+	mJointDMatrix.resize(numControlledDofs, numControlledDofs);
+	mJointDMatrix.setZero();
+	mJointDMatrix.diagonal() << 8,8,8,6,6,6;
 
 
-    ROS_INFO_STREAM("4");
+		ROS_INFO_STREAM("4");
 
-  // Initialize buffers to avoid dynamic memory allocation at runtime.
-  mDesiredPosition.resize(numControlledDofs);
-  mDesiredVelocity.resize(numControlledDofs);
-  mZeros.resize(numControlledDofs);
-  mZeros.setZero();
+	// Initialize buffers to avoid dynamic memory allocation at runtime.
+	mDesiredPosition.resize(numControlledDofs);
+	mDesiredVelocity.resize(numControlledDofs);
+	mZeros.resize(numControlledDofs);
+	mZeros.setZero();
 
-    ROS_INFO_STREAM("5");
+		ROS_INFO_STREAM("5");
 
-  mName = internal::getLeafNamespace(n);
+	mName = internal::getLeafNamespace(n);
 
-  // Initialize controlled joints
-  std::string param_name = "joints";
-  if(!n.getParam(param_name, mJointNames))
-  {
-    ROS_ERROR_STREAM("Failed to getParam '" << param_name << "' (namespace: " << n.getNamespace() << ").");
-    return false;
-  }
+	// Initialize controlled joints
+	std::string param_name = "joints";
+	if(!n.getParam(param_name, mJointNames))
+	{
+		ROS_ERROR_STREAM("Failed to getParam '" << param_name << "' (namespace: " << n.getNamespace() << ").");
+		return false;
+	}
 
-  // Action status checking update rate
-  double action_monitor_rate = 20.0;
-  n.getParam("action_monitor_rate", action_monitor_rate);
-  mActionMonitorPeriod = ros::Duration(1.0 / action_monitor_rate);
-  ROS_DEBUG_STREAM_NAMED(mName, "Action status changes will be monitored at " << action_monitor_rate << "Hz.");
+	// Action status checking update rate
+	double action_monitor_rate = 20.0;
+	n.getParam("action_monitor_rate", action_monitor_rate);
+	mActionMonitorPeriod = ros::Duration(1.0 / action_monitor_rate);
+	ROS_DEBUG_STREAM_NAMED(mName, "Action status changes will be monitored at " << action_monitor_rate << "Hz.");
 
-  // Rajat ToDo: Add initial state of controller here
+	// Rajat ToDo: Add initial state of controller here
 
-  // ROS API: Subscribed topics
-  mSubCommand = n.subscribe<trajectory_msgs::JointTrajectoryPoint>("command", 1, &TaskSpaceCompliantController::commandCallback, this);
+	// ROS API: Subscribed topics
+	mSubCommand = n.subscribe<trajectory_msgs::JointTrajectoryPoint>("command", 1, &TaskSpaceCompliantController::commandCallback, this);
 
-  // Start the action server. This must be last.
-  // using std::placeholders::_1; // Rajat check: is this required?
+	// Start the action server. This must be last.
+	// using std::placeholders::_1; // Rajat check: is this required?
 
-  // ROS API: Action interface
-  mActionServer.reset(new ActionServer(n, "joint_group_command",
-                                      boost::bind(&TaskSpaceCompliantController::goalCallback, this, _1),
-                                      boost::bind(&TaskSpaceCompliantController::cancelCallback, this, _1),
-                                      false));
-  mActionServer->start();
+	// ROS API: Action interface
+	mActionServer.reset(new ActionServer(n, "joint_group_command",
+																			boost::bind(&TaskSpaceCompliantController::goalCallback, this, _1),
+																			boost::bind(&TaskSpaceCompliantController::cancelCallback, this, _1),
+																			false));
+	mActionServer->start();
 
-  ROS_INFO("TaskSpaceCompliantController initialized successfully");
-  return true;
+	ROS_INFO("TaskSpaceCompliantController initialized successfully");
+	return true;
 }
 
 //=============================================================================
 void TaskSpaceCompliantController::starting(const ros::Time &time) {
 
-  mExecuteDefaultCommand = true;
+	mExecuteDefaultCommand = true;
 
-  ROS_DEBUG_STREAM(
-      "Initialized desired position: " << mDesiredPosition.transpose());
-  ROS_DEBUG_STREAM(
-      "Initialized desired velocity: " << mDesiredVelocity.transpose());
+	ROS_DEBUG_STREAM(
+			"Initialized desired position: " << mDesiredPosition.transpose());
+	ROS_DEBUG_STREAM(
+			"Initialized desired velocity: " << mDesiredVelocity.transpose());
 
-  ROS_DEBUG("Reset PID.");
+	ROS_DEBUG("Reset PID.");
 
 }
 
 //=============================================================================
 void TaskSpaceCompliantController::stopping(const ros::Time &time) {
-  preemptActiveGoal(); // Rajat check: Is this required?
+	preemptActiveGoal(); // Rajat check: Is this required?
 }
 
 //=============================================================================
 void TaskSpaceCompliantController::update(const ros::Time &time,
-                                               const ros::Duration &period) {
+																							 const ros::Duration &period) {
 
-  // Update the state of the Skeleton.
-  mSkeletonUpdater->update();
-  mActualPosition = mControlledSkeleton->getPositions();
-  mActualVelocity = mControlledSkeleton->getVelocities();
-  mActualEffort = mControlledSkeleton->getForces();
+	// Update the state of the Skeleton.
+	mSkeletonUpdater->update();
+	mActualPosition = mControlledSkeleton->getPositions();
+	mActualVelocity = mControlledSkeleton->getVelocities();
+	mActualEffort = mControlledSkeleton->getForces();
+	mActualEETransform =  mEENode->getWorldTransform();
 
-  std::string stopReason;
-  bool shouldStopExec = shouldStopExecution(stopReason);
+	std::string stopReason;
+	bool shouldStopExec = shouldStopExecution(stopReason);
 
-  if(shouldStopExec)
-  {
-    std::cout<<"Controller halted due to: "<<stopReason<<std::endl;
-    preemptActiveGoal();
-    mExecuteDefaultCommand = true;
-  }
-  
-  if(shouldStopExec || mExecuteDefaultCommand.load())
-  {
-    std::cout<<"1. Updating desired position ..."<<std::endl;
-    mDesiredPosition = mActualPosition;
-    mDesiredVelocity.setZero();
-  }
-  else
-  {
-    // std::cout<<"Reading from RT Buffer... "<<std::endl;
-    trajectory_msgs::JointTrajectoryPoint command = *mCommandsBuffer.readFromRT(); // Rajat check: should this be by reference?
-    // std::cout<<"... Read. :| "<<std::endl;
-  
-    // std::cout<<"Efforts Size: "<<command.effort.size()<<std::endl;
-    // std::cout<<"Positions Size: "<<command.positions.size()<<std::endl;
-    // std::cout<<"Velocities Size: "<<command.velocities.size()<<std::endl;
-    // std::cout<<"Accelerations Size: "<<command.accelerations.size()<<std::endl;
+	if(shouldStopExec)
+	{
+		std::cout<<"Controller halted due to: "<<stopReason<<std::endl;
+		preemptActiveGoal();
+		mExecuteDefaultCommand = true;
+	}
+	
+	if(shouldStopExec || mExecuteDefaultCommand.load())
+	{
+		std::cout<<"1. Updating desired position ..."<<std::endl;
+		mDesiredPosition = mActualPosition;
+		mDesiredVelocity.setZero();
+	}
+	else
+	{
+		// std::cout<<"Reading from RT Buffer... "<<std::endl;
+		trajectory_msgs::JointTrajectoryPoint command = *mCommandsBuffer.readFromRT(); // Rajat check: should this be by reference?
+		// std::cout<<"... Read. :| "<<std::endl;
+	
+		// std::cout<<"Efforts Size: "<<command.effort.size()<<std::endl;
+		// std::cout<<"Positions Size: "<<command.positions.size()<<std::endl;
+		// std::cout<<"Velocities Size: "<<command.velocities.size()<<std::endl;
+		// std::cout<<"Accelerations Size: "<<command.accelerations.size()<<std::endl;
 
-    for (const auto &dof : mControlledSkeleton->getDofs()) 
-    {
-      // Rajat ToDo: Find better method
-      std::size_t index = mControlledSkeleton->getIndexOf(dof);
-      mDesiredPosition[index] = (command.positions.size() == 0) ? 0.0 : command.positions[index];
-      mDesiredVelocity[index] = (command.velocities.size() == 0) ? 0.0 : command.velocities[index];
-    }
-    // std::cout<<"Out. :) "<<std::endl;
-  }
+		for (const auto &dof : mControlledSkeleton->getDofs()) 
+		{
+			// Rajat ToDo: Find better method
+			std::size_t index = mControlledSkeleton->getIndexOf(dof);
+			mDesiredPosition[index] = (command.positions.size() == 0) ? 0.0 : command.positions[index];
+			mDesiredVelocity[index] = (command.velocities.size() == 0) ? 0.0 : command.velocities[index];
+		}
+		// std::cout<<"Out. :) "<<std::endl;
+	}
 
-  {
+	{
 
-    mExtendedJointsGravity->is_initialized = false;
-    mExtendedJointsGravity->initializeExtendedJointPosition(mDesiredPosition);
-    mExtendedJointsGravity->estimateExtendedJoint(mExtendedJointsGravity->mLastDesiredPosition);
-    mActualTheta = mExtendedJointsGravity->getExtendedJoint();
+		mExtendedJointsGravity->is_initialized = false;
+		mExtendedJointsGravity->initializeExtendedJointPosition(mDesiredPosition);
+		mExtendedJointsGravity->estimateExtendedJoint(mExtendedJointsGravity->mLastDesiredPosition);
+		mActualTheta = mExtendedJointsGravity->getExtendedJoint();
 
-    mControlledSkeleton->setPositions(mActualTheta);
-    mControlledSkeleton->setVelocities(mZeros);
-    mControlledSkeleton->setAccelerations(mZeros); 
-    mSkeleton->computeInverseDynamics();
-    mGravity = mControlledSkeleton->getGravityForces();
+		mControlledSkeleton->setPositions(mActualTheta);
+		mControlledSkeleton->setVelocities(mZeros);
+		mControlledSkeleton->setAccelerations(mZeros); 
+		mSkeleton->computeInverseDynamics();
+		mGravity = mControlledSkeleton->getGravityForces();
 
-    // Restore the state of the Skeleton from JointState interfaces. These values
-    // may be used by the adapters below.
-    mControlledSkeleton->setPositions(mActualPosition);
-    mControlledSkeleton->setVelocities(mActualVelocity);
+		// Restore the state of the Skeleton from JointState interfaces. These values
+		// may be used by the adapters below.
+		mControlledSkeleton->setPositions(mActualPosition);
+		mControlledSkeleton->setVelocities(mActualVelocity);
 
-  }
+	}
 
-  if (!mExtendedJoints->is_initialized){
-    std::cout<<"2. Updating desired position ..."<<std::endl;
-    mLastDesiredPosition = mDesiredPosition;
-    mExtendedJoints->initializeExtendedJointPosition(mDesiredPosition);
-    mExtendedJoints->estimateExtendedJoint(mDesiredPosition);
-    mNominalThetaPrev = mExtendedJoints->getExtendedJoint();
-    mNominalThetaDotPrev = mActualVelocity;
-    mTrueDesiredPosition = mExtendedJoints->getExtendedJoint();
-    mTrueDesiredVelocity = mDesiredVelocity;
-  }
+	if (!mExtendedJoints->is_initialized){
+		std::cout<<"2. Updating desired position ..."<<std::endl;
+		mLastDesiredPosition = mDesiredPosition;
+		mExtendedJoints->initializeExtendedJointPosition(mDesiredPosition);
+		mExtendedJoints->estimateExtendedJoint(mDesiredPosition);
+		mNominalThetaPrev = mExtendedJoints->getExtendedJoint();
+		mNominalThetaDotPrev = mActualVelocity;
+		mTrueDesiredPosition = mExtendedJoints->getExtendedJoint();
+		mTrueDesiredVelocity = mDesiredVelocity;
+	}
 
-  if (mDesiredPosition != mLastDesiredPosition && mActualPosition != mDesiredPosition){
-    std::cout<<"3. Updating desired position ..."<<std::endl;
-    mLastDesiredPosition = mDesiredPosition;
-    mExtendedJoints->estimateExtendedJoint(mDesiredPosition);
-    mTrueDesiredPosition = mExtendedJoints->getExtendedJoint();
-    mTrueDesiredVelocity = mDesiredVelocity;
-  }
-  
-  mExtendedJoints->estimateExtendedJoint(mActualPosition);
-  mActualTheta = mExtendedJoints->getExtendedJoint();
+	if (mDesiredPosition != mLastDesiredPosition && mActualPosition != mDesiredPosition){
+		std::cout<<"3. Updating desired position ..."<<std::endl;
+		mLastDesiredPosition = mDesiredPosition;
+		mExtendedJoints->estimateExtendedJoint(mDesiredPosition);
+		mTrueDesiredPosition = mExtendedJoints->getExtendedJoint();
+		mTrueDesiredVelocity = mDesiredVelocity;
+	}
+	
+	mExtendedJoints->estimateExtendedJoint(mActualPosition);
+	mActualTheta = mExtendedJoints->getExtendedJoint();
 
-  mDesiredTheta = mTrueDesiredPosition + mJointStiffnessMatrix.inverse()*mGravity;
-  mDesiredThetaDot = mTrueDesiredVelocity;
-  
-  mTaskEffort = -mJointKMatrix*(mNominalThetaPrev-mDesiredTheta) - mJointDMatrix*(mNominalThetaDotPrev - mDesiredThetaDot) + mGravity;
+	mDesiredTheta = mTrueDesiredPosition + mJointStiffnessMatrix.inverse()*mGravity;
+	mDesiredThetaDot = mTrueDesiredVelocity;
+	
+	mTaskEffort = -mJointKMatrix*(mNominalThetaPrev-mDesiredTheta) - mJointDMatrix*(mNominalThetaDotPrev - mDesiredThetaDot) + mGravity;
 
-  double step_time;
-  step_time = 0.001;
 
-  mNominalThetaDDot = mRotorInertiaMatrix.inverse()*(mTaskEffort+mActualEffort); // mActualEffort is negative of what is required here
-  mNominalThetaDot = mNominalThetaDotPrev + mNominalThetaDDot*step_time;
-  mNominalTheta = mNominalThetaPrev + mNominalThetaDot*step_time;
+	//Compute error
+	Eigen::VectorXd dart_error(6);   
+	Eigen::MatrixXd dart_nominal_jacobian(6, 6); // change to numControlledDofs
+	{
+		mControlledSkeleton->setPositions(mTrueDesiredPosition);
+		mControlledSkeleton->setVelocities(mZeros);
+		mControlledSkeleton->setAccelerations(mZeros); 
+		mDesiredEETransform = mEENode->getWorldTransform();
 
-  mNominalThetaPrev = mNominalTheta;
-  mNominalThetaDotPrev = mNominalThetaDot;
+		mControlledSkeleton->setPositions(mNominalThetaPrev);
+		mControlledSkeleton->setVelocities(mNominalThetaDotPrev);
+		mControlledSkeleton->setAccelerations(mZeros); 
+		mSkeleton->computeInverseDynamics(); // Do we need this to update jacobian?
+		mNominalEETransform = mEENode->getWorldTransform();
 
-  mNominalFriction = mRotorInertiaMatrix*mFrictionL*((mNominalThetaDotPrev - mActualVelocity) + mFrictionLp*(mNominalThetaPrev - mActualTheta));
+		Eigen::Quaterniond nominal_ee_quat(mNominalEETransform.linear());
+		
+		// Get Jacobian relative only to controlled joints
+		Eigen::MatrixXd dart_nominal_jacobian_incorrect(6, 6);
+		Eigen::MatrixXd fullJ = mEENode->getWorldJacobian();
+		std::cout<<"\n"<<"Full Jacobian: "<<fullJ<<"\n\n";
+		auto fullDofs = mEENode->getDependentDofs();
+		for (size_t fullIndex = 0; fullIndex < fullDofs.size(); fullIndex++)
+		{
+			auto it = std::find(mDofs.begin(), mDofs.end(), fullDofs[fullIndex]);
+			if (it != mDofs.end())
+			{
+				int index = it - mDofs.begin();
+				dart_nominal_jacobian_incorrect.col(index) = fullJ.col(fullIndex);
+			}
+		}
 
-  mDesiredEffort = mTaskEffort + mNominalFriction;
+		for(int i=0; i<3; i++)
+		{
+			dart_nominal_jacobian.row(i) = dart_nominal_jacobian_incorrect.row(i+3);
+			dart_nominal_jacobian.row(i+3) = dart_nominal_jacobian_incorrect.row(i);
+		}
 
-  if(mCount < 2000)
-  {
-    mDesiredEffort = mGravity;
-    mCount++;
-    if(mCount%200 == 0)
-      std::cout<<"Initializing controller: "<<mCount<<std::endl; 
-  }
+		dart_error.head(3) << mNominalEETransform.translation() - mDesiredEETransform.translation(); // positional error
+		
+		Eigen::Quaterniond ee_quat_d(mDesiredEETransform.linear());
 
-  std::cout<<"mTaskEffort: "<<mTaskEffort.transpose()<<std::endl;
-  std::cout<<"mNominalFriction: "<<mNominalFriction.transpose()<<std::endl;
-  std::cout<<"mActualTheta: "<<mActualTheta.transpose()<<std::endl;
-  std::cout<<"mActualEffort: "<<mActualEffort.transpose()<<std::endl;
+		if (ee_quat_d.coeffs().dot(nominal_ee_quat.coeffs()) < 0.0) 
+		{
+				nominal_ee_quat.coeffs() << -nominal_ee_quat.coeffs();
+		}
+		Eigen::Quaterniond error_qtn(nominal_ee_quat.inverse() * ee_quat_d);
+		dart_error.tail(3) << error_qtn.x(), error_qtn.y(), error_qtn.z();
+		dart_error.tail(3) << -mNominalEETransform.linear() * dart_error.tail(3);
 
-  for (size_t idof = 0; idof < mControlledJointHandles.size(); ++idof) 
-  {
-    auto jointHandle = mControlledJointHandles[idof];
-    jointHandle.setCommand(mDesiredEffort[idof]);
-  }
 
-  setActionFeedback(time);  // Rajat check: Is this required?
+		// Restore the state of the Skeleton from JointState interfaces. These values
+		// may be used by the adapters below.
+		mControlledSkeleton->setPositions(mActualPosition);
+		mControlledSkeleton->setVelocities(mActualVelocity);
+	}
+
+	Eigen::VectorXd luca_error(6);   
+	Eigen::MatrixXd luca_nominal_jacobian(6, 6); // change to numControlledDofs
+	{
+		//compute nominal jacobian
+		dyn->run(mTrueDesiredPosition, mZeros);
+		Eigen::Affine3d ee_htm_d =  dyn->get_Homogeneous(0);
+
+		//compute nominal jacobian
+		dyn->run(mNominalThetaPrev, mNominalThetaDotPrev);
+
+		//Get End-effector jacobian w.r.t world frame
+		Eigen::Affine3d nominal_ee_htm = dyn->get_Homogeneous(0);
+		Eigen::Matrix3d nominal_ee_rot = nominal_ee_htm.rotation();
+		Eigen::Quaterniond nominal_ee_quat(nominal_ee_htm.linear());
+		Eigen::Vector3d nominal_ee_pos = nominal_ee_htm.translation();
+
+		Eigen::MatrixXd gen_rot_mat(6,6);
+		gen_rot_mat.setZero();
+		gen_rot_mat.topLeftCorner(3,3) = nominal_ee_rot;
+		gen_rot_mat.bottomRightCorner(3,3) = nominal_ee_rot;
+		// std::cout<<"\nLuca jacobian before rotation: "<<dyn->get_Jtcp(0)<<"\n\n"	;
+		luca_nominal_jacobian = gen_rot_mat * dyn->get_Jtcp(0);
+
+		luca_error.head(3) << nominal_ee_pos - ee_htm_d.translation(); // positional error
+
+		Eigen::Quaterniond ee_quat_d(ee_htm_d.linear());
+
+		if (ee_quat_d.coeffs().dot(nominal_ee_quat.coeffs()) < 0.0) 
+		{
+				nominal_ee_quat.coeffs() << -nominal_ee_quat.coeffs();
+		}
+		Eigen::Quaterniond error_qtn(nominal_ee_quat.inverse() * ee_quat_d);
+		luca_error.tail(3) << error_qtn.x(), error_qtn.y(), error_qtn.z();
+		luca_error.tail(3) << -nominal_ee_htm.linear() * luca_error.tail(3);
+	}
+
+	std::cout<<"DART Error: "<<dart_error.transpose()<<std::endl;
+	std::cout<<"LUCA Error: "<<luca_error.transpose()<<std::endl;
+
+	std::cout<<"DART Jacobian: "<<dart_nominal_jacobian<<std::endl;
+	std::cout<<"LUCA Jacobian: "<<luca_nominal_jacobian<<std::endl;
+	std::cout<<"\n---\n";
+
+	// tau_task = nominal_jacobian.transpose() * (-mTaskKMatrix * error - mTaskDMatrix * (nominal_jacobian * mNominalThetaDotPrev)) + mGravity;
+
+
+	double step_time;
+	step_time = 0.001;
+
+	mNominalThetaDDot = mRotorInertiaMatrix.inverse()*(mTaskEffort+mActualEffort); // mActualEffort is negative of what is required here
+	mNominalThetaDot = mNominalThetaDotPrev + mNominalThetaDDot*step_time;
+	mNominalTheta = mNominalThetaPrev + mNominalThetaDot*step_time;
+
+	mNominalThetaPrev = mNominalTheta;
+	mNominalThetaDotPrev = mNominalThetaDot;
+
+	mNominalFriction = mRotorInertiaMatrix*mFrictionL*((mNominalThetaDotPrev - mActualVelocity) + mFrictionLp*(mNominalThetaPrev - mActualTheta));
+
+	mDesiredEffort = mTaskEffort + mNominalFriction;
+
+	if(mCount < 2000)
+	{
+		mDesiredEffort = mGravity;
+		mCount++;
+		if(mCount%200 == 0)
+			std::cout<<"Initializing controller: "<<mCount<<std::endl; 
+	}
+
+	// std::cout<<"mTaskEffort: "<<mTaskEffort.transpose()<<std::endl;
+	// std::cout<<"mNominalFriction: "<<mNominalFriction.transpose()<<std::endl;
+	// std::cout<<"mActualTheta: "<<mActualTheta.transpose()<<std::endl;
+	// std::cout<<"mActualEffort: "<<mActualEffort.transpose()<<std::endl;
+
+	for (size_t idof = 0; idof < mControlledJointHandles.size(); ++idof) 
+	{
+		auto jointHandle = mControlledJointHandles[idof];
+		jointHandle.setCommand(mDesiredEffort[idof]);
+	}
+
+	setActionFeedback(time);  // Rajat check: Is this required?
 }
 
 void TaskSpaceCompliantController::preemptActiveGoal()
 {
-    RealtimeGoalHandlePtr current_active_goal(mRTActiveGoal);
+		RealtimeGoalHandlePtr current_active_goal(mRTActiveGoal);
 
-    // Cancel any goal timeout
-    mGoalDurationTimer.stop();
+		// Cancel any goal timeout
+		mGoalDurationTimer.stop();
 
-    // Cancels the currently active goal
-    if (current_active_goal)
-    {
-      // Marks the current goal as canceled
-      mRTActiveGoal.reset();
-      current_active_goal->gh_.setCanceled();
-    }
+		// Cancels the currently active goal
+		if (current_active_goal)
+		{
+			// Marks the current goal as canceled
+			mRTActiveGoal.reset();
+			current_active_goal->gh_.setCanceled();
+		}
 }
 
 void TaskSpaceCompliantController::commandCallback(const trajectory_msgs::JointTrajectoryPointConstPtr& msg)
 {
-  // Preconditions
-  if (!shouldAcceptRequests())
-  {
-    ROS_ERROR_STREAM_NAMED(mName, "Can't accept new commands. Controller is not running.");
-    return;
-  }
+	// Preconditions
+	if (!shouldAcceptRequests())
+	{
+		ROS_ERROR_STREAM_NAMED(mName, "Can't accept new commands. Controller is not running.");
+		return;
+	}
 
-  if (!msg)
-  {
-    ROS_WARN_STREAM_NAMED(mName, "Received null-pointer message, skipping.");
-    return;
-  }
+	if (!msg)
+	{
+		ROS_WARN_STREAM_NAMED(mName, "Received null-pointer message, skipping.");
+		return;
+	}
 
-  mCommandsBuffer.writeFromNonRT(*msg);
-  preemptActiveGoal();
-  mExecuteDefaultCommand = false;
+	mCommandsBuffer.writeFromNonRT(*msg);
+	preemptActiveGoal();
+	mExecuteDefaultCommand = false;
 }
 
 void TaskSpaceCompliantController::goalCallback(GoalHandle gh)
 {
-  std::cout<<"Joint group command controller: Recieved new goal!"<<std::endl;
-  ROS_DEBUG_STREAM_NAMED(mName,"Received new action goal");
-  pr_control_msgs::JointGroupCommandResult result;
+	std::cout<<"Joint group command controller: Recieved new goal!"<<std::endl;
+	ROS_DEBUG_STREAM_NAMED(mName,"Received new action goal");
+	pr_control_msgs::JointGroupCommandResult result;
 
-  // Preconditions
-  if (!shouldAcceptRequests())
-  {
-    result.error_string = "Can't accept new action goals. Controller is not running.";
-    ROS_ERROR_STREAM_NAMED(mName, result.error_string);
-    result.error_code = pr_control_msgs::JointGroupCommandResult::INVALID_GOAL;
-    gh.setRejected(result);
-    return;
-  }
+	// Preconditions
+	if (!shouldAcceptRequests())
+	{
+		result.error_string = "Can't accept new action goals. Controller is not running.";
+		ROS_ERROR_STREAM_NAMED(mName, result.error_string);
+		result.error_code = pr_control_msgs::JointGroupCommandResult::INVALID_GOAL;
+		gh.setRejected(result);
+		return;
+	}
 
-  // if (gh.getGoal()->joint_names.size() != gh.getGoal()->command.positions.size()) {
-  //   result.error_string = "Size of command must match size of joint_names.";
-  //   ROS_ERROR_STREAM_NAMED(mName, result.error_string);
-  //   result.error_code = pr_control_msgs::JointGroupCommandResult::INVALID_GOAL;
-  //   gh.setRejected(result);
-  //   return;
-  // }
+	// if (gh.getGoal()->joint_names.size() != gh.getGoal()->command.positions.size()) {
+	//   result.error_string = "Size of command must match size of joint_names.";
+	//   ROS_ERROR_STREAM_NAMED(mName, result.error_string);
+	//   result.error_code = pr_control_msgs::JointGroupCommandResult::INVALID_GOAL;
+	//   gh.setRejected(result);
+	//   return;
+	// }
 
-  // Goal should specify valid controller joints (they can be ordered differently). Reject if this is not the case
+	// Goal should specify valid controller joints (they can be ordered differently). Reject if this is not the case
 
-  // update new command
-  RealtimeGoalHandlePtr rt_goal(new RealtimeGoalHandle(gh));
-  trajectory_msgs::JointTrajectoryPoint new_command = gh.getGoal()->command;
-  rt_goal->preallocated_feedback_->joint_names = mJointNames;
-  mCommandsBuffer.writeFromNonRT(new_command);
+	// update new command
+	RealtimeGoalHandlePtr rt_goal(new RealtimeGoalHandle(gh));
+	trajectory_msgs::JointTrajectoryPoint new_command = gh.getGoal()->command;
+	rt_goal->preallocated_feedback_->joint_names = mJointNames;
+	mCommandsBuffer.writeFromNonRT(new_command);
 
-    // Accept new goal
-  preemptActiveGoal();
-  gh.setAccepted();
-  mRTActiveGoal = rt_goal;
-  mExecuteDefaultCommand = false;
+		// Accept new goal
+	preemptActiveGoal();
+	gh.setAccepted();
+	mRTActiveGoal = rt_goal;
+	mExecuteDefaultCommand = false;
 
-  // Setup goal status checking timer
-  mGoalHandleTimer = mNodeHandle->createTimer(mActionMonitorPeriod,
-                                                    &RealtimeGoalHandle::runNonRealtime,
-                                                    rt_goal);
-  mGoalHandleTimer.start();
+	// Setup goal status checking timer
+	mGoalHandleTimer = mNodeHandle->createTimer(mActionMonitorPeriod,
+																										&RealtimeGoalHandle::runNonRealtime,
+																										rt_goal);
+	mGoalHandleTimer.start();
 
-  // Setup goal timeout
-  if (gh.getGoal()->command.time_from_start > ros::Duration()) {
-    mGoalDurationTimer = mNodeHandle->createTimer(gh.getGoal()->command.time_from_start,
-                                                    &TaskSpaceCompliantController::timeoutCallback,
-                                                    this,
-                                                    true);
-    mGoalDurationTimer.start();
-  }
+	// Setup goal timeout
+	if (gh.getGoal()->command.time_from_start > ros::Duration()) {
+		mGoalDurationTimer = mNodeHandle->createTimer(gh.getGoal()->command.time_from_start,
+																										&TaskSpaceCompliantController::timeoutCallback,
+																										this,
+																										true);
+		mGoalDurationTimer.start();
+	}
 }
 
 void TaskSpaceCompliantController::timeoutCallback(const ros::TimerEvent& event)
 {
-  RealtimeGoalHandlePtr current_active_goal(mRTActiveGoal);
+	RealtimeGoalHandlePtr current_active_goal(mRTActiveGoal);
 
-  // Check that timeout refers to currently active goal (if any)
-  if (current_active_goal) {
-    ROS_DEBUG_NAMED(mName, "Active action goal reached requested timeout.");
+	// Check that timeout refers to currently active goal (if any)
+	if (current_active_goal) {
+		ROS_DEBUG_NAMED(mName, "Active action goal reached requested timeout.");
 
-    // Give sub-classes option to update mDefaultCommand
-    mExecuteDefaultCommand = true;
+		// Give sub-classes option to update mDefaultCommand
+		mExecuteDefaultCommand = true;
 
-    // Marks the current goal as succeeded
-    mRTActiveGoal.reset();
-    current_active_goal->gh_.setSucceeded();
-  }
+		// Marks the current goal as succeeded
+		mRTActiveGoal.reset();
+		current_active_goal->gh_.setSucceeded();
+	}
 }
 
 void TaskSpaceCompliantController::cancelCallback(GoalHandle gh)
 {
-  RealtimeGoalHandlePtr current_active_goal(mRTActiveGoal);
+	RealtimeGoalHandlePtr current_active_goal(mRTActiveGoal);
 
-  // Check that cancel request refers to currently active goal
-  if (current_active_goal && current_active_goal->gh_ == gh)
-  {
-    ROS_DEBUG_NAMED(mName, "Canceling active action goal because cancel callback recieved from actionlib.");
+	// Check that cancel request refers to currently active goal
+	if (current_active_goal && current_active_goal->gh_ == gh)
+	{
+		ROS_DEBUG_NAMED(mName, "Canceling active action goal because cancel callback recieved from actionlib.");
 
-    // Give sub-classes option to update mDefaultCommand
-    mExecuteDefaultCommand = true;
+		// Give sub-classes option to update mDefaultCommand
+		mExecuteDefaultCommand = true;
 
-    preemptActiveGoal();
-  }
+		preemptActiveGoal();
+	}
 }
 
 void TaskSpaceCompliantController::setActionFeedback(const ros::Time& time)
 {
-  RealtimeGoalHandlePtr current_active_goal(mRTActiveGoal);
-  if (!current_active_goal)
-  {
-    return;
-  }
+	RealtimeGoalHandlePtr current_active_goal(mRTActiveGoal);
+	if (!current_active_goal)
+	{
+		return;
+	}
 
-  current_active_goal->preallocated_feedback_->header.stamp = time;
-  current_active_goal->preallocated_feedback_->desired = current_active_goal->gh_.getGoal()->command;
-  current_active_goal->preallocated_feedback_->actual.positions.clear();
-  current_active_goal->preallocated_feedback_->actual.velocities.clear();
-  current_active_goal->preallocated_feedback_->actual.effort.clear();
-  for (const auto &dof : mControlledSkeleton->getDofs()) 
-  {
-      std::size_t index = mControlledSkeleton->getIndexOf(dof);
-      current_active_goal->preallocated_feedback_->actual.positions.push_back(mActualPosition[index]);
-      current_active_goal->preallocated_feedback_->actual.velocities.push_back(mActualVelocity[index]);
-      current_active_goal->preallocated_feedback_->actual.effort.push_back(mActualEffort[index]);
-  }
+	current_active_goal->preallocated_feedback_->header.stamp = time;
+	current_active_goal->preallocated_feedback_->desired = current_active_goal->gh_.getGoal()->command;
+	current_active_goal->preallocated_feedback_->actual.positions.clear();
+	current_active_goal->preallocated_feedback_->actual.velocities.clear();
+	current_active_goal->preallocated_feedback_->actual.effort.clear();
+	for (const auto &dof : mControlledSkeleton->getDofs()) 
+	{
+			std::size_t index = mControlledSkeleton->getIndexOf(dof);
+			current_active_goal->preallocated_feedback_->actual.positions.push_back(mActualPosition[index]);
+			current_active_goal->preallocated_feedback_->actual.velocities.push_back(mActualVelocity[index]);
+			current_active_goal->preallocated_feedback_->actual.effort.push_back(mActualEffort[index]);
+	}
 
-  current_active_goal->setFeedback( current_active_goal->preallocated_feedback_ );
+	current_active_goal->setFeedback( current_active_goal->preallocated_feedback_ );
 }
 
 //=============================================================================
 bool TaskSpaceCompliantController::shouldAcceptRequests() { 
-  return isRunning(); 
+	return isRunning(); 
 }
 
 //=============================================================================
 // Default for virtual function is do nothing. DO NOT EDIT
 bool TaskSpaceCompliantController::shouldStopExecution(std::string &message) {
-  return false;
+	return false;
 }
 
 } // namespace
@@ -520,4 +632,4 @@ bool TaskSpaceCompliantController::shouldStopExecution(std::string &message) {
 
 //=============================================================================
 PLUGINLIB_EXPORT_CLASS(rewd_controllers::TaskSpaceCompliantController,
-                       controller_interface::ControllerBase)
+											 controller_interface::ControllerBase)

@@ -79,16 +79,15 @@ private:
   unsigned int numberOfInput;
   double threshold_of_change;
 
-  Eigen::MatrixXd init_q;
-  Eigen::MatrixXd extended_q;
-  Eigen::MatrixXd previous_sensor_q;
-  bool is_initialized = false;
+  Eigen::VectorXd init_q;
+  Eigen::VectorXd extended_q;
+  Eigen::VectorXd previous_sensor_q;
 
 public:
     // Set to 7 and 3PI/2
   ExtendedJointPosition(unsigned int numberOfInput_args, double threshold_of_change_args);
 
-  void initializeExtendedJointPosition(const Eigen::MatrixXd& init_q_args);
+  void initializeExtendedJointPosition(const Eigen::VectorXd& init_q_args);
 
   void initializeExtendedJointPosition(const double init_q_args, int dof);
 
@@ -103,6 +102,9 @@ public:
   Eigen::VectorXd getExtendedJoint();
 
   double getExtendedJoint(int dof);
+
+  bool is_initialized = false;
+  Eigen::VectorXd mLastDesiredPosition;
 };
 
 } // namespace rewd_controllers

@@ -162,20 +162,32 @@ JointCompliantAdapter::JointCompliantAdapter(
     : mEffortHandle{effortHandle}, mDof{dof} {
   mExtendedJoints = new ExtendedJointPosition(1, 3 * M_PI / 2);
 
-  mJointStiffnessMatrix.resize(7, 7);
+  mJointStiffnessMatrix.resize(6, 6);
   mJointStiffnessMatrix.setZero();
-  Eigen::VectorXd joint_stiffness_vec(7);
+  Eigen::VectorXd joint_stiffness_vec(6);
   // joint_stiffness_vec << 3000,3000,3000,3000,2000,2000,2000;
-  joint_stiffness_vec << 300, 300, 300, 300, 100, 100, 100;
+  
+
+  joint_stiffness_vec << 8000,8000,8000,7000,7000,7000;
+  // Used by Rishabh
+  // joint_stiffness_vec << 7000, 7000, 7000, 5000, 5000, 7000;
+
+
   // joint_stiffness_vec << 100,100,100,100,80,80,80;
   mJointStiffnessMatrix.diagonal() = joint_stiffness_vec;
 
-  mRotorInertiaMatrix.resize(7, 7);
+  mRotorInertiaMatrix.resize(6, 6);
   mRotorInertiaMatrix.setZero();
-  Eigen::VectorXd rotor_inertia_vec(7);
+  Eigen::VectorXd rotor_inertia_vec(6);
   // joint_stiffness_vec << 3000,3000,3000,3000,2000,2000,2000;
-  rotor_inertia_vec << 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.05;
+  
+  rotor_inertia_vec << 0.4, 0.4, 0.4, 0.2, 0.2, 0.2;
+  // Used by Rishabh
+  // rotor_inertia_vec << 0.3, 0.3, 0.3, 0.18, 0.18, 0.2;
+  
   mRotorInertiaMatrix.diagonal() = rotor_inertia_vec;
+
+  mCount = 0; 
 }
 
 //=============================================================================
@@ -208,13 +220,15 @@ void JointCompliantAdapter::update(const ros::Time & /*time*/,
     mDesiredVelocity = desiredVelocity;
   }
 
-  std::cout << "Joint: " << dof << " Desired Position: " << desiredPosition << std::endl;
-  if (std::abs(desiredPosition - mLastDesiredPosition) > 0.000001 && actualPosition != desiredPosition) {
+  // std::cout << "Joint: " << dof << " Desired Position: " << desiredPosition << std::endl;
+  // if (std::abs(desiredPosition - mLastDesiredPosition) > 0.000001 && actualPosition != desiredPosition) {
+  if (desiredPosition != mLastDesiredPosition && actualPosition != desiredPosition){
+    std::cout << "This part is executed!" << std::endl;
     mLastDesiredPosition = desiredPosition;
-    mExtendedJoints->initializeExtendedJointPosition(desiredPosition, dof);
+    // mExtendedJoints->initializeExtendedJointPosition(desiredPosition, dof);
     mExtendedJoints->estimateExtendedJoint(desiredPosition, dof);
-    nominal_theta_prev_ = mExtendedJoints->getExtendedJoint(dof);
-    nominal_theta_dot_prev_ = actualVelocity;
+    // nominal_theta_prev_ = mExtendedJoints->getExtendedJoint(dof);
+    // nominal_theta_dot_prev_ = actualVelocity;
     mDesiredPosition = mExtendedJoints->getExtendedJoint(dof);
     // mDesiredVelocity = 0.;
     mDesiredVelocity = desiredVelocity;
@@ -227,12 +241,16 @@ void JointCompliantAdapter::update(const ros::Time & /*time*/,
   actualEffort = -actualEffort;
 
   // FO Parameters
-  Eigen::MatrixXd L(7,7), Lp(7,7);
+  Eigen::MatrixXd L(6,6), Lp(6,6);
   L.setZero();
   Lp.setZero();
   // TODO: Make sure these values match the ones in Yui
-  L.diagonal() << 160, 160, 160, 160, 100, 100, 100;
-  Lp.diagonal() << 10, 10, 10, 10, 7.5, 7.5, 7.5;
+  L.diagonal() << 160, 160, 160, 100, 100, 100;
+  Lp.diagonal() << 10, 10, 10, 7.5, 7.5, 7.5;
+
+  // L.diagonal() << 250, 250, 250, 160, 160, 160;
+  // Lp.diagonal() << 15, 15, 15, 10, 10, 10;
+
 
   // Eigen::VectorXd q(7), dq(7), 
   double theta, dtheta;
@@ -243,7 +261,7 @@ void JointCompliantAdapter::update(const ros::Time & /*time*/,
   double theta_d, dtheta_d;
   // TODO: Convert this to 1 / stiffness for the given joint
   theta_d = mDesiredPosition + nominalEffort / mJointStiffnessMatrix.coeff(dof, dof);
-  dtheta_d = desiredVelocity;
+  dtheta_d = mDesiredVelocity;
 
   //compute joint torque
   double tau_d, tau_task;
@@ -284,11 +302,19 @@ void JointCompliantAdapter::update(const ros::Time & /*time*/,
   // std::cout << "----------------------------------" << std::endl;
   // std::cout << "\nNominal_theta_dot_prev_: " << nominal_theta_dot_prev_ << "\nactualVelocity: " << actualVelocity << "\nNominal_theta_prev_: " << nominal_theta_prev_ << "\ntheta: " << theta << std::endl;
   // std::cout << "==================================" << std::endl;
-  tau_d = tau_task + nominal_friction;
   // tau_d = nominal_friction + nominalEffort;
   // std::cout << "tau_d: " << tau_d << std::endl;
   // mEffortHandle.setCommand(nominalEffort);
-  mEffortHandle.setCommand(tau_d);
+
+  if(mCount < 2000)
+  {
+    mEffortHandle.setCommand(nominalEffort);
+    mCount++;
+    if(mCount%200 == 0)
+      std::cout<<"Initializing controller: "<<mCount<<std::endl; 
+  }
+  else
+    mEffortHandle.setCommand(tau_d);
 }
 
 //=============================================================================

@@ -127,6 +127,8 @@ private:
   Eigen::VectorXd init_dq;
 
   ExtendedJointPosition* mExtendedJoints;
+
+  long long int mCount;
 };
 
 //=============================================================================

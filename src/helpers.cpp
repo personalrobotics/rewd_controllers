@@ -267,10 +267,11 @@ ExtendedJointPosition::ExtendedJointPosition(unsigned int numberOfInput_args, do
   previous_sensor_q.resize(numberOfInput, 1);
 }
 
-void ExtendedJointPosition::initializeExtendedJointPosition(const Eigen::MatrixXd& init_q_args)
+void ExtendedJointPosition::initializeExtendedJointPosition(const Eigen::VectorXd& init_q_args)
 {
   if (is_initialized == false)
   {
+    mLastDesiredPosition = init_q_args;
     init_q = normalizeJointPosition(init_q_args);
     extended_q = init_q;
     previous_sensor_q = init_q;

@@ -171,11 +171,23 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 	mTaskDMatrix.setZero();
 	mTaskDMatrix.diagonal() << 60,60,60,40,40,40;
 
+	mContactKMatrix.resize(6, 6);
+	mContactKMatrix.setZero();
+	mContactKMatrix.diagonal() << 7.0, 7.0, 7.0, 7.0, 7.0, 7.0;
+
+	mContactIMatrix.resize(6, 6);
+	mContactIMatrix.setZero();
+	mContactIMatrix.diagonal() << 20, 20, 20, 20, 20, 20;
+
+
 	// Initialize buffers to avoid dynamic memory allocation at runtime.
 	mDesiredPosition.resize(numControlledDofs);
 	mDesiredVelocity.resize(numControlledDofs);
 	mZeros.resize(numControlledDofs);
 	mZeros.setZero();
+
+	mContactIntegral.resize(numControlledDofs);
+	mContactIntegral.setZero();
 
 	mName = internal::getLeafNamespace(n);
 
@@ -198,6 +210,8 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 	// ROS API: Subscribed topics
 	mSubCommand = n.subscribe<trajectory_msgs::JointTrajectoryPoint>("command", 1, &TaskSpaceCompliantController::commandCallback, this);
 
+	mSubFTSensor = n.subscribe("/forque/forqueSensor", 1, &TaskSpaceCompliantController::forceTorqueDataCallback, this);
+
 	// Start the action server. This must be last.
 	// using std::placeholders::_1; // Rajat check: is this required?
 
@@ -210,6 +224,18 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 
 	ROS_INFO("TaskSpaceCompliantController initialized successfully");
 	return true;
+}
+
+//=============================================================================
+void TaskSpaceCompliantController::forceTorqueDataCallback(
+    const geometry_msgs::WrenchStamped &msg) {
+  std::lock_guard<std::mutex> lock(mForceTorqueDataMutex);
+  mForce.x() = msg.wrench.force.x;
+  mForce.y() = msg.wrench.force.y;
+  mForce.z() = msg.wrench.force.z;
+  mTorque.x() = msg.wrench.torque.x;
+  mTorque.y() = msg.wrench.torque.y;
+  mTorque.z() = msg.wrench.torque.z;
 }
 
 //=============================================================================
@@ -242,6 +268,32 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 	mActualEffort = mControlledSkeleton->getForces();
 	mActualEETransform =  mEENode->getWorldTransform();
 
+	Eigen::MatrixXd dart_actual_jacobian(6, 6); // change to numControlledDofs
+	{
+		mControlledSkeleton->setAccelerations(mZeros); 
+		mSkeleton->computeInverseDynamics();
+		Eigen::MatrixXd dart_actual_jacobian_flipped(6, 6);
+		Eigen::MatrixXd fullJ = mEENode->getWorldJacobian();
+		// std::cout<<"\n"<<"Full Jacobian: "<<fullJ<<"\n\n";
+		auto fullDofs = mEENode->getDependentDofs();
+		// std::cout<<"fullDofs.size(): "<<fullDofs.size()<<std::endl;
+		for (size_t fullIndex = 0; fullIndex < fullDofs.size(); fullIndex++)
+		{
+			auto it = std::find(mDofs.begin(), mDofs.end(), fullDofs[fullIndex]);
+			if (it != mDofs.end())
+			{
+				int index = it - mDofs.begin();
+				dart_actual_jacobian_flipped.col(index) = fullJ.col(fullIndex);
+			}
+		}
+
+		for(int i=0; i<3; i++)
+		{
+			dart_actual_jacobian.row(i) = dart_actual_jacobian_flipped.row(i+3);
+			dart_actual_jacobian.row(i+3) = dart_actual_jacobian_flipped.row(i);
+		}
+	}
+
 	std::string stopReason;
 	bool shouldStopExec = shouldStopExecution(stopReason);
 
@@ -254,7 +306,7 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 	
 	if(shouldStopExec || mExecuteDefaultCommand.load())
 	{
-		std::cout<<"1. Updating desired position ..."<<std::endl;
+		// std::cout<<"1. Updating desired position ..."<<std::endl;
 		mDesiredPosition = mActualPosition;
 		mDesiredVelocity.setZero();
 	}
@@ -344,7 +396,7 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 	mDesiredTheta = mTrueDesiredPosition + mJointStiffnessMatrix.inverse()*mGravity;
 	mDesiredThetaDot = mTrueDesiredVelocity;
 	
-	mTaskEffort = -mJointKMatrix*(mNominalThetaPrev-mDesiredTheta) - mJointDMatrix*(mNominalThetaDotPrev - mDesiredThetaDot) + mGravity;
+	// mTaskEffort = -mJointKMatrix*(mNominalThetaPrev-mDesiredTheta) - mJointDMatrix*(mNominalThetaDotPrev - mDesiredThetaDot) + mGravity;
 
 	//Compute error
 	Eigen::VectorXd dart_error(6);   
@@ -366,9 +418,9 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 		// Get Jacobian relative only to controlled joints -- Rajat ToDo: Check with Ethan
 		Eigen::MatrixXd dart_nominal_jacobian_flipped(6, 6);
 		Eigen::MatrixXd fullJ = mEENode->getWorldJacobian();
-		std::cout<<"\n"<<"Full Jacobian: "<<fullJ<<"\n\n";
+		// std::cout<<"\n"<<"Full Jacobian: "<<fullJ<<"\n\n";
 		auto fullDofs = mEENode->getDependentDofs();
-		std::cout<<"fullDofs.size(): "<<fullDofs.size()<<std::endl;
+		// std::cout<<"fullDofs.size(): "<<fullDofs.size()<<std::endl;
 		for (size_t fullIndex = 0; fullIndex < fullDofs.size(); fullIndex++)
 		{
 			auto it = std::find(mDofs.begin(), mDofs.end(), fullDofs[fullIndex]);
@@ -404,12 +456,79 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 		mControlledSkeleton->setVelocities(mActualVelocity);
 	}
 
+	double step_time;
+	step_time = 0.001;
+
 	// std::cout<<"\n"<<"Nominal Jacobian: "<<dart_nominal_jacobian<<"\n\n";
 
 	mTaskEffort = dart_nominal_jacobian.transpose() * (-mTaskKMatrix * dart_error - mTaskDMatrix * (dart_nominal_jacobian * mNominalThetaDotPrev)) + mQuasiGravity;
 
-	double step_time;
-	step_time = 0.001;
+	Eigen::Vector3d force;
+	{
+		std::lock_guard<std::mutex> lock(mForceTorqueDataMutex);
+		force << mForce.x(), mForce.y(), mForce.z();
+	}
+	force = mActualEETransform.linear() * force; // force in world frame
+
+	for(int i=0; i<3; i++)
+	{
+		if (force(i) > 4 || force(i) < -4)
+			force(i) = 0;
+		else if (force(i) >= 0)
+			force(i) = std::max(0.0,force(i)-1);
+		else
+			force(i) = std::min(0.0,force(i)+1);
+	}
+
+	std::cout<<"FT Sensor Forces: "<<force.transpose()<<std::endl;
+
+	if (force.norm() > 0.0)
+	{
+		Eigen::VectorXd ft_wrench(6);	
+		ft_wrench << force(0), force(1), force(2), 0.0, 0.0, 0.0;
+
+		mContactIntegral += step_time*(ft_wrench);
+
+		// // Cap I term
+		// for(int i=0; i<3; i++)
+		// {
+		// 	if(mContactIntegral(i) > 2)
+		// 		mContactIntegral(i) = 2;
+		// 	if(mContactIntegral(i) < -2)
+		// 		mContactIntegral(i) = -2;
+		// }
+
+		// mContactEffort = dart_actual_jacobian.transpose() * (mContactKMatrix * ft_wrench);
+		mContactEffort = dart_actual_jacobian.transpose() * (mContactKMatrix * ft_wrench + mContactIMatrix * mContactIntegral);
+	}
+	else
+	{
+		mContactEffort = mZeros;
+		mContactIntegral.setZero();
+	}
+
+	// SAFETY
+	for(int i=0; i<6; i++)
+	{
+		if(mContactEffort(i) > 10 || mContactEffort(i) < -10)
+			mContactEffort(i) = 0;
+	}
+
+	std::cout<<"Contact Effort: "<<mContactEffort.transpose()<<std::endl;
+	std::cout<<"Contact Integral Term: "<< (dart_actual_jacobian.transpose()*mContactIMatrix * mContactIntegral).transpose()<<std::endl;
+
+	if(mCount>5000)
+	{
+		mTaskEffort = mTaskEffort + mContactEffort;
+		std::cout<<"Adding to mTaskEffort!"<<std::endl;
+	}
+	else if(mCount >= 2000 && mCount<=5000)
+	{
+		if(mCount%200 == 0)
+			std::cout<<"Initializing controller: "<<mCount<<std::endl; 
+		mCount++;		
+	}
+
 
 	mNominalThetaDDot = mRotorInertiaMatrix.inverse()*(mTaskEffort+mActualEffort); // mActualEffort is negative of what is required here
 	mNominalThetaDot = mNominalThetaDotPrev + mNominalThetaDDot*step_time;
@@ -425,9 +544,9 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 	if(mCount < 2000)
 	{
 		mDesiredEffort = mGravity;
-		mCount++;
 		if(mCount%200 == 0)
 			std::cout<<"Initializing controller: "<<mCount<<std::endl; 
+		mCount++;
 	}
 
 	// std::cout<<"mTaskEffort: "<<mTaskEffort.transpose()<<std::endl;

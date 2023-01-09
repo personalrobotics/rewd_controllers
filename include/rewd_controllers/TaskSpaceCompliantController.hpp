@@ -13,6 +13,7 @@
 // ROS messages
 #include <pr_control_msgs/JointGroupCommandAction.h>
 #include <trajectory_msgs/JointTrajectoryPoint.h>
+#include <geometry_msgs/WrenchStamped.h>
 
 // ros_controls
 #include <hardware_interface/joint_command_interface.h>
@@ -108,6 +109,9 @@ private:
   Eigen::MatrixXd mTaskKMatrix;
   Eigen::MatrixXd mTaskDMatrix;
 
+  Eigen::MatrixXd mContactKMatrix;
+  Eigen::MatrixXd mContactIMatrix;
+
   long long int mCount;
 
   std::unique_ptr<SkeletonJointStateUpdater> mSkeletonUpdater;
@@ -125,6 +129,7 @@ private:
 
   Eigen::VectorXd mDesiredEffort;
   Eigen::VectorXd mTaskEffort;
+  Eigen::VectorXd mContactEffort;
 
   Eigen::VectorXd mLastDesiredPosition;
   Eigen::VectorXd mLastDesiredVelocity;
@@ -158,6 +163,13 @@ private:
   ros::Timer         mGoalDurationTimer;
   ros::Duration      mActionMonitorPeriod;
 
+  ros::Subscriber    mSubFTSensor;
+  std::mutex mForceTorqueDataMutex;
+  Eigen::Vector3d mForce;
+  Eigen::Vector3d mTorque;
+
+  Eigen::VectorXd mContactIntegral;
+
   boost::shared_ptr<luca_dynamics::model> urdf_model;
   boost::shared_ptr<luca_dynamics::luca_dynamics> dyn; 
 
@@ -166,6 +178,8 @@ private:
   void timeoutCallback(const ros::TimerEvent& event);
   void preemptActiveGoal();
   void commandCallback(const trajectory_msgs::JointTrajectoryPointConstPtr& msg);
+
+  void forceTorqueDataCallback(const geometry_msgs::WrenchStamped &msg);
 
   void setActionFeedback(const ros::Time& time);
 };

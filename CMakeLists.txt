@@ -30,36 +30,16 @@ include_directories(SYSTEM ${aikido_INCLUDE_DIRS})
 find_package(DART 6.6.2 REQUIRED COMPONENTS utils utils-urdf optimizer-nlopt CONFIG)
 include_directories(SYSTEM ${DART_INCLUDE_DIRS})
 
-set(LUCA_PATH "/home/rkjenamani/controller_ws/src/compliant-controller/thirdParty/lucadynamics")
-
 include_directories(
   include/
   ${catkin_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
   ${Boost_INCLUDE_DIRS}
-  ${LUCA_PATH}/include
-  ${LUCA_PATH}/include/tinyxml
-  ${LUCA_PATH}/include/luca_dynamics
-)
-
-#for luca dynamics
-find_library(TINYXML
-  NAMES libtinyxml.so
-  PATHS ${LUCA_PATH}/lib
-  REQUIRED
-)
-
-find_library(LUCA_DYN
-  NAMES libluca_dyn.so
-  PATHS ${LUCA_PATH}/lib
-  # REQUIRED COMPONENTS tinyxml
 )
 
 link_libraries(
   # ${catkin_LIBRARIES}
   Threads::Threads
-  ${LUCA_DYN}
-  ${TINYXML} 
   )
 
 

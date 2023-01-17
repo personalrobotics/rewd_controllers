@@ -39,8 +39,6 @@ inline std::string getLeafNamespace(const ros::NodeHandle& nh)
 
 TaskSpaceCompliantController::TaskSpaceCompliantController() 
 		: MultiInterfaceController(true) // allow_optional_interfaces
-		, urdf_model(luca_dynamics::create_model_from_urdf("/home/rkjenamani/controller_ws/src/compliant-controller/models/kinova.urdf"))
-		, dyn(new luca_dynamics::luca_dynamics(urdf_model))
 {}
 
 //=============================================================================
@@ -132,7 +130,9 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 		}
 	}
 
-	mEENode = mSkeleton->getBodyNode(std::string("ft_sensor"));
+	std::string mEENodeName;
+	n.getParam("/adaConf/end_effector", mEENodeName);
+	mEENode = mSkeleton->getBodyNode(mEENodeName);
 
 	mExtendedJoints = new ExtendedJointPosition(numControlledDofs, 3 * M_PI / 2);
 	mExtendedJointsGravity = new ExtendedJointPosition(numControlledDofs, 3 * M_PI / 2);
@@ -141,35 +141,35 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 
 	mJointStiffnessMatrix.resize(numControlledDofs, numControlledDofs);
 	mJointStiffnessMatrix.setZero();
-	mJointStiffnessMatrix.diagonal() << 8000,8000,8000,7000,7000,7000;
+	mJointStiffnessMatrix.diagonal() << 6000,6000,6000,6000,5000,5000,5000;
 
 	mRotorInertiaMatrix.resize(numControlledDofs, numControlledDofs);
 	mRotorInertiaMatrix.setZero();
-	mRotorInertiaMatrix.diagonal() << 0.4, 0.4, 0.4, 0.2, 0.2, 0.2;
+	mRotorInertiaMatrix.diagonal() << 0.3, 0.3, 0.3, 0.3, 0.18, 0.18, 0.18;
 
 	mFrictionL.resize(numControlledDofs, numControlledDofs);
 	mFrictionL.setZero();
-	mFrictionL.diagonal() << 160, 160, 160, 100, 100, 100;
+	mFrictionL.diagonal() << 160, 160, 160, 160, 100, 100, 100;
 
 	mFrictionLp.resize(numControlledDofs, numControlledDofs);
 	mFrictionLp.setZero();
-	mFrictionLp.diagonal() << 10, 10, 10, 7.5, 7.5, 7.5;
+	mFrictionLp.diagonal() << 10, 10, 10, 10, 7.5, 7.5, 7.5;
 
 	mJointKMatrix.resize(numControlledDofs, numControlledDofs);
 	mJointKMatrix.setZero();
-	mJointKMatrix.diagonal() << 80,80,80,60,60,60;
+	mJointKMatrix.diagonal() << 80,80,80,80,60,60,60;
 
 	mJointDMatrix.resize(numControlledDofs, numControlledDofs);
 	mJointDMatrix.setZero();
-	mJointDMatrix.diagonal() << 8,8,8,6,6,6;
+	mJointDMatrix.diagonal() << 8,8,8,8,6,6,6;
 
 	mTaskKMatrix.resize(6, 6);
 	mTaskKMatrix.setZero();
-	mTaskKMatrix.diagonal() << 200,200,200,150,150,150;
+	mTaskKMatrix.diagonal() << 200,200,200,100,100,100;
 
 	mTaskDMatrix.resize(6, 6);
 	mTaskDMatrix.setZero();
-	mTaskDMatrix.diagonal() << 60,60,60,40,40,40;
+	mTaskDMatrix.diagonal() << 20,20,20,10,10,10;
 
 	// Initialize buffers to avoid dynamic memory allocation at runtime.
 	mDesiredPosition.resize(numControlledDofs);
@@ -242,6 +242,7 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 	mActualEffort = mControlledSkeleton->getForces();
 	mActualEETransform =  mEENode->getWorldTransform();
 
+	const auto numControlledDofs = mControlledSkeleton->getNumDofs();
 	std::string stopReason;
 	bool shouldStopExec = shouldStopExecution(stopReason);
 
@@ -297,7 +298,7 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 	    //Number of iteration can be modified by edit int i ( recommend is 1 or 2 for real time computing)
 
 	    int iteration = 2; // number of iteration
-	    Eigen::VectorXd qs_estimate_link_pos(6);
+	    Eigen::VectorXd qs_estimate_link_pos(numControlledDofs);
 	    qs_estimate_link_pos = mActualTheta;
 
 	    for (int i=0; i<iteration; i++)
@@ -348,7 +349,7 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 
 	//Compute error
 	Eigen::VectorXd dart_error(6);   
-	Eigen::MatrixXd dart_nominal_jacobian(6, 6); // change to numControlledDofs
+	Eigen::MatrixXd dart_nominal_jacobian(6, numControlledDofs); // change to numControlledDofs
 	{
 		mControlledSkeleton->setPositions(mTrueDesiredPosition);
 		mControlledSkeleton->setVelocities(mZeros);
@@ -364,11 +365,11 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 		Eigen::Quaterniond nominal_ee_quat(mNominalEETransform.linear());
 		
 		// Get Jacobian relative only to controlled joints -- Rajat ToDo: Check with Ethan
-		Eigen::MatrixXd dart_nominal_jacobian_flipped(6, 6);
+		Eigen::MatrixXd dart_nominal_jacobian_flipped(6, numControlledDofs);
 		Eigen::MatrixXd fullJ = mEENode->getWorldJacobian();
-		std::cout<<"\n"<<"Full Jacobian: "<<fullJ<<"\n\n";
+		// std::cout<<"\n"<<"Full Jacobian: "<<fullJ<<"\n\n";
 		auto fullDofs = mEENode->getDependentDofs();
-		std::cout<<"fullDofs.size(): "<<fullDofs.size()<<std::endl;
+		// std::cout<<"fullDofs.size(): "<<fullDofs.size()<<std::endl;
 		for (size_t fullIndex = 0; fullIndex < fullDofs.size(); fullIndex++)
 		{
 			auto it = std::find(mDofs.begin(), mDofs.end(), fullDofs[fullIndex]);
@@ -421,6 +422,35 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 	mNominalFriction = mRotorInertiaMatrix*mFrictionL*((mNominalThetaDotPrev - mActualVelocity) + mFrictionLp*(mNominalThetaPrev - mActualTheta));
 
 	mDesiredEffort = mTaskEffort + mNominalFriction;
+
+	bool mNullSpace = false;
+	if (mNullSpace)
+	{
+		Eigen::MatrixXd Kp, Kv;
+		Kp.resize(numControlledDofs, numControlledDofs);
+		Kv.resize(numControlledDofs, numControlledDofs);
+		Kp.diagonal() << 8., 8., 8., 8., 8., 8., 8.;
+		Kv.diagonal() << 2.7, 2.7, 2.7, 2.7, 2.7, 2.7, 2.7;
+
+		// https://github.com/studywolf/control/blob/master/studywolf_control/controllers/osc.py
+		Eigen::VectorXd q_err = mExtendedJoints->normalizeJointPosition(mLastDesiredPosition) - mExtendedJoints->normalizeJointPosition(mActualPosition);
+		Eigen::VectorXd qd_err = mTrueDesiredVelocity - mActualVelocity;
+		Eigen::VectorXd q_des = Kp * q_err + Kv * qd_err;
+
+		// Get mass matrix in joint space Mq
+		Eigen::MatrixXd mq = mSkeleton->getMassMatrix();
+		Eigen::MatrixXd Mq = Eigen::Map<Eigen::MatrixXd>(mq.data(), numControlledDofs, numControlledDofs);
+		Eigen::MatrixXd q = mExtendedJoints->normalizeJointPosition(mActualPosition);
+		Eigen::MatrixXd Mx = mExtendedJoints->computeEEMassMatrix(Mq, q, dart_nominal_jacobian);
+		Eigen::VectorXd tau_null = Mq * q_des;
+		std::cout << "Tau null: " << tau_null.transpose() << std::endl;
+		Eigen::MatrixXd Jdyn_inv = Mx * (dart_nominal_jacobian * mExtendedJoints->pseudoinverse(Mq, 1e-6));
+		// std::cout << "Jdyn computed " << std::endl;
+		Eigen::MatrixXd null_filter = Eigen::MatrixXd::Identity(numControlledDofs, numControlledDofs) - dart_nominal_jacobian.transpose() * Jdyn_inv;
+		Eigen::VectorXd tau_signal = null_filter * tau_null;
+		std::cout << "Tau signal: " << tau_signal.transpose() << std::endl;
+		mDesiredEffort = mDesiredEffort + tau_signal;
+	}
 
 	if(mCount < 2000)
 	{

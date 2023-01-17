@@ -27,9 +27,6 @@
 #include <dart/dynamics/dynamics.hpp>
 #include <rewd_controllers/helpers.hpp>
 
-#include "luca_dynamics/luca_dynamics.hpp"
-#include "luca_dynamics/model.hpp"
-
 
 namespace rewd_controllers {
 class TaskSpaceCompliantController
@@ -157,9 +154,6 @@ private:
   ros::Timer         mGoalHandleTimer;
   ros::Timer         mGoalDurationTimer;
   ros::Duration      mActionMonitorPeriod;
-
-  boost::shared_ptr<luca_dynamics::model> urdf_model;
-  boost::shared_ptr<luca_dynamics::luca_dynamics> dyn; 
 
   void goalCallback(GoalHandle gh);
   void cancelCallback(GoalHandle gh);

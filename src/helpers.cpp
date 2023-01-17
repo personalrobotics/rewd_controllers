@@ -1,3 +1,4 @@
+#include <aikido/common/PseudoInverse.hpp>
 #include <aikido/io/CatkinResourceRetriever.hpp>
 #include <dart/utils/urdf/urdf.hpp>
 #include <rewd_controllers/helpers.hpp>
@@ -377,6 +378,75 @@ Eigen::VectorXd ExtendedJointPosition::getExtendedJoint()
 double ExtendedJointPosition::getExtendedJoint(int dof)
 {
   return extended_q(0);
+}
+
+Eigen::MatrixXd ExtendedJointPosition::pseudoinverse(const Eigen::MatrixXd& mat, double eps)
+{
+  if (mat.rows() == mat.cols() && mat.determinant() > eps)
+    return mat.inverse();
+
+  else
+  {
+    if (mat.cols() == 1)
+    {
+      if (mat.isApproxToConstant(0))
+      {
+        return Eigen::VectorXd::Zero(mat.rows());
+      }
+
+      return mat.transpose() / (pow(mat.norm(), 2));
+    }
+
+    /// Use SVD decomposition.
+    Eigen::JacobiSVD<Eigen::MatrixXd> jacSVD(
+        mat, Eigen::ComputeThinU | Eigen::ComputeThinV);
+    Eigen::MatrixXd U = jacSVD.matrixU();
+    Eigen::MatrixXd V = jacSVD.matrixV();
+    Eigen::VectorXd S = jacSVD.singularValues();
+
+    Eigen::MatrixXd S_inv(Eigen::MatrixXd::Zero(mat.cols(), mat.rows()));
+
+    for (int i = 0; i < S.rows(); i++)
+    {
+      if (S(i) > eps)
+      {
+        S_inv(i, i) = 1.0 / S(i);
+      }
+      else
+      {
+        S_inv(i, i) = 0;
+      }
+    }
+
+    return V * S_inv * U.transpose();
+  }
+}
+
+Eigen::MatrixXd ExtendedJointPosition::computeEEMassMatrix(Eigen::MatrixXd mMassMatrix, Eigen::VectorXd q, Eigen::MatrixXd J)
+{
+  Eigen::MatrixXd Mq_inv = pseudoinverse(mMassMatrix, 1e-6);
+  Eigen::MatrixXd Mx_inv = J * (Mq_inv * J.transpose());
+  Eigen::JacobiSVD<Eigen::MatrixXd> jacSVD(
+        Mx_inv, Eigen::ComputeThinU | Eigen::ComputeThinV);
+  Eigen::MatrixXd U = jacSVD.matrixU();
+  Eigen::MatrixXd V = jacSVD.matrixV();
+  Eigen::VectorXd S = jacSVD.singularValues();
+
+  Eigen::MatrixXd S_inv(Eigen::MatrixXd::Zero(Mx_inv.cols(), Mx_inv.rows()));
+  for (int i = 0; i < S.rows(); i++)
+  {
+    if (S(i) > 0.0025)
+    {
+      S_inv(i, i) = 1.0 / S(i);
+    }
+    else
+    {
+      S_inv(i, i) = 0;
+    }
+  }
+
+  Eigen::MatrixXd Mx = V * S_inv * U.transpose();
+  return Mx;
 }
 
 } // namespace rewd_controllers

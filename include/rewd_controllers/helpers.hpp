@@ -105,8 +105,14 @@ public:
 
   bool is_initialized = false;
   Eigen::VectorXd mLastDesiredPosition;
+
+  Eigen::MatrixXd pseudoinverse(const Eigen::MatrixXd& mat, double eps=1e-6);
+
+  Eigen::MatrixXd computeEEMassMatrix(Eigen::MatrixXd mMassMatrix, Eigen::VectorXd q, Eigen::MatrixXd J);
 };
 
 } // namespace rewd_controllers
+
+
 
 #endif // ifndef REWD_CONTROLLERS_HELPERS_HPP_

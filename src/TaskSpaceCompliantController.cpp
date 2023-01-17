@@ -132,7 +132,7 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 		}
 	}
 
-	mEENode = mSkeleton->getBodyNode(std::string("ft_sensor"));
+	mEENode = mSkeleton->getBodyNode(std::string("forque"));
 
 	mExtendedJoints = new ExtendedJointPosition(numControlledDofs, 3 * M_PI / 2);
 	mExtendedJointsGravity = new ExtendedJointPosition(numControlledDofs, 3 * M_PI / 2);
@@ -208,7 +208,7 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 	// Rajat ToDo: Add initial state of controller here
 
 	// ROS API: Subscribed topics
-	mSubCommand = n.subscribe<trajectory_msgs::JointTrajectoryPoint>("command", 1, &TaskSpaceCompliantController::commandCallback, this);
+	mSubCommand = n.subscribe<moveit_msgs::CartesianTrajectoryPoint>("command", 1, &TaskSpaceCompliantController::commandCallback, this);
 
 	mSubFTSensor = n.subscribe("/forque/forqueSensor", 1, &TaskSpaceCompliantController::forceTorqueDataCallback, this);
 
@@ -309,27 +309,77 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 		// std::cout<<"1. Updating desired position ..."<<std::endl;
 		mDesiredPosition = mActualPosition;
 		mDesiredVelocity.setZero();
+
+		mControlledSkeleton->setPositions(mDesiredPosition);
+		mControlledSkeleton->setVelocities(mZeros);
+		mControlledSkeleton->setAccelerations(mZeros); 
+		mDesiredEETransform = mEENode->getWorldTransform();
+
 	}
 	else
 	{
 		// std::cout<<"Reading from RT Buffer... "<<std::endl;
-		trajectory_msgs::JointTrajectoryPoint command = *mCommandsBuffer.readFromRT(); // Rajat check: should this be by reference?
+		moveit_msgs::CartesianTrajectoryPoint command = *mCommandsBuffer.readFromRT(); // Rajat check: should this be by reference?
 		// std::cout<<"... Read. :| "<<std::endl;
 	
 		// std::cout<<"Efforts Size: "<<command.effort.size()<<std::endl;
 		// std::cout<<"Positions Size: "<<command.positions.size()<<std::endl;
 		// std::cout<<"Velocities Size: "<<command.velocities.size()<<std::endl;
 		// std::cout<<"Accelerations Size: "<<command.accelerations.size()<<std::endl;
+		geometry_msgs::Pose command_pose = command.point.pose;
+		// std::cout<<"Received Command: "<<command_pose.position.x<<" "<<command_pose.position.y<<" "<<command_pose.position.z<<" "<<command_pose.orientation.x<<" "<<
+			// command_pose.orientation.y<<" "<<command_pose.orientation.z<<" "<<command_pose.orientation.w<<std::endl;
+		tf::poseMsgToEigen(command_pose, mDesiredEETransform);
 
-		for (const auto &dof : mControlledSkeleton->getDofs()) 
-		{
-			// Rajat ToDo: Find better method
-			std::size_t index = mControlledSkeleton->getIndexOf(dof);
-			mDesiredPosition[index] = (command.positions.size() == 0) ? 0.0 : command.positions[index];
-			mDesiredVelocity[index] = (command.velocities.size() == 0) ? 0.0 : command.velocities[index];
-		}
+		// for (const auto &dof : mControlledSkeleton->getDofs()) 
+		// {
+		// 	// Rajat ToDo: Find better method
+		// 	std::size_t index = mControlledSkeleton->getIndexOf(dof);
+		// 	mDesiredPosition[index] = (command.positions.size() == 0) ? 0.0 : command.positions[index];
+		// 	mDesiredVelocity[index] = (command.velocities.size() == 0) ? 0.0 : command.velocities[index];
+		// }
 		// std::cout<<"Out. :) "<<std::endl;
 	}
+
+	if (!mExtendedJoints->is_initialized){
+		std::cout<<"2. Updating desired position ..."<<std::endl;
+		mLastDesiredPosition = mDesiredPosition;
+		mLastDesiredEETransform = mDesiredEETransform;
+		mExtendedJoints->initializeExtendedJointPosition(mDesiredPosition);
+		mExtendedJoints->estimateExtendedJoint(mDesiredPosition);
+		mNominalThetaPrev = mExtendedJoints->getExtendedJoint();
+		mNominalThetaDotPrev = mActualVelocity;
+		mTrueDesiredPosition = mExtendedJoints->getExtendedJoint();
+		mTrueDesiredVelocity = mDesiredVelocity;
+
+		mTrueDesiredEETransform = mDesiredEETransform;
+	}
+
+	if ((mDesiredPosition != mLastDesiredPosition || !mDesiredEETransform.isApprox(mLastDesiredEETransform,0.0001) ) && mActualPosition != mDesiredPosition){
+		std::cout<<"3. Updating desired position ..."<<std::endl;
+		std::cout<<"mDesiredEETransform: "<<mDesiredEETransform.translation().transpose()<<std::endl;
+		std::cout<<"mLastDesiredEETransform: "<<mLastDesiredEETransform.translation().transpose()<<std::endl;
+		std::cout<<"(mDesiredPosition != mLastDesiredPosition): "<<(mDesiredPosition != mLastDesiredPosition)<<std::endl;
+		std::cout<<"!mDesiredEETransform.isApprox(mLastDesiredEETransform,0.0001): "<<(!mDesiredEETransform.isApprox(mLastDesiredEETransform,0.0001))<<std::endl;
+		mLastDesiredPosition = mDesiredPosition;
+		mLastDesiredEETransform = mDesiredEETransform;
+		mExtendedJoints->estimateExtendedJoint(mDesiredPosition);
+		mTrueDesiredPosition = mExtendedJoints->getExtendedJoint();
+		mTrueDesiredVelocity = mDesiredVelocity;
+		mTrueDesiredEETransform = mDesiredEETransform;
+	}
+	// else
+	// {
+	// 	std::cout<<"Goal Matches.... "<<std::endl;
+	// 	std::cout<<"mDesiredEETransform: "<<mDesiredEETransform.translation().transpose()<<std::endl;
+	// 	std::cout<<"mLastDesiredEETransform: "<<mLastDesiredEETransform.translation().transpose()<<std::endl;
+	// }
+
+	Eigen::Quaterniond qd(mTrueDesiredEETransform.linear());
+	// std::cout<<"Desired Pose: "<<mTrueDesiredEETransform.translation().transpose()<<" "<<qd.x()<<" "<<qd.y()<<" "<<qd.z()<<" "<<qd.w()<<std::endl;
+
+	Eigen::Quaterniond q(mActualEETransform.linear());
+	// std::cout<<"Current Pose: "<<mActualEETransform.translation().transpose()<<" "<<q.x()<<" "<<q.y()<<" "<<q.z()<<" "<<q.w()<<std::endl;
 
 	{
 
@@ -350,14 +400,14 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 
 	    int iteration = 2; // number of iteration
 	    Eigen::VectorXd qs_estimate_link_pos(6);
-	    qs_estimate_link_pos = mActualTheta;
+	    qs_estimate_link_pos = mNominalThetaPrev;
 
 	    for (int i=0; i<iteration; i++)
 	    {
 	    	mControlledSkeleton->setPositions(qs_estimate_link_pos);
 			mControlledSkeleton->setVelocities(mZeros);
 			mSkeleton->computeInverseDynamics();
-	        qs_estimate_link_pos = mActualTheta - mJointStiffnessMatrix.inverse()*(mControlledSkeleton->getGravityForces());
+	        qs_estimate_link_pos = mNominalThetaPrev - mJointStiffnessMatrix.inverse()*(mControlledSkeleton->getGravityForces());
 	    }
 	    mControlledSkeleton->setPositions(qs_estimate_link_pos);
 		mControlledSkeleton->setVelocities(mZeros);
@@ -369,25 +419,6 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 		mControlledSkeleton->setPositions(mActualPosition);
 		mControlledSkeleton->setVelocities(mActualVelocity);
 
-	}
-
-	if (!mExtendedJoints->is_initialized){
-		std::cout<<"2. Updating desired position ..."<<std::endl;
-		mLastDesiredPosition = mDesiredPosition;
-		mExtendedJoints->initializeExtendedJointPosition(mDesiredPosition);
-		mExtendedJoints->estimateExtendedJoint(mDesiredPosition);
-		mNominalThetaPrev = mExtendedJoints->getExtendedJoint();
-		mNominalThetaDotPrev = mActualVelocity;
-		mTrueDesiredPosition = mExtendedJoints->getExtendedJoint();
-		mTrueDesiredVelocity = mDesiredVelocity;
-	}
-
-	if (mDesiredPosition != mLastDesiredPosition && mActualPosition != mDesiredPosition){
-		std::cout<<"3. Updating desired position ..."<<std::endl;
-		mLastDesiredPosition = mDesiredPosition;
-		mExtendedJoints->estimateExtendedJoint(mDesiredPosition);
-		mTrueDesiredPosition = mExtendedJoints->getExtendedJoint();
-		mTrueDesiredVelocity = mDesiredVelocity;
 	}
 	
 	mExtendedJoints->estimateExtendedJoint(mActualPosition);
@@ -402,11 +433,6 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 	Eigen::VectorXd dart_error(6);   
 	Eigen::MatrixXd dart_nominal_jacobian(6, 6); // change to numControlledDofs
 	{
-		mControlledSkeleton->setPositions(mTrueDesiredPosition);
-		mControlledSkeleton->setVelocities(mZeros);
-		mControlledSkeleton->setAccelerations(mZeros); 
-		mDesiredEETransform = mEENode->getWorldTransform();
-
 		mControlledSkeleton->setPositions(mNominalThetaPrev);
 		mControlledSkeleton->setVelocities(mNominalThetaDotPrev);
 		mControlledSkeleton->setAccelerations(mZeros); 
@@ -437,9 +463,9 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 			dart_nominal_jacobian.row(i+3) = dart_nominal_jacobian_flipped.row(i);
 		}
 
-		dart_error.head(3) << mNominalEETransform.translation() - mDesiredEETransform.translation(); // positional error
+		dart_error.head(3) << mNominalEETransform.translation() - mTrueDesiredEETransform.translation(); // positional error
 		
-		Eigen::Quaterniond ee_quat_d(mDesiredEETransform.linear());
+		Eigen::Quaterniond ee_quat_d(mTrueDesiredEETransform.linear());
 
 		if (ee_quat_d.coeffs().dot(nominal_ee_quat.coeffs()) < 0.0) 
 		{
@@ -463,71 +489,73 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 
 	mTaskEffort = dart_nominal_jacobian.transpose() * (-mTaskKMatrix * dart_error - mTaskDMatrix * (dart_nominal_jacobian * mNominalThetaDotPrev)) + mQuasiGravity;
 
-	Eigen::Vector3d force;
-	{
-		std::lock_guard<std::mutex> lock(mForceTorqueDataMutex);
-		force << mForce.x(), mForce.y(), mForce.z();
-	}
-	force = mActualEETransform.linear() * force; // force in world frame
+	// Eigen::Vector3d force;
+	// {
+	// 	std::lock_guard<std::mutex> lock(mForceTorqueDataMutex);
+	// 	// force << mForce.x(), mForce.y(), mForce.z();
+	// 	force << mForce.x(), mForce.y(), 0.0;
+	// }
 
-	for(int i=0; i<3; i++)
-	{
-		if (force(i) > 4 || force(i) < -4)
-			force(i) = 0;
-		else if (force(i) >= 0)
-			force(i) = std::max(0.0,force(i)-1);
-		else
-			force(i) = std::min(0.0,force(i)+1);
-	}
+	// for(int i=0; i<3; i++)
+	// {
+	// 	if (force(i) > 4 || force(i) < -4)
+	// 		force(i) = 0;
+	// 	else if (force(i) >= 0)
+	// 		force(i) = std::max(0.0,force(i)-0.05);
+	// 	else
+	// 		force(i) = std::min(0.0,force(i)+0.05);
+	// }
 
-	std::cout<<"FT Sensor Forces: "<<force.transpose()<<std::endl;
+	// force = mActualEETransform.linear() * force; // force in world frame
 
-	if (force.norm() > 0.0)
-	{
-		Eigen::VectorXd ft_wrench(6);	
-		ft_wrench << force(0), force(1), force(2), 0.0, 0.0, 0.0;
+	// std::cout<<"FT Sensor Forces: "<<force.transpose()<<std::endl;
 
-		mContactIntegral += step_time*(ft_wrench);
+	// if (force.norm() > 0.0)
+	// {
+	// 	Eigen::VectorXd ft_wrench(6);	
+	// 	ft_wrench << force(0), force(1), force(2), 0.0, 0.0, 0.0;
 
-		// // Cap I term
-		// for(int i=0; i<3; i++)
-		// {
-		// 	if(mContactIntegral(i) > 2)
-		// 		mContactIntegral(i) = 2;
-		// 	if(mContactIntegral(i) < -2)
-		// 		mContactIntegral(i) = -2;
-		// }
+	// 	mContactIntegral += step_time*(ft_wrench);
 
-		// mContactEffort = dart_actual_jacobian.transpose() * (mContactKMatrix * ft_wrench);
-		mContactEffort = dart_actual_jacobian.transpose() * (mContactKMatrix * ft_wrench + mContactIMatrix * mContactIntegral);
-	}
-	else
-	{
-		mContactEffort = mZeros;
-		mContactIntegral.setZero();
-	}
+	// 	// // Cap I term
+	// 	// for(int i=0; i<3; i++)
+	// 	// {
+	// 	// 	if(mContactIntegral(i) > 2)
+	// 	// 		mContactIntegral(i) = 2;
+	// 	// 	if(mContactIntegral(i) < -2)
+	// 	// 		mContactIntegral(i) = -2;
+	// 	// }
 
-	// SAFETY
-	for(int i=0; i<6; i++)
-	{
-		if(mContactEffort(i) > 10 || mContactEffort(i) < -10)
-			mContactEffort(i) = 0;
-	}
+	// 	// mContactEffort = dart_actual_jacobian.transpose() * (mContactKMatrix * ft_wrench);
+	// 	mContactEffort = dart_actual_jacobian.transpose() * (mContactKMatrix * ft_wrench + mContactIMatrix * mContactIntegral);
+	// }
+	// else
+	// {
+	// 	mContactEffort = mZeros;
+	// 	mContactIntegral.setZero();
+	// }
 
-	std::cout<<"Contact Effort: "<<mContactEffort.transpose()<<std::endl;
-	std::cout<<"Contact Integral Term: "<< (dart_actual_jacobian.transpose()*mContactIMatrix * mContactIntegral).transpose()<<std::endl;
+	// // SAFETY
+	// for(int i=0; i<6; i++)
+	// {
+	// 	if(mContactEffort(i) > 10 || mContactEffort(i) < -10)
+	// 		mContactEffort(i) = 0;
+	// }
 
-	if(mCount>5000)
-	{
-		mTaskEffort = mTaskEffort + mContactEffort;
-		std::cout<<"Adding to mTaskEffort!"<<std::endl;
-	}
-	else if(mCount >= 2000 && mCount<=5000)
-	{
-		if(mCount%200 == 0)
-			std::cout<<"Initializing controller: "<<mCount<<std::endl; 
-		mCount++;		
-	}
+	// std::cout<<"Contact Effort: "<<mContactEffort.transpose()<<std::endl;
+	// std::cout<<"Contact Integral Term: "<< (dart_actual_jacobian.transpose()*mContactIMatrix * mContactIntegral).transpose()<<std::endl;
+
+	// if(mCount>5000)
+	// {
+	// 	mTaskEffort = mTaskEffort + mContactEffort;
+	// 	std::cout<<"Adding to mTaskEffort!"<<std::endl;
+	// }
+	// else if(mCount >= 2000 && mCount<=5000)
+	// {
+	// 	if(mCount%200 == 0)
+	// 		std::cout<<"Initializing controller: "<<mCount<<std::endl; 
+	// 	mCount++;		
+	// }
 
 
 	mNominalThetaDDot = mRotorInertiaMatrix.inverse()*(mTaskEffort+mActualEffort); // mActualEffort is negative of what is required here
@@ -579,7 +607,7 @@ void TaskSpaceCompliantController::preemptActiveGoal()
 		}
 }
 
-void TaskSpaceCompliantController::commandCallback(const trajectory_msgs::JointTrajectoryPointConstPtr& msg)
+void TaskSpaceCompliantController::commandCallback(const moveit_msgs::CartesianTrajectoryPointConstPtr& msg)
 {
 	// Preconditions
 	if (!shouldAcceptRequests())
@@ -603,14 +631,14 @@ void TaskSpaceCompliantController::goalCallback(GoalHandle gh)
 {
 	std::cout<<"Joint group command controller: Recieved new goal!"<<std::endl;
 	ROS_DEBUG_STREAM_NAMED(mName,"Received new action goal");
-	pr_control_msgs::JointGroupCommandResult result;
+	pr_control_msgs::TaskCommandResult result;
 
 	// Preconditions
 	if (!shouldAcceptRequests())
 	{
 		result.error_string = "Can't accept new action goals. Controller is not running.";
 		ROS_ERROR_STREAM_NAMED(mName, result.error_string);
-		result.error_code = pr_control_msgs::JointGroupCommandResult::INVALID_GOAL;
+		result.error_code = pr_control_msgs::TaskCommandResult::INVALID_GOAL;
 		gh.setRejected(result);
 		return;
 	}
@@ -618,7 +646,7 @@ void TaskSpaceCompliantController::goalCallback(GoalHandle gh)
 	// if (gh.getGoal()->joint_names.size() != gh.getGoal()->command.positions.size()) {
 	//   result.error_string = "Size of command must match size of joint_names.";
 	//   ROS_ERROR_STREAM_NAMED(mName, result.error_string);
-	//   result.error_code = pr_control_msgs::JointGroupCommandResult::INVALID_GOAL;
+	//   result.error_code = pr_control_msgs::TaskCommandResult::INVALID_GOAL;
 	//   gh.setRejected(result);
 	//   return;
 	// }
@@ -627,7 +655,7 @@ void TaskSpaceCompliantController::goalCallback(GoalHandle gh)
 
 	// update new command
 	RealtimeGoalHandlePtr rt_goal(new RealtimeGoalHandle(gh));
-	trajectory_msgs::JointTrajectoryPoint new_command = gh.getGoal()->command;
+	moveit_msgs::CartesianTrajectoryPoint new_command = gh.getGoal()->command;
 	rt_goal->preallocated_feedback_->joint_names = mJointNames;
 	mCommandsBuffer.writeFromNonRT(new_command);
 
@@ -696,16 +724,10 @@ void TaskSpaceCompliantController::setActionFeedback(const ros::Time& time)
 
 	current_active_goal->preallocated_feedback_->header.stamp = time;
 	current_active_goal->preallocated_feedback_->desired = current_active_goal->gh_.getGoal()->command;
-	current_active_goal->preallocated_feedback_->actual.positions.clear();
-	current_active_goal->preallocated_feedback_->actual.velocities.clear();
-	current_active_goal->preallocated_feedback_->actual.effort.clear();
-	for (const auto &dof : mControlledSkeleton->getDofs()) 
-	{
-			std::size_t index = mControlledSkeleton->getIndexOf(dof);
-			current_active_goal->preallocated_feedback_->actual.positions.push_back(mActualPosition[index]);
-			current_active_goal->preallocated_feedback_->actual.velocities.push_back(mActualVelocity[index]);
-			current_active_goal->preallocated_feedback_->actual.effort.push_back(mActualEffort[index]);
-	}
+
+	moveit_msgs::CartesianTrajectoryPoint point;
+	tf::poseEigenToMsg(mActualEETransform, point.point.pose);
+	current_active_goal->preallocated_feedback_->actual.point.pose = point.point.pose;
 
 	current_active_goal->setFeedback( current_active_goal->preallocated_feedback_ );
 }

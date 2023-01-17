@@ -11,9 +11,11 @@
 #include <actionlib/server/action_server.h>
 
 // ROS messages
-#include <pr_control_msgs/JointGroupCommandAction.h>
-#include <trajectory_msgs/JointTrajectoryPoint.h>
+#include <pr_control_msgs/TaskCommandAction.h>
+#include <moveit_msgs/CartesianTrajectoryPoint.h>
 #include <geometry_msgs/WrenchStamped.h>
+#include <geometry_msgs/Pose.h>
+#include <eigen_conversions/eigen_msg.h>
 
 // ros_controls
 #include <hardware_interface/joint_command_interface.h>
@@ -74,12 +76,12 @@ private:
   bool shouldAcceptRequests();
   bool shouldStopExecution(std::string &message);
 
-  using ActionServer = actionlib::ActionServer<pr_control_msgs::JointGroupCommandAction>;
+  using ActionServer = actionlib::ActionServer<pr_control_msgs::TaskCommandAction>;
   using GoalHandle = ActionServer::GoalHandle;
-  using RealtimeGoalHandle = realtime_tools::RealtimeServerGoalHandle<pr_control_msgs::JointGroupCommandAction>;
+  using RealtimeGoalHandle = realtime_tools::RealtimeServerGoalHandle<pr_control_msgs::TaskCommandAction>;
   using RealtimeGoalHandlePtr = boost::shared_ptr<RealtimeGoalHandle>;
 
-  realtime_tools::RealtimeBuffer<trajectory_msgs::JointTrajectoryPoint> mCommandsBuffer;
+  realtime_tools::RealtimeBuffer<moveit_msgs::CartesianTrajectoryPoint> mCommandsBuffer;
   std::atomic_bool mExecuteDefaultCommand;
 
   std::string                                    mName;               ///< Controller name.
@@ -134,6 +136,9 @@ private:
   Eigen::VectorXd mLastDesiredPosition;
   Eigen::VectorXd mLastDesiredVelocity;
 
+  Eigen::Isometry3d mLastDesiredEETransform;
+  Eigen::Isometry3d mTrueDesiredEETransform;
+
   Eigen::VectorXd mNominalTheta;
   Eigen::VectorXd mNominalThetaDot;
   Eigen::VectorXd mNominalThetaDDot;
@@ -177,7 +182,7 @@ private:
   void cancelCallback(GoalHandle gh);
   void timeoutCallback(const ros::TimerEvent& event);
   void preemptActiveGoal();
-  void commandCallback(const trajectory_msgs::JointTrajectoryPointConstPtr& msg);
+  void commandCallback(const moveit_msgs::CartesianTrajectoryPointConstPtr& msg);
 
   void forceTorqueDataCallback(const geometry_msgs::WrenchStamped &msg);
 

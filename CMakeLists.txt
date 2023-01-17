@@ -17,6 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
   pr_control_msgs
   pr_hardware_interfaces
   realtime_tools
+  eigen_conversions
 )
 include_directories(SYSTEM ${catkin_INCLUDE_DIRS})
 

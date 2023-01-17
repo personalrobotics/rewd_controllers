@@ -241,8 +241,29 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 	mActualVelocity = mControlledSkeleton->getVelocities();
 	mActualEffort = mControlledSkeleton->getForces();
 	mActualEETransform =  mEENode->getWorldTransform();
-
 	const auto numControlledDofs = mControlledSkeleton->getNumDofs();
+
+	Eigen::MatrixXd Jq(6, numControlledDofs);
+	Eigen::MatrixXd Jq_flipped(6, numControlledDofs);
+	Eigen::MatrixXd fullJq = mEENode->getWorldJacobian();
+	// std::cout<<"\n"<<"Full Jacobian: "<<fullJ<<"\n\n";
+	auto fullDofs = mEENode->getDependentDofs();
+	// std::cout<<"fullDofs.size(): "<<fullDofs.size()<<std::endl;
+	for (size_t fullIndex = 0; fullIndex < fullDofs.size(); fullIndex++)
+	{
+		auto it = std::find(mDofs.begin(), mDofs.end(), fullDofs[fullIndex]);
+		if (it != mDofs.end())
+		{
+			int index = it - mDofs.begin();
+			Jq_flipped.col(index) = fullJq.col(fullIndex);
+		}
+	}
+	for(int i=0; i<3; i++)
+	{
+		Jq.row(i) = Jq_flipped.row(i+3);
+		Jq.row(i+3) = Jq_flipped.row(i);
+	}
+
 	std::string stopReason;
 	bool shouldStopExec = shouldStopExecution(stopReason);
 
@@ -368,7 +389,6 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 		Eigen::MatrixXd dart_nominal_jacobian_flipped(6, numControlledDofs);
 		Eigen::MatrixXd fullJ = mEENode->getWorldJacobian();
 		// std::cout<<"\n"<<"Full Jacobian: "<<fullJ<<"\n\n";
-		auto fullDofs = mEENode->getDependentDofs();
 		// std::cout<<"fullDofs.size(): "<<fullDofs.size()<<std::endl;
 		for (size_t fullIndex = 0; fullIndex < fullDofs.size(); fullIndex++)
 		{
@@ -423,33 +443,41 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 
 	mDesiredEffort = mTaskEffort + mNominalFriction;
 
-	bool mNullSpace = false;
+	bool mNullSpace = true;
 	if (mNullSpace)
 	{
 		Eigen::MatrixXd Kp, Kv;
 		Kp.resize(numControlledDofs, numControlledDofs);
 		Kv.resize(numControlledDofs, numControlledDofs);
-		Kp.diagonal() << 8., 8., 8., 8., 8., 8., 8.;
-		Kv.diagonal() << 2.7, 2.7, 2.7, 2.7, 2.7, 2.7, 2.7;
+		// Kp.diagonal() << 8., 8., 8., 8., 8., 8., 8.;
+		Kp.diagonal() << 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2;
+		Kv << 2 * Kp.array().sqrt();
 
 		// https://github.com/studywolf/control/blob/master/studywolf_control/controllers/osc.py
 		Eigen::VectorXd q_err = mExtendedJoints->normalizeJointPosition(mLastDesiredPosition) - mExtendedJoints->normalizeJointPosition(mActualPosition);
 		Eigen::VectorXd qd_err = mTrueDesiredVelocity - mActualVelocity;
 		Eigen::VectorXd q_des = Kp * q_err + Kv * qd_err;
 
-		// Get mass matrix in joint space Mq
-		Eigen::MatrixXd mq = mSkeleton->getMassMatrix();
-		Eigen::MatrixXd Mq = Eigen::Map<Eigen::MatrixXd>(mq.data(), numControlledDofs, numControlledDofs);
-		Eigen::MatrixXd q = mExtendedJoints->normalizeJointPosition(mActualPosition);
-		Eigen::MatrixXd Mx = mExtendedJoints->computeEEMassMatrix(Mq, q, dart_nominal_jacobian);
-		Eigen::VectorXd tau_null = Mq * q_des;
-		std::cout << "Tau null: " << tau_null.transpose() << std::endl;
-		Eigen::MatrixXd Jdyn_inv = Mx * (dart_nominal_jacobian * mExtendedJoints->pseudoinverse(Mq, 1e-6));
-		// std::cout << "Jdyn computed " << std::endl;
-		Eigen::MatrixXd null_filter = Eigen::MatrixXd::Identity(numControlledDofs, numControlledDofs) - dart_nominal_jacobian.transpose() * Jdyn_inv;
-		Eigen::VectorXd tau_signal = null_filter * tau_null;
-		std::cout << "Tau signal: " << tau_signal.transpose() << std::endl;
-		mDesiredEffort = mDesiredEffort + tau_signal;
+		// // Get mass matrix in joint space Mq
+		// Eigen::MatrixXd mq = mSkeleton->getMassMatrix();
+		// Eigen::MatrixXd Mq = Eigen::Map<Eigen::MatrixXd>(mq.data(), numControlledDofs, numControlledDofs);
+		// Eigen::MatrixXd q = mExtendedJoints->normalizeJointPosition(mActualPosition);
+		// Eigen::MatrixXd Mx = mExtendedJoints->computeEEMassMatrix(Mq, q, Jq);
+		// Eigen::VectorXd tau_null = Mq * q_des;
+		// std::cout << "Tau null: " << tau_null.transpose() << std::endl;
+		// Eigen::MatrixXd Jdyn_inv = Mx * (Jq * mExtendedJoints->pseudoinverse(Mq, 1e-6));
+		// Eigen::MatrixXd null_filter = Eigen::MatrixXd::Identity(numControlledDofs, numControlledDofs) - Jq.transpose() * Jdyn_inv;
+		// Eigen::VectorXd tau_signal = null_filter * tau_null;
+		// std::cout << "Tau signal: " << tau_signal.transpose() << std::endl;
+		// mDesiredEffort = mDesiredEffort + tau_signal;
+
+		// tau_nullspace
+		// https://github.com/nbfigueroa/franka_interactive_controllers/blob/main/src/franka_cartesian_controllers/cartesian_pose_impedance_controller.cpp
+		// tau_nullspace = I - J.T * (J.T)^-1 * (K * (q_d - q) - 2 * sqrt(K) * dq);
+		Eigen::VectorXd tau_nullspace;
+		tau_nullspace = (Eigen::MatrixXd::Identity(numControlledDofs, numControlledDofs) - Jq.transpose() * mExtendedJoints->pseudoinverse(Jq.transpose(), 1e-6)) * q_des;
+		std::cout << "Tau null space: " << tau_nullspace.transpose() << std::endl;
+		mDesiredEffort = mDesiredEffort + tau_nullspace;
 	}
 
 	if(mCount < 2000)

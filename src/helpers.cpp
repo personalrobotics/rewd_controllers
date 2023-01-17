@@ -399,7 +399,8 @@ Eigen::MatrixXd ExtendedJointPosition::pseudoinverse(const Eigen::MatrixXd& mat,
 
     /// Use SVD decomposition.
     Eigen::JacobiSVD<Eigen::MatrixXd> jacSVD(
-        mat, Eigen::ComputeThinU | Eigen::ComputeThinV);
+        mat, Eigen::ComputeFullU | Eigen::ComputeFullV);
+        // mat, Eigen::ComputeThinU | Eigen::ComputeThinV);
     Eigen::MatrixXd U = jacSVD.matrixU();
     Eigen::MatrixXd V = jacSVD.matrixV();
     Eigen::VectorXd S = jacSVD.singularValues();
@@ -427,7 +428,8 @@ Eigen::MatrixXd ExtendedJointPosition::computeEEMassMatrix(Eigen::MatrixXd mMass
   Eigen::MatrixXd Mq_inv = pseudoinverse(mMassMatrix, 1e-6);
   Eigen::MatrixXd Mx_inv = J * (Mq_inv * J.transpose());
   Eigen::JacobiSVD<Eigen::MatrixXd> jacSVD(
-        Mx_inv, Eigen::ComputeThinU | Eigen::ComputeThinV);
+        Mx_inv, Eigen::ComputeFullU | Eigen::ComputeFullV);
+        // Mx_inv, Eigen::ComputeThinU | Eigen::ComputeThinV);
   Eigen::MatrixXd U = jacSVD.matrixU();
   Eigen::MatrixXd V = jacSVD.matrixV();
   Eigen::VectorXd S = jacSVD.singularValues();

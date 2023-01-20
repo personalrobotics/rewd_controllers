@@ -9,12 +9,15 @@
 
 // actionlib
 #include <actionlib/server/action_server.h>
+#include <actionlib/client/simple_action_client.h>
 
 // ROS messages
-#include <pr_control_msgs/TaskCommandAction.h>
+#include <pr_control_msgs/JointGroupCommandAction.h>
+#include <pr_control_msgs/TriggerAction.h>
 #include <moveit_msgs/CartesianTrajectoryPoint.h>
 #include <geometry_msgs/WrenchStamped.h>
 #include <geometry_msgs/Pose.h>
+#include <std_msgs/Int64.h>
 #include <eigen_conversions/eigen_msg.h>
 
 // ros_controls
@@ -76,9 +79,9 @@ private:
   bool shouldAcceptRequests();
   bool shouldStopExecution(std::string &message);
 
-  using ActionServer = actionlib::ActionServer<pr_control_msgs::TaskCommandAction>;
+  using ActionServer = actionlib::ActionServer<pr_control_msgs::JointGroupCommandAction>;
   using GoalHandle = ActionServer::GoalHandle;
-  using RealtimeGoalHandle = realtime_tools::RealtimeServerGoalHandle<pr_control_msgs::TaskCommandAction>;
+  using RealtimeGoalHandle = realtime_tools::RealtimeServerGoalHandle<pr_control_msgs::JointGroupCommandAction>;
   using RealtimeGoalHandlePtr = boost::shared_ptr<RealtimeGoalHandle>;
 
   realtime_tools::RealtimeBuffer<moveit_msgs::CartesianTrajectoryPoint> mCommandsBuffer;
@@ -173,6 +176,9 @@ private:
   Eigen::Vector3d mForce;
   Eigen::Vector3d mTorque;
 
+  // ros::Subscriber    mSubBiteTransferState;
+  // std::atomic_bool mUseContactData;
+
   Eigen::VectorXd mContactIntegral;
 
   boost::shared_ptr<luca_dynamics::model> urdf_model;
@@ -186,7 +192,13 @@ private:
 
   void forceTorqueDataCallback(const geometry_msgs::WrenchStamped &msg);
 
+  // void biteTransferStateCallback(const std_msgs::Int64 &msg);
+
   void setActionFeedback(const ros::Time& time);
+
+  // using TareActionClient = actionlib::SimpleActionClient<pr_control_msgs::TriggerAction>;
+  // std::unique_ptr<TareActionClient> mTareActionClient;
+
 };
 
 } // namespace rewd_controllers

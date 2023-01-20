@@ -212,6 +212,8 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 
 	mSubFTSensor = n.subscribe("/forque/forqueSensor", 1, &TaskSpaceCompliantController::forceTorqueDataCallback, this);
 
+	// mSubBiteTransferState = n.subscribe("/move_inside", 1, &TaskSpaceCompliantController::biteTransferStateCallback, this);
+
 	// Start the action server. This must be last.
 	// using std::placeholders::_1; // Rajat check: is this required?
 
@@ -221,6 +223,13 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 																			boost::bind(&TaskSpaceCompliantController::cancelCallback, this, _1),
 																			false));
 	mActionServer->start();
+
+	// mTareActionClient = std::unique_ptr<TareActionClient>(new TareActionClient(n, "/forque/bias_controller/trigger"));
+	// mTareActionClient->waitForServer();
+
+	// pr_control_msgs::TriggerGoal goal;
+	// mTareActionClient->sendGoalAndWait(goal);
+	// ROS_INFO("Taring completed!");
 
 	ROS_INFO("TaskSpaceCompliantController initialized successfully");
 	return true;
@@ -239,9 +248,27 @@ void TaskSpaceCompliantController::forceTorqueDataCallback(
 }
 
 //=============================================================================
+// void TaskSpaceCompliantController::biteTransferStateCallback(
+//     const std_msgs::Int64 &msg) {
+  
+// 	if(msg.data == 1)
+// 	{
+// 		pr_control_msgs::TriggerGoal goal;
+// 		mTareActionClient->sendGoalAndWait(goal);
+// 		ROS_INFO("Taring completed!");
+// 		mUseContactData = true;
+// 	}
+  
+// 	if(msg.data !=1 && msg.data != 2)
+// 		mUseContactData = false;
+
+// }
+
+//=============================================================================
 void TaskSpaceCompliantController::starting(const ros::Time &time) {
 
 	mExecuteDefaultCommand = true;
+	// mUseContactData = false;
 
 	ROS_DEBUG_STREAM(
 			"Initialized desired position: " << mDesiredPosition.transpose());
@@ -267,6 +294,27 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 	mActualVelocity = mControlledSkeleton->getVelocities();
 	mActualEffort = mControlledSkeleton->getForces();
 	mActualEETransform =  mEENode->getWorldTransform();
+
+	// if(true)
+	//  Gravity compensation for switching controllers
+	if(mCount < 2000)
+	{
+		mSkeleton->computeInverseDynamics();
+		mGravity = mControlledSkeleton->getGravityForces();
+		
+		if(mCount%200 == 0)
+			std::cout<<"Initializing controller while in gravity compensation: "<<mCount<<std::endl; 
+		mCount++;	
+
+		for (size_t idof = 0; idof < mControlledJointHandles.size(); ++idof) 
+		{
+			auto jointHandle = mControlledJointHandles[idof];
+			jointHandle.setCommand(mGravity[idof]);
+		}
+
+		setActionFeedback(time);  // Rajat check: Is this required?
+		return;
+	}
 
 	Eigen::MatrixXd dart_actual_jacobian(6, 6); // change to numControlledDofs
 	{
@@ -318,9 +366,9 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 	}
 	else
 	{
-		// std::cout<<"Reading from RT Buffer... "<<std::endl;
+		std::cout<<"Reading from RT Buffer... "<<std::endl;
 		moveit_msgs::CartesianTrajectoryPoint command = *mCommandsBuffer.readFromRT(); // Rajat check: should this be by reference?
-		// std::cout<<"... Read. :| "<<std::endl;
+		std::cout<<"... Read. :| "<<std::endl;
 	
 		// std::cout<<"Efforts Size: "<<command.effort.size()<<std::endl;
 		// std::cout<<"Positions Size: "<<command.positions.size()<<std::endl;
@@ -489,72 +537,77 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 
 	mTaskEffort = dart_nominal_jacobian.transpose() * (-mTaskKMatrix * dart_error - mTaskDMatrix * (dart_nominal_jacobian * mNominalThetaDotPrev)) + mQuasiGravity;
 
-	// Eigen::Vector3d force;
+	// if(mUseContactData.load())
 	// {
-	// 	std::lock_guard<std::mutex> lock(mForceTorqueDataMutex);
-	// 	// force << mForce.x(), mForce.y(), mForce.z();
-	// 	force << mForce.x(), mForce.y(), 0.0;
-	// }
+	// 	Eigen::Vector3d force;
+	// 	{
+	// 		std::lock_guard<std::mutex> lock(mForceTorqueDataMutex);
+	// 		// force << mForce.x(), mForce.y(), mForce.z();
+	// 		force << mForce.x(), mForce.y(), 0.0;
+	// 	}
 
-	// for(int i=0; i<3; i++)
-	// {
-	// 	if (force(i) > 4 || force(i) < -4)
-	// 		force(i) = 0;
-	// 	else if (force(i) >= 0)
-	// 		force(i) = std::max(0.0,force(i)-0.05);
+	// 	for(int i=0; i<3; i++)
+	// 	{
+	// 		if (force(i) > 4 || force(i) < -4)
+	// 			force(i) = 0;
+	// 		else if (force(i) >= 0)
+	// 			force(i) = std::max(0.0,force(i)-0.05);
+	// 		else
+	// 			force(i) = std::min(0.0,force(i)+0.05);
+	// 	}
+
+	// 	force = mActualEETransform.linear() * force; // force in world frame
+
+	// 	std::cout<<"FT Sensor Forces: "<<force.transpose()<<std::endl;
+
+	// 	if (force.norm() > 0.0)
+	// 	{
+	// 		Eigen::VectorXd ft_wrench(6);	
+	// 		ft_wrench << force(0), force(1), force(2), 0.0, 0.0, 0.0;
+
+	// 		mContactIntegral += step_time*(ft_wrench);
+
+	// 		// // Cap I term
+	// 		// for(int i=0; i<3; i++)
+	// 		// {
+	// 		// 	if(mContactIntegral(i) > 2)
+	// 		// 		mContactIntegral(i) = 2;
+	// 		// 	if(mContactIntegral(i) < -2)
+	// 		// 		mContactIntegral(i) = -2;
+	// 		// }
+
+	// 		// mContactEffort = dart_actual_jacobian.transpose() * (mContactKMatrix * ft_wrench);
+	// 		mContactEffort = dart_actual_jacobian.transpose() * (mContactKMatrix * ft_wrench + mContactIMatrix * mContactIntegral);
+	// 	}
 	// 	else
-	// 		force(i) = std::min(0.0,force(i)+0.05);
-	// }
+	// 	{
+	// 		mContactEffort = mZeros;
+	// 		mContactIntegral.setZero();
+	// 	}
 
-	// force = mActualEETransform.linear() * force; // force in world frame
+	// 	// SAFETY
+	// 	for(int i=0; i<6; i++)
+	// 	{
+	// 		if(mContactEffort(i) > 10 || mContactEffort(i) < -10)
+	// 			mContactEffort(i) = 0;
+	// 	}
 
-	// std::cout<<"FT Sensor Forces: "<<force.transpose()<<std::endl;
+	// 	std::cout<<"Contact Effort: "<<mContactEffort.transpose()<<std::endl;
+	// 	std::cout<<"Contact Integral Term: "<< (dart_actual_jacobian.transpose()*mContactIMatrix * mContactIntegral).transpose()<<std::endl;
 
-	// if (force.norm() > 0.0)
-	// {
-	// 	Eigen::VectorXd ft_wrench(6);	
-	// 	ft_wrench << force(0), force(1), force(2), 0.0, 0.0, 0.0;
-
-	// 	mContactIntegral += step_time*(ft_wrench);
-
-	// 	// // Cap I term
-	// 	// for(int i=0; i<3; i++)
-	// 	// {
-	// 	// 	if(mContactIntegral(i) > 2)
-	// 	// 		mContactIntegral(i) = 2;
-	// 	// 	if(mContactIntegral(i) < -2)
-	// 	// 		mContactIntegral(i) = -2;
-	// 	// }
-
-	// 	// mContactEffort = dart_actual_jacobian.transpose() * (mContactKMatrix * ft_wrench);
-	// 	mContactEffort = dart_actual_jacobian.transpose() * (mContactKMatrix * ft_wrench + mContactIMatrix * mContactIntegral);
-	// }
-	// else
-	// {
-	// 	mContactEffort = mZeros;
-	// 	mContactIntegral.setZero();
-	// }
-
-	// // SAFETY
-	// for(int i=0; i<6; i++)
-	// {
-	// 	if(mContactEffort(i) > 10 || mContactEffort(i) < -10)
-	// 		mContactEffort(i) = 0;
-	// }
-
-	// std::cout<<"Contact Effort: "<<mContactEffort.transpose()<<std::endl;
-	// std::cout<<"Contact Integral Term: "<< (dart_actual_jacobian.transpose()*mContactIMatrix * mContactIntegral).transpose()<<std::endl;
-
-	// if(mCount>5000)
-	// {
 	// 	mTaskEffort = mTaskEffort + mContactEffort;
-	// 	std::cout<<"Adding to mTaskEffort!"<<std::endl;
-	// }
-	// else if(mCount >= 2000 && mCount<=5000)
-	// {
-	// 	if(mCount%200 == 0)
-	// 		std::cout<<"Initializing controller: "<<mCount<<std::endl; 
-	// 	mCount++;		
+
+	// 	if(mCount>5000)
+	// 	{
+	// 		mTaskEffort = mTaskEffort + mContactEffort;
+	// 		std::cout<<"Adding to mTaskEffort!"<<std::endl;
+	// 	}
+	// 	else if(mCount >= 3000 && mCount<=5000)
+	// 	{
+	// 		if(mCount%200 == 0)
+	// 			std::cout<<"Initializing controller: "<<mCount<<std::endl; 
+	// 		mCount++;		
+	// 	}
 	// }
 
 
@@ -569,11 +622,13 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 
 	mDesiredEffort = mTaskEffort + mNominalFriction;
 
-	if(mCount < 2000)
+
+	// Gravity Compensation for initializing nominal values
+	if(mCount < 3000)
 	{
 		mDesiredEffort = mGravity;
 		if(mCount%200 == 0)
-			std::cout<<"Initializing controller: "<<mCount<<std::endl; 
+			std::cout<<"Initializing controller while in gravity compensation: "<<mCount<<std::endl; 
 		mCount++;
 	}
 
@@ -593,18 +648,18 @@ void TaskSpaceCompliantController::update(const ros::Time &time,
 
 void TaskSpaceCompliantController::preemptActiveGoal()
 {
-		RealtimeGoalHandlePtr current_active_goal(mRTActiveGoal);
+		// RealtimeGoalHandlePtr current_active_goal(mRTActiveGoal);
 
-		// Cancel any goal timeout
-		mGoalDurationTimer.stop();
+		// // Cancel any goal timeout
+		// mGoalDurationTimer.stop();
 
-		// Cancels the currently active goal
-		if (current_active_goal)
-		{
-			// Marks the current goal as canceled
-			mRTActiveGoal.reset();
-			current_active_goal->gh_.setCanceled();
-		}
+		// // Cancels the currently active goal
+		// if (current_active_goal)
+		// {
+		// 	// Marks the current goal as canceled
+		// 	mRTActiveGoal.reset();
+		// 	current_active_goal->gh_.setCanceled();
+		// }
 }
 
 void TaskSpaceCompliantController::commandCallback(const moveit_msgs::CartesianTrajectoryPointConstPtr& msg)
@@ -629,107 +684,107 @@ void TaskSpaceCompliantController::commandCallback(const moveit_msgs::CartesianT
 
 void TaskSpaceCompliantController::goalCallback(GoalHandle gh)
 {
-	std::cout<<"Joint group command controller: Recieved new goal!"<<std::endl;
-	ROS_DEBUG_STREAM_NAMED(mName,"Received new action goal");
-	pr_control_msgs::TaskCommandResult result;
+	// std::cout<<"Joint group command controller: Recieved new goal!"<<std::endl;
+	// ROS_DEBUG_STREAM_NAMED(mName,"Received new action goal");
+	// pr_control_msgs::TaskCommandResult result;
 
-	// Preconditions
-	if (!shouldAcceptRequests())
-	{
-		result.error_string = "Can't accept new action goals. Controller is not running.";
-		ROS_ERROR_STREAM_NAMED(mName, result.error_string);
-		result.error_code = pr_control_msgs::TaskCommandResult::INVALID_GOAL;
-		gh.setRejected(result);
-		return;
-	}
-
-	// if (gh.getGoal()->joint_names.size() != gh.getGoal()->command.positions.size()) {
-	//   result.error_string = "Size of command must match size of joint_names.";
-	//   ROS_ERROR_STREAM_NAMED(mName, result.error_string);
-	//   result.error_code = pr_control_msgs::TaskCommandResult::INVALID_GOAL;
-	//   gh.setRejected(result);
-	//   return;
+	// // Preconditions
+	// if (!shouldAcceptRequests())
+	// {
+	// 	result.error_string = "Can't accept new action goals. Controller is not running.";
+	// 	ROS_ERROR_STREAM_NAMED(mName, result.error_string);
+	// 	result.error_code = pr_control_msgs::TaskCommandResult::INVALID_GOAL;
+	// 	gh.setRejected(result);
+	// 	return;
 	// }
 
-	// Goal should specify valid controller joints (they can be ordered differently). Reject if this is not the case
+	// // if (gh.getGoal()->joint_names.size() != gh.getGoal()->command.positions.size()) {
+	// //   result.error_string = "Size of command must match size of joint_names.";
+	// //   ROS_ERROR_STREAM_NAMED(mName, result.error_string);
+	// //   result.error_code = pr_control_msgs::TaskCommandResult::INVALID_GOAL;
+	// //   gh.setRejected(result);
+	// //   return;
+	// // }
 
-	// update new command
-	RealtimeGoalHandlePtr rt_goal(new RealtimeGoalHandle(gh));
-	moveit_msgs::CartesianTrajectoryPoint new_command = gh.getGoal()->command;
-	rt_goal->preallocated_feedback_->joint_names = mJointNames;
-	mCommandsBuffer.writeFromNonRT(new_command);
+	// // Goal should specify valid controller joints (they can be ordered differently). Reject if this is not the case
 
-		// Accept new goal
-	preemptActiveGoal();
-	gh.setAccepted();
-	mRTActiveGoal = rt_goal;
-	mExecuteDefaultCommand = false;
+	// // update new command
+	// RealtimeGoalHandlePtr rt_goal(new RealtimeGoalHandle(gh));
+	// moveit_msgs::CartesianTrajectoryPoint new_command = gh.getGoal()->command;
+	// rt_goal->preallocated_feedback_->joint_names = mJointNames;
+	// mCommandsBuffer.writeFromNonRT(new_command);
 
-	// Setup goal status checking timer
-	mGoalHandleTimer = mNodeHandle->createTimer(mActionMonitorPeriod,
-																										&RealtimeGoalHandle::runNonRealtime,
-																										rt_goal);
-	mGoalHandleTimer.start();
+	// 	// Accept new goal
+	// preemptActiveGoal();
+	// gh.setAccepted();
+	// mRTActiveGoal = rt_goal;
+	// mExecuteDefaultCommand = false;
 
-	// Setup goal timeout
-	if (gh.getGoal()->command.time_from_start > ros::Duration()) {
-		mGoalDurationTimer = mNodeHandle->createTimer(gh.getGoal()->command.time_from_start,
-																										&TaskSpaceCompliantController::timeoutCallback,
-																										this,
-																										true);
-		mGoalDurationTimer.start();
-	}
+	// // Setup goal status checking timer
+	// mGoalHandleTimer = mNodeHandle->createTimer(mActionMonitorPeriod,
+	// 																									&RealtimeGoalHandle::runNonRealtime,
+	// 																									rt_goal);
+	// mGoalHandleTimer.start();
+
+	// // Setup goal timeout
+	// if (gh.getGoal()->command.time_from_start > ros::Duration()) {
+	// 	mGoalDurationTimer = mNodeHandle->createTimer(gh.getGoal()->command.time_from_start,
+	// 																									&TaskSpaceCompliantController::timeoutCallback,
+	// 																									this,
+	// 																									true);
+	// 	mGoalDurationTimer.start();
+	// }
 }
 
 void TaskSpaceCompliantController::timeoutCallback(const ros::TimerEvent& event)
 {
-	RealtimeGoalHandlePtr current_active_goal(mRTActiveGoal);
+	// RealtimeGoalHandlePtr current_active_goal(mRTActiveGoal);
 
-	// Check that timeout refers to currently active goal (if any)
-	if (current_active_goal) {
-		ROS_DEBUG_NAMED(mName, "Active action goal reached requested timeout.");
+	// // Check that timeout refers to currently active goal (if any)
+	// if (current_active_goal) {
+	// 	ROS_DEBUG_NAMED(mName, "Active action goal reached requested timeout.");
 
-		// Give sub-classes option to update mDefaultCommand
-		mExecuteDefaultCommand = true;
+	// 	// Give sub-classes option to update mDefaultCommand
+	// 	mExecuteDefaultCommand = true;
 
-		// Marks the current goal as succeeded
-		mRTActiveGoal.reset();
-		current_active_goal->gh_.setSucceeded();
-	}
+	// 	// Marks the current goal as succeeded
+	// 	mRTActiveGoal.reset();
+	// 	current_active_goal->gh_.setSucceeded();
+	// }
 }
 
 void TaskSpaceCompliantController::cancelCallback(GoalHandle gh)
 {
-	RealtimeGoalHandlePtr current_active_goal(mRTActiveGoal);
+	// RealtimeGoalHandlePtr current_active_goal(mRTActiveGoal);
 
-	// Check that cancel request refers to currently active goal
-	if (current_active_goal && current_active_goal->gh_ == gh)
-	{
-		ROS_DEBUG_NAMED(mName, "Canceling active action goal because cancel callback recieved from actionlib.");
+	// // Check that cancel request refers to currently active goal
+	// if (current_active_goal && current_active_goal->gh_ == gh)
+	// {
+	// 	ROS_DEBUG_NAMED(mName, "Canceling active action goal because cancel callback recieved from actionlib.");
 
-		// Give sub-classes option to update mDefaultCommand
-		mExecuteDefaultCommand = true;
+	// 	// Give sub-classes option to update mDefaultCommand
+	// 	mExecuteDefaultCommand = true;
 
-		preemptActiveGoal();
-	}
+	// 	preemptActiveGoal();
+	// }
 }
 
 void TaskSpaceCompliantController::setActionFeedback(const ros::Time& time)
 {
-	RealtimeGoalHandlePtr current_active_goal(mRTActiveGoal);
-	if (!current_active_goal)
-	{
-		return;
-	}
+	// RealtimeGoalHandlePtr current_active_goal(mRTActiveGoal);
+	// if (!current_active_goal)
+	// {
+	// 	return;
+	// }
 
-	current_active_goal->preallocated_feedback_->header.stamp = time;
-	current_active_goal->preallocated_feedback_->desired = current_active_goal->gh_.getGoal()->command;
+	// current_active_goal->preallocated_feedback_->header.stamp = time;
+	// current_active_goal->preallocated_feedback_->desired = current_active_goal->gh_.getGoal()->command;
 
-	moveit_msgs::CartesianTrajectoryPoint point;
-	tf::poseEigenToMsg(mActualEETransform, point.point.pose);
-	current_active_goal->preallocated_feedback_->actual.point.pose = point.point.pose;
+	// moveit_msgs::CartesianTrajectoryPoint point;
+	// tf::poseEigenToMsg(mActualEETransform, point.point.pose);
+	// current_active_goal->preallocated_feedback_->actual.point.pose = point.point.pose;
 
-	current_active_goal->setFeedback( current_active_goal->preallocated_feedback_ );
+	// current_active_goal->setFeedback( current_active_goal->preallocated_feedback_ );
 }
 
 //=============================================================================

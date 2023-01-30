@@ -111,7 +111,7 @@ void JointEffortAdapter::update(const ros::Time & /*time*/,
                                 double actualVelocity, double desiredVelocity,
                                 double /*actualEffort*/,
                                 double nominalEffort,
-                                int /*dof*/) {
+                                int dof) {
   // TODO: Handle position wrapping on SO(2) joints.
   const auto pidEffort =
       mPid.computeCommand(desiredPosition - actualPosition,
@@ -122,7 +122,9 @@ void JointEffortAdapter::update(const ros::Time & /*time*/,
     throw std::range_error("calculated pidEffort is NaN");
   double tau_task = nominalEffort + pidEffort;
 
+  std::cout<<"DOF :"<<dof<<" gravity effort:"<<nominalEffort<<" pid effort:"<<pidEffort<<" desiredPosition:"<<desiredPosition<<" actualPosition:"<<actualPosition<<" error:"<<desiredPosition-actualPosition<<std::endl;
   mEffortHandle.setCommand(nominalEffort + pidEffort);
+  // mEffortHandle.setCommand(nominalEffort);
 }
 
 //=============================================================================

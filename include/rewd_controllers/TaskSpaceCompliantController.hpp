@@ -9,15 +9,12 @@
 
 // actionlib
 #include <actionlib/server/action_server.h>
-#include <actionlib/client/simple_action_client.h>
 
 // ROS messages
 #include <pr_control_msgs/JointGroupCommandAction.h>
-#include <pr_control_msgs/TriggerAction.h>
 #include <moveit_msgs/CartesianTrajectoryPoint.h>
 #include <geometry_msgs/WrenchStamped.h>
 #include <geometry_msgs/Pose.h>
-#include <std_msgs/Int64.h>
 #include <eigen_conversions/eigen_msg.h>
 
 // ros_controls
@@ -35,6 +32,9 @@
 
 #include "luca_dynamics/luca_dynamics.hpp"
 #include "luca_dynamics/model.hpp"
+
+#include <chrono>
+using namespace std::chrono;
 
 
 namespace rewd_controllers {
@@ -113,6 +113,7 @@ private:
 
   Eigen::MatrixXd mTaskKMatrix;
   Eigen::MatrixXd mTaskDMatrix;
+  Eigen::MatrixXd mTaskIMatrix;
 
   Eigen::MatrixXd mContactKMatrix;
   Eigen::MatrixXd mContactIMatrix;
@@ -134,6 +135,7 @@ private:
 
   Eigen::VectorXd mDesiredEffort;
   Eigen::VectorXd mTaskEffort;
+  Eigen::VectorXd mExtraTaskEffort;
   Eigen::VectorXd mContactEffort;
 
   Eigen::VectorXd mLastDesiredPosition;
@@ -176,13 +178,25 @@ private:
   Eigen::Vector3d mForce;
   Eigen::Vector3d mTorque;
 
-  // ros::Subscriber    mSubBiteTransferState;
-  // std::atomic_bool mUseContactData;
-
   Eigen::VectorXd mContactIntegral;
+  Eigen::VectorXd mTaskPoseIntegral;
 
   boost::shared_ptr<luca_dynamics::model> urdf_model;
   boost::shared_ptr<luca_dynamics::luca_dynamics> dyn; 
+
+  bool mUseContactData = false;
+
+  bool mUseIntegralTerm = false;
+  Eigen::VectorXd mUseIntegralTermMaxThreshold;
+  Eigen::VectorXd mUseIntegralTermMinThreshold;
+
+  bool mUseIntegralTermForqueFrame = true;
+  double mUseIntegralTermForqueFrameMaxThreshold;
+  double mUseIntegralTermForqueFrameMinThreshold;
+
+  std::chrono::time_point<std::chrono::high_resolution_clock> mLastTimePoint;
+
+  int mZeroCount = 0;
 
   void goalCallback(GoalHandle gh);
   void cancelCallback(GoalHandle gh);
@@ -192,13 +206,7 @@ private:
 
   void forceTorqueDataCallback(const geometry_msgs::WrenchStamped &msg);
 
-  // void biteTransferStateCallback(const std_msgs::Int64 &msg);
-
   void setActionFeedback(const ros::Time& time);
-
-  // using TareActionClient = actionlib::SimpleActionClient<pr_control_msgs::TriggerAction>;
-  // std::unique_ptr<TareActionClient> mTareActionClient;
-
 };
 
 } // namespace rewd_controllers

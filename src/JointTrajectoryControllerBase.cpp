@@ -318,6 +318,8 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
     mControlledSkeleton->setAccelerations(zeros); 
     mSkeleton->computeInverseDynamics();
     mDesiredEffort += mControlledSkeleton->getCoriolisAndGravityForces(); // also add friction forces?
+
+    // std::cout<<"Current Gravity: "<<mDesiredEffort.transpose()<<std::endl;
   }
 
   // Restore the state of the Skeleton from JointState interfaces. These values
@@ -328,6 +330,10 @@ void JointTrajectoryControllerBase::updateStep(const ros::Time &time,
   for (size_t idof = 0; idof < mAdapters.size(); ++idof) {
     // Check for SO2
     auto actualPos = mActualPosition[idof];
+
+    // if (actualPos > M_PI)
+    //   actualPos -= 2*M_PI;
+
     auto desiredPos = mDesiredPosition[idof];
     auto jointSpace = mControlledSpace->getJointSpace(idof);
     auto r1Joint = std::dynamic_pointer_cast<const R1Joint>(jointSpace);

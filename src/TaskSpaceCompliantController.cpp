@@ -149,13 +149,14 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 
 	mFrictionL.resize(numControlledDofs, numControlledDofs);
 	mFrictionL.setZero();
+	// mFrictionL.diagonal() << 160, 160, 160, 100, 100, 100;	
 	mFrictionL.diagonal() << 50, 50, 50, 35, 35, 35;
 	// mFrictionL.diagonal() << 200, 200, 200, 130, 130, 130;
 
 	mFrictionLp.resize(numControlledDofs, numControlledDofs);
 	mFrictionLp.setZero();
-	// mFrictionLp.diagonal() << 10, 10, 10, 7.5, 7.5, 7.5;
-	mFrictionLp.diagonal() << 5, 5, 5, 3.75, 3.75, 3.75;
+	mFrictionLp.diagonal() << 10, 10, 10, 7.5, 7.5, 7.5;
+	// mFrictionLp.diagonal() << 5, 5, 5, 3.75, 3.75, 3.75;
 
 	mJointKMatrix.resize(numControlledDofs, numControlledDofs);
 	mJointKMatrix.setZero();

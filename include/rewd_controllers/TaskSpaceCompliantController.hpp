@@ -15,6 +15,7 @@
 #include <moveit_msgs/CartesianTrajectoryPoint.h>
 #include <geometry_msgs/WrenchStamped.h>
 #include <geometry_msgs/Pose.h>
+#include <std_msgs/String.h>
 #include <eigen_conversions/eigen_msg.h>
 
 // ros_controls
@@ -173,6 +174,8 @@ private:
   ros::Timer         mGoalDurationTimer;
   ros::Duration      mActionMonitorPeriod;
 
+  ros::Subscriber    mSubMode;
+
   ros::Subscriber    mSubFTSensor;
   std::mutex mForceTorqueDataMutex;
   Eigen::Vector3d mForce;
@@ -184,13 +187,14 @@ private:
   boost::shared_ptr<luca_dynamics::model> urdf_model;
   boost::shared_ptr<luca_dynamics::luca_dynamics> dyn; 
 
-  bool mUseContactData = false;
+  std::atomic_bool mMaintainZeroContact;
+  std::atomic_bool mMaintainNonZeroContact;
 
   bool mUseIntegralTerm = false;
   Eigen::VectorXd mUseIntegralTermMaxThreshold;
   Eigen::VectorXd mUseIntegralTermMinThreshold;
 
-  bool mUseIntegralTermForqueFrame = true;
+  std::atomic_bool mUseIntegralTermForqueFrame;
   double mUseIntegralTermForqueFrameMaxThreshold;
   double mUseIntegralTermForqueFrameMinThreshold;
 
@@ -205,6 +209,7 @@ private:
   void commandCallback(const moveit_msgs::CartesianTrajectoryPointConstPtr& msg);
 
   void forceTorqueDataCallback(const geometry_msgs::WrenchStamped &msg);
+  void modeCallback(const std_msgs::String &msg);
 
   void setActionFeedback(const ros::Time& time);
 };

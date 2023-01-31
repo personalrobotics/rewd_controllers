@@ -208,8 +208,8 @@ private:
   void preemptActiveGoal();
   void commandCallback(const moveit_msgs::CartesianTrajectoryPointConstPtr& msg);
 
-  void forceTorqueDataCallback(const geometry_msgs::WrenchStamped &msg);
-  void modeCallback(const std_msgs::String &msg);
+  // void forceTorqueDataCallback(const geometry_msgs::WrenchStamped &msg);
+  // void modeCallback(const std_msgs::String &msg);
 
   void setActionFeedback(const ros::Time& time);
 };

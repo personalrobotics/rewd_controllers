@@ -150,12 +150,22 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 	mFrictionL.resize(numControlledDofs, numControlledDofs);
 	mFrictionL.setZero();
 	// mFrictionL.diagonal() << 160, 160, 160, 100, 100, 100;	
-	mFrictionL.diagonal() << 50, 50, 50, 35, 35, 35;
+	// mFrictionL.diagonal() << 50, 50, 50, 35, 35, 35;
+	// mFrictionL.diagonal() << 75, 75, 75, 45, 45, 45;
+	mFrictionL.diagonal() << 100, 100, 100, 45, 45, 45;	
 	// mFrictionL.diagonal() << 200, 200, 200, 130, 130, 130;
+
+	// very high Lp (200) and high L (80) does not work as well
+	// Very high Lp compared to L causes rough vibrations. 
 
 	mFrictionLp.resize(numControlledDofs, numControlledDofs);
 	mFrictionLp.setZero();
-	mFrictionLp.diagonal() << 10, 10, 10, 7.5, 7.5, 7.5;
+	// mFrictionLp.diagonal() << 40, 40, 40, 30, 30, 30;
+	// mFrictionLp.diagonal() << 15, 15, 15, 10, 10, 10; // last used value
+	mFrictionLp.diagonal() << 5, 5, 5, 5, 5, 5; // last used value
+	// mFrictionLp.diagonal() << 10, 10, 10, 7.5, 7.5, 7.5; // last used value
+	// mFrictionLp.diagonal() << 20, 20, 20, 15, 15, 15;
+	// mFrictionLp.diagonal() << 50, 50, 50, 50, 50, 50; // Causes large scale vibrations
 	// mFrictionLp.diagonal() << 5, 5, 5, 3.75, 3.75, 3.75;
 
 	mJointKMatrix.resize(numControlledDofs, numControlledDofs);
@@ -169,12 +179,13 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 	mTaskKMatrix.resize(6, 6);
 	mTaskKMatrix.setZero();
 	mTaskKMatrix.diagonal() << 200,200,200,150,150,150;
-	// mTaskKMatrix.diagonal() << 100,100,100,150,150,150;
+	// mTaskKMatrix.diagonal() << 300,300,300,150,150,150;
 
 	mTaskDMatrix.resize(6, 6);
 	mTaskDMatrix.setZero();
 	// mTaskDMatrix.diagonal() << 40,40,40,30,30,30;
 	mTaskDMatrix.diagonal() << 60,60,60,40,40,40;
+	// mTaskDMatrix.diagonal() << 40,40,40,30,30,30;
 	// mTaskDMatrix.diagonal() << 70,70,70,50,50,50;
 
 	mTaskIMatrix.resize(6, 6);
@@ -187,7 +198,8 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 
 	mContactIMatrix.resize(6, 6);
 	mContactIMatrix.setZero();
-	mContactIMatrix.diagonal() << 15, 15, 15, 15, 15, 15;
+	// mContactIMatrix.diagonal() << 15, 15, 15, 15, 15, 15;
+	mContactIMatrix.diagonal() << 3.0, 3.0, 3.0, 3.0, 3.0, 3.0;
 
 	mUseIntegralTermMaxThreshold.resize(6);
 	mUseIntegralTermMaxThreshold << 0.015, 0.015, 0.015, M_PI/30, M_PI/30, M_PI/30;
@@ -231,9 +243,9 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 	// ROS API: Subscribed topics
 	mSubCommand = n.subscribe<moveit_msgs::CartesianTrajectoryPoint>("command", 1, &TaskSpaceCompliantController::commandCallback, this);
 
-	// mSubMode = n.subscribe("mode", 1, &TaskSpaceCompliantController::modeCallback, this);
+	mSubMode = n.subscribe("mode", 1, &TaskSpaceCompliantController::modeCallback, this);
 
-	// mSubFTSensor = n.subscribe("/forque/forqueSensor", 1, &TaskSpaceCompliantController::forceTorqueDataCallback, this);
+	mSubFTSensor = n.subscribe("/forque/forqueSensor", 1, &TaskSpaceCompliantController::forceTorqueDataCallback, this);
 
 	// Start the action server. This must be last.
 	// using std::placeholders::_1; // Rajat check: is this required?
@@ -251,56 +263,56 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 
 
 //=============================================================================
-// void TaskSpaceCompliantController::modeCallback(
-//     const std_msgs::String &msg) {
+void TaskSpaceCompliantController::modeCallback(
+    const std_msgs::String &msg) {
 
-// 	if(msg.data == "maintain_contact")
-// 	{
-// 		mMaintainNonZeroContact = true;
-// 		mMaintainZeroContact = false;
-// 		mUseIntegralTermForqueFrame = false;
-// 	}
-// 	else if(msg.data == "use_pose_integral")
-// 	{
-// 		mMaintainNonZeroContact = false;
-// 		mMaintainZeroContact = false;
-// 		mUseIntegralTermForqueFrame = true;
-// 	}
-// 	else if(msg.data == "zero_contact")
-// 	{
-// 		mMaintainNonZeroContact = false;
-// 		mMaintainZeroContact = true;
-// 		mUseIntegralTermForqueFrame = false;
-// 	}
-// 	else
-// 	{
-// 		mMaintainNonZeroContact = false;
-// 		mMaintainZeroContact = false;
-// 		mUseIntegralTermForqueFrame = false;
-// 	}
+	if(msg.data == "maintain_contact")
+	{
+		mMaintainNonZeroContact = true;
+		mMaintainZeroContact = false;
+		mUseIntegralTermForqueFrame = false;
+	}
+	else if(msg.data == "use_pose_integral")
+	{
+		mMaintainNonZeroContact = false;
+		mMaintainZeroContact = false;
+		mUseIntegralTermForqueFrame = true;
+	}
+	else if(msg.data == "zero_contact")
+	{
+		mMaintainNonZeroContact = false;
+		mMaintainZeroContact = true;
+		mUseIntegralTermForqueFrame = false;
+	}
+	else
+	{
+		mMaintainNonZeroContact = false;
+		mMaintainZeroContact = false;
+		mUseIntegralTermForqueFrame = false;
+	}
 
 
-// }
+}
 
 //=============================================================================
-// void TaskSpaceCompliantController::forceTorqueDataCallback(
-//     const geometry_msgs::WrenchStamped &msg) {
-//   std::lock_guard<std::mutex> lock(mForceTorqueDataMutex);
-//   mForce.x() = msg.wrench.force.x;
-//   mForce.y() = msg.wrench.force.y;
-//   mForce.z() = msg.wrench.force.z;
-//   mTorque.x() = msg.wrench.torque.x;
-//   mTorque.y() = msg.wrench.torque.y;
-//   mTorque.z() = msg.wrench.torque.z;
+void TaskSpaceCompliantController::forceTorqueDataCallback(
+    const geometry_msgs::WrenchStamped &msg) {
+  std::lock_guard<std::mutex> lock(mForceTorqueDataMutex);
+  mForce.x() = msg.wrench.force.x;
+  mForce.y() = msg.wrench.force.y;
+  mForce.z() = msg.wrench.force.z;
+  mTorque.x() = msg.wrench.torque.x;
+  mTorque.y() = msg.wrench.torque.y;
+  mTorque.z() = msg.wrench.torque.z;
 
-//   // if (mForce.norm() < 0.005)
-//   // 	mZeroCount = 0;
-//   // else
-//   // 	mZeroCount++;
+  // if (mForce.norm() < 0.005)
+  // 	mZeroCount = 0;
+  // else
+  // 	mZeroCount++;
 
-//   // if(mZeroCount < 100)
-//   // 	mForce << 0.0, 0.0, 0.0;
-// }
+  // if(mZeroCount < 100)
+  // 	mForce << 0.0, 0.0, 0.0;
+}
 
 //=============================================================================
 void TaskSpaceCompliantController::starting(const ros::Time &time) {
@@ -585,9 +597,9 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 	}
 
 	double step_time;
-	step_time = duration.count()/1000000.0;
-	// step_time = 0.001;
-	std::cout<<"Step time: "<<duration.count()/1000000.0<<std::endl;
+	// step_time = duration.count()/1000000.0;
+	step_time = 0.001;
+	std::cout<<"Step time: "<<step_time<<std::endl;
 
 	// std::cout<<"\n"<<"Nominal Jacobian: "<<dart_nominal_jacobian<<"\n\n";
 
@@ -641,144 +653,144 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 	// }
 
 
-	// if(mUseIntegralTermForqueFrame.load())
-	// {
-	// 	Eigen::Vector3d position_error(dart_error(0), dart_error(1), dart_error(2));
-	// 	Eigen::MatrixXd mActualEERotation = mActualEETransform.linear();
-	// 	position_error = mActualEERotation.inverse() * position_error; 
-	// 	std::cout<<"BF Position error in FT frame: "<<position_error.transpose()<<std::endl;
-	// 	// position_error(2) = 0; // zero out the z term in FT sensor frame of reference
+	if(mUseIntegralTermForqueFrame.load())
+	{
+		Eigen::Vector3d position_error(dart_error(0), dart_error(1), dart_error(2));
+		Eigen::MatrixXd mActualEERotation = mActualEETransform.linear();
+		position_error = mActualEERotation.inverse() * position_error; 
+		std::cout<<"BF Position error in FT frame: "<<position_error.transpose()<<std::endl;
+		// position_error(2) = 0; // zero out the z term in FT sensor frame of reference
 
-	// 	// if(std::abs(position_error(0)) > mUseIntegralTermForqueFrameMaxThreshold || std::abs(position_error(1)) > mUseIntegralTermForqueFrameMaxThreshold)
-	// 	// {
-	// 	// 	position_error(0) = 0;
-	// 	// 	position_error(1) = 0;
-	// 	// }
-	// 	// if(std::abs(position_error(0)) < mUseIntegralTermForqueFrameMinThreshold)
-	// 	// 	position_error(0) = 0;
-	// 	// if(std::abs(position_error(1)) < mUseIntegralTermForqueFrameMinThreshold)
-	// 	// 	position_error(1) = 0;
+		// if(std::abs(position_error(0)) > mUseIntegralTermForqueFrameMaxThreshold || std::abs(position_error(1)) > mUseIntegralTermForqueFrameMaxThreshold)
+		// {
+		// 	position_error(0) = 0;
+		// 	position_error(1) = 0;
+		// }
+		// if(std::abs(position_error(0)) < mUseIntegralTermForqueFrameMinThreshold)
+		// 	position_error(0) = 0;
+		// if(std::abs(position_error(1)) < mUseIntegralTermForqueFrameMinThreshold)
+		// 	position_error(1) = 0;
 
-	// 	if(position_error.norm() > mUseIntegralTermForqueFrameMaxThreshold)
-	// 	{
-	// 		position_error(0) = 0;
-	// 		position_error(1) = 0;
-	// 		position_error(2) = 0;
-	// 	}
+		if(position_error.norm() > mUseIntegralTermForqueFrameMaxThreshold)
+		{
+			position_error(0) = 0;
+			position_error(1) = 0;
+			position_error(2) = 0;
+		}
 
-	// 	std::cout<<"AF Position error in FT frame: "<<position_error.transpose()<<std::endl;
-	// 	std::cout<<"error norm: "<<position_error.norm()<<std::endl;
-	// 	position_error = mActualEERotation * position_error;
+		std::cout<<"AF Position error in FT frame: "<<position_error.transpose()<<std::endl;
+		std::cout<<"error norm: "<<position_error.norm()<<std::endl;
+		position_error = mActualEERotation * position_error;
 
-	// 	Eigen::VectorXd error_wrench(6);	
-	// 	error_wrench << position_error(0), position_error(1), position_error(2), 0.0, 0.0, 0.0;
+		Eigen::VectorXd error_wrench(6);	
+		error_wrench << position_error(0), position_error(1), position_error(2), 0.0, 0.0, 0.0;
 
-	// 	if(error_wrench.norm() > 0.00000001)
-	// 	{
-	// 		mTaskPoseIntegral += dart_nominal_jacobian.transpose() * (-mTaskIMatrix * error_wrench);
+		if(error_wrench.norm() > 0.00000001)
+		{
+			mTaskPoseIntegral += dart_nominal_jacobian.transpose() * (-mTaskIMatrix * error_wrench);
 
-	// 		// cap the i term
-	// 		for(int i=0; i<6; i++)
-	// 		{
-	// 			if(mTaskPoseIntegral(i) > 1.0)
-	// 				mTaskPoseIntegral(i) = 1.0;
-	// 			if(mTaskPoseIntegral(i) < -1.0)
-	// 				mTaskPoseIntegral(i) = -1.0;
-	// 		}
+			// cap the i term
+			for(int i=0; i<6; i++)
+			{
+				if(mTaskPoseIntegral(i) > 1.0)
+					mTaskPoseIntegral(i) = 1.0;
+				if(mTaskPoseIntegral(i) < -1.0)
+					mTaskPoseIntegral(i) = -1.0;
+			}
 
-	// 		mTaskEffort += mTaskPoseIntegral;
-	// 	}
-	// 	else
-	// 	{
-	// 		mTaskPoseIntegral.setZero();
-	// 	}
+			mTaskEffort += mTaskPoseIntegral;
+		}
+		else
+		{
+			mTaskPoseIntegral.setZero();
+		}
 
-	// 	std::cout<<"mTaskPoseIntegral: "<<mTaskPoseIntegral.transpose()<<std::endl;
-	// }
+		std::cout<<"mTaskPoseIntegral: "<<mTaskPoseIntegral.transpose()<<std::endl;
+	}
 
-	// if(mMaintainZeroContact.load() || mMaintainNonZeroContact.load())
-	// {
-	// 	Eigen::Vector3d force;
-	// 	{
-	// 		std::lock_guard<std::mutex> lock(mForceTorqueDataMutex);
-	// 		force << mForce.x(), mForce.y(), mForce.z();
-	// 		// force << mForce.x(), mForce.y(), 0.0;
-	// 	}
+	if(mMaintainZeroContact.load() || mMaintainNonZeroContact.load())
+	{
+		Eigen::Vector3d force;
+		{
+			std::lock_guard<std::mutex> lock(mForceTorqueDataMutex);
+			force << mForce.x(), mForce.y(), mForce.z();
+			// force << mForce.x(), mForce.y(), 0.0;
+		}
 
-	// 	Eigen::Vector3d filter(0.1, 0.1, 0.1);
+		Eigen::Vector3d filter(0.1, 0.1, 0.1);
 
-	// 	for(int i=0; i<3; i++)
-	// 	{
-	// 		// if (force(i) > 4 || force(i) < -4)
-	// 			// force(i) = 4;
-	// 		// else 
-	// 		if (force(i) >= 0)
-	// 			force(i) = std::max(0.0,force(i)-filter(i));
-	// 		else
-	// 			force(i) = std::min(0.0,force(i)+filter(i));
-	// 	}
+		for(int i=0; i<3; i++)
+		{
+			// if (force(i) > 4 || force(i) < -4)
+				// force(i) = 4;
+			// else 
+			if (force(i) >= 0)
+				force(i) = std::max(0.0,force(i)-filter(i));
+			else
+				force(i) = std::min(0.0,force(i)+filter(i));
+		}
 
-	// 	if(mMaintainNonZeroContact.load())
-	// 	{
-	// 		force(1) += 2; //maintain 2N force in y-axis
-	// 		// force(0) = 0;
-	// 		// force(2) = 0;
-	// 	}
+		if(mMaintainNonZeroContact.load())
+		{
+			force(1) += 2; //maintain 2N force in y-axis
+			// force(0) = 0;
+			// force(2) = 0;
+		}
 
-	// 	force = mActualEETransform.linear() * force; // force in world frame
+		force = mActualEETransform.linear() * force; // force in world frame
 
-	// 	std::cout<<"FT Sensor Forces: "<<force.transpose()<<std::endl;
+		std::cout<<"FT Sensor Forces: "<<force.transpose()<<std::endl;
 
-	// 	// if (force.norm() > 0.0)
-	// 	{
-	// 		Eigen::VectorXd ft_wrench(6);	
-	// 		ft_wrench << force(0), force(1), force(2), 0.0, 0.0, 0.0;
+		// if (force.norm() > 0.0)
+		{
+			Eigen::VectorXd ft_wrench(6);	
+			ft_wrench << force(0), force(1), force(2), 0.0, 0.0, 0.0;
 
-	// 		mContactIntegral += step_time*(ft_wrench);
+			mContactIntegral += step_time*(ft_wrench);
 
-	// 		// // Cap I term
-	// 		// for(int i=0; i<3; i++)
-	// 		// {
-	// 		// 	if(mContactIntegral(i) > 2)
-	// 		// 		mContactIntegral(i) = 2;
-	// 		// 	if(mContactIntegral(i) < -2)
-	// 		// 		mContactIntegral(i) = -2;
-	// 		// }
+			// // Cap I term
+			// for(int i=0; i<3; i++)
+			// {
+			// 	if(mContactIntegral(i) > 2)
+			// 		mContactIntegral(i) = 2;
+			// 	if(mContactIntegral(i) < -2)
+			// 		mContactIntegral(i) = -2;
+			// }
 
-	// 		// mContactEffort = dart_actual_jacobian.transpose() * (mContactKMatrix * ft_wrench);
-	// 		// mContactEffort = dart_actual_jacobian.transpose() * (mContactKMatrix * ft_wrench + mContactIMatrix * mContactIntegral);
-	// 		mContactEffort = dart_actual_jacobian.transpose() * (mContactIMatrix * mContactIntegral);
-	// 	}
-	// 	// else
-	// 	// {
-	// 	// 	mContactEffort = mZeros;
-	// 	// 	mContactIntegral.setZero();
-	// 	// }
+			// mContactEffort = dart_actual_jacobian.transpose() * (mContactKMatrix * ft_wrench);
+			// mContactEffort = dart_actual_jacobian.transpose() * (mContactKMatrix * ft_wrench + mContactIMatrix * mContactIntegral);
+			mContactEffort = dart_actual_jacobian.transpose() * (mContactIMatrix * mContactIntegral);
+		}
+		// else
+		// {
+		// 	mContactEffort = mZeros;
+		// 	mContactIntegral.setZero();
+		// }
 
-	// 	// SAFETY
-	// 	for(int i=0; i<6; i++)
-	// 	{
-	// 		if(mContactEffort(i) > 20)
-	// 			mContactEffort(i) = 20;
-	// 		if(mContactEffort(i) < -20)
-	// 			mContactEffort(i) = -20;
-	// 	}
+		// SAFETY
+		for(int i=0; i<6; i++)
+		{
+			if(mContactEffort(i) > 20)
+				mContactEffort(i) = 20;
+			if(mContactEffort(i) < -20)
+				mContactEffort(i) = -20;
+		}
 
-	// 	std::cout<<"Contact Effort: "<<mContactEffort.transpose()<<std::endl;
-	// 	// std::cout<<"Contact Integral Term: "<< (dart_actual_jacobian.transpose()*mContactIMatrix * mContactIntegral).transpose()<<std::endl;
+		std::cout<<"Contact Effort: "<<mContactEffort.transpose()<<std::endl;
+		// std::cout<<"Contact Integral Term: "<< (dart_actual_jacobian.transpose()*mContactIMatrix * mContactIntegral).transpose()<<std::endl;
 
-	// 	if(mCount>5000)
-	// 	{
-	// 		mTaskEffort = mTaskEffort + mContactEffort;
-	// 		// std::cout<<"Adding to mTaskEffort!"<<std::endl;
-	// 	}
-	// 	else if(mCount >= 3000 && mCount<=5000)
-	// 	{
-	// 		if(mCount%200 == 0)
-	// 			std::cout<<"Initializing controller: "<<mCount<<std::endl; 
-	// 		mCount++;		
-	// 	}
-	// }
+		if(mCount>5000)
+		{
+			mTaskEffort = mTaskEffort + mContactEffort;
+			// std::cout<<"Adding to mTaskEffort!"<<std::endl;
+		}
+		else if(mCount >= 3000 && mCount<=5000)
+		{
+			if(mCount%200 == 0)
+				std::cout<<"Initializing controller: "<<mCount<<std::endl; 
+			mCount++;		
+		}
+	}
 
 	mNominalThetaDDot = mRotorInertiaMatrix.inverse()*(mTaskEffort+mActualEffort); // mActualEffort is negative of what is required here
 	mNominalThetaDot = mNominalThetaDotPrev + mNominalThetaDDot*step_time;
@@ -801,10 +813,11 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 		mCount++;
 	}
 
-	// std::cout<<"mTaskEffort: "<<mTaskEffort.transpose()<<std::endl;
-	// std::cout<<"mNominalFriction: "<<mNominalFriction.transpose()<<std::endl;
-	// std::cout<<"mActualTheta: "<<mActualTheta.transpose()<<std::endl;
-	// std::cout<<"mActualEffort: "<<mActualEffort.transpose()<<std::endl;
+	std::cout<<"mTaskEffort: "<<mTaskEffort.transpose()<<std::endl;
+	std::cout<<"mNominalFriction: "<<mNominalFriction.transpose()<<std::endl;
+	std::cout<<"mNominalThetaPrev: "<<mNominalThetaPrev.transpose()<<std::endl;
+	std::cout<<"mNominalThetaDotPrev: "<<mNominalThetaDotPrev.transpose()<<std::endl;
+	std::cout<<"mActualEffort: "<<mActualEffort.transpose()<<std::endl;
 
 	for (size_t idof = 0; idof < mControlledJointHandles.size(); ++idof) 
 	{

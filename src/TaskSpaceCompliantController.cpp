@@ -145,15 +145,15 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 
 	mRotorInertiaMatrix.resize(numControlledDofs, numControlledDofs);
 	mRotorInertiaMatrix.setZero();
-	// mRotorInertiaMatrix.diagonal() << 0.4, 0.4, 0.4, 0.2, 0.2, 0.2;
-	mRotorInertiaMatrix.diagonal() << 0.1, 0.25, 0.25, 0.18, 0.18, 0.18;
+	mRotorInertiaMatrix.diagonal() << 0.4, 0.4, 0.4, 0.2, 0.2, 0.2;
+	// mRotorInertiaMatrix.diagonal() << 0.1, 0.25, 0.25, 0.18, 0.18, 0.18;
 
 	mFrictionL.resize(numControlledDofs, numControlledDofs);
 	mFrictionL.setZero();
-	// mFrictionL.diagonal() << 160, 160, 160, 100, 100, 100;	
+	mFrictionL.diagonal() << 160, 160, 160, 100, 100, 100;	
 	// mFrictionL.diagonal() << 50, 50, 50, 35, 35, 35;
 	// mFrictionL.diagonal() << 75, 75, 75, 45, 45, 45;
-	mFrictionL.diagonal() << 100, 100, 100, 45, 45, 45; // no vibrations	
+	// mFrictionL.diagonal() << 100, 100, 100, 45, 45, 45; // no vibrations	
 	// mFrictionL.diagonal() << 200, 200, 200, 130, 130, 130;
 
 	// very high Lp (200) and high L (80) does not work as well
@@ -702,8 +702,8 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 	// 	// std::cout<<"mTaskPoseIntegral: "<<mTaskPoseIntegral.transpose()<<std::endl;
 	// }
 
+	Eigen::VectorXd ee_error(6);  
 	{
-		Eigen::VectorXd ee_error(6);  
 		ee_error.head(3) << mActualEETransform.translation() - mTrueDesiredEETransform.translation(); // positional error
 		
 		Eigen::Quaterniond actual_ee_quat(mActualEETransform.linear());
@@ -720,9 +720,85 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 	}
 
 
+	// if(mUseIntegralTermForqueFrame.load())
+	// {
+	// 	Eigen::Vector3d position_error(dart_error(0), dart_error(1), dart_error(2));
+	// 	Eigen::MatrixXd mNominalEERotation = mNominalEETransform.linear();
+	// 	position_error = mNominalEERotation.inverse() * position_error; 
+	// 	std::cout<<"BF Position error in FT frame: "<<position_error.transpose()<<std::endl;
+	// 	// position_error(2) = 0; // zero out the z term in FT sensor frame of reference
+
+	// 	// if(std::abs(position_error(0)) > mUseIntegralTermForqueFrameMaxThreshold || std::abs(position_error(1)) > mUseIntegralTermForqueFrameMaxThreshold)
+	// 	// {
+	// 	// 	position_error(0) = 0;
+	// 	// 	position_error(1) = 0;
+	// 	// }
+	// 	// if(std::abs(position_error(0)) < mUseIntegralTermForqueFrameMinThreshold)
+	// 	// 	position_error(0) = 0;
+	// 	// if(std::abs(position_error(1)) < mUseIntegralTermForqueFrameMinThreshold)
+	// 	// 	position_error(1) = 0;
+
+	// 	if(position_error.norm() > mUseIntegralTermForqueFrameMaxThreshold)
+	// 	{
+	// 		position_error(0) = 0;
+	// 		position_error(1) = 0;
+	// 		position_error(2) = 0;
+	// 	}
+
+	// 	std::cout<<"AF Position error in FT frame: "<<position_error.transpose()<<std::endl;
+	// 	std::cout<<"error norm: "<<position_error.norm()<<std::endl;
+	// 	position_error = mNominalEERotation * position_error;
+
+	// 	Eigen::VectorXd error_wrench(6);	
+	// 	error_wrench << position_error(0), position_error(1), position_error(2), 0.0, 0.0, 0.0;
+
+	// 	if(mTargetUpdate)
+	// 	{
+	// 		// mTaskPoseIntegralBuffer += mTaskPoseIntegral;
+	// 		mTaskPoseIntegral.setZero();
+	// 	}
+
+	// 	if(error_wrench.norm() > 0.00000001)
+	// 	{
+	// 		mTaskPoseIntegral += dart_nominal_jacobian.transpose() * (-mTaskIMatrix * error_wrench);
+
+	// 		Eigen::VectorXd update;
+	// 		update = dart_nominal_jacobian.transpose() * (-mTaskIMatrix * error_wrench);
+	// 		std::cout<<"Task Pose Integral Update: "<<update.transpose()<<std::endl;
+
+	// 		// cap the i term
+	// 		for(int i=0; i<6; i++)
+	// 		{
+	// 			if(mTaskPoseIntegral(i) > 1.0)
+	// 				mTaskPoseIntegral(i) = 1.0;
+	// 			if(mTaskPoseIntegral(i) < -1.0)
+	// 				mTaskPoseIntegral(i) = -1.0;
+	// 		}
+	// 	}
+	// 	else
+	// 	{
+	// 		mTaskPoseIntegral.setZero();
+	// 	}
+
+	// 	// // SAFETY
+	// 	// for(int i=0; i<6; i++)
+	// 	// {
+	// 	// 	if(mTaskPoseIntegralBuffer(i) > 20)
+	// 	// 		mTaskPoseIntegralBuffer(i) = 20;
+	// 	// 	if(mTaskPoseIntegralBuffer(i) < -20)
+	// 	// 		mTaskPoseIntegralBuffer(i) = -20;
+	// 	// }
+
+	// 	// std::cout<<"mTaskPoseIntegralBuffer: "<<mTaskPoseIntegralBuffer.transpose()<<std::endl;
+	// 	std::cout<<"mTaskPoseIntegral: "<<mTaskPoseIntegral.transpose()<<std::endl;
+
+	// 	// mTaskEffort += mTaskPoseIntegral + mTaskPoseIntegralBuffer;
+	// 	mTaskEffort += mTaskPoseIntegral;
+	// }
+
 	if(mUseIntegralTermForqueFrame.load())
 	{
-		Eigen::Vector3d position_error(dart_error(0), dart_error(1), dart_error(2));
+		Eigen::Vector3d position_error(ee_error(0), ee_error(1), ee_error(2));
 		Eigen::MatrixXd mActualEERotation = mActualEETransform.linear();
 		position_error = mActualEERotation.inverse() * position_error; 
 		std::cout<<"BF Position error in FT frame: "<<position_error.transpose()<<std::endl;
@@ -760,10 +836,10 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 
 		if(error_wrench.norm() > 0.00000001)
 		{
-			mTaskPoseIntegral += dart_nominal_jacobian.transpose() * (-mTaskIMatrix * error_wrench);
+			mTaskPoseIntegral += dart_actual_jacobian.transpose() * (-mTaskIMatrix * error_wrench);
 
 			Eigen::VectorXd update;
-			update = dart_nominal_jacobian.transpose() * (-mTaskIMatrix * error_wrench);
+			update = dart_actual_jacobian.transpose() * (-mTaskIMatrix * error_wrench);
 			std::cout<<"Task Pose Integral Update: "<<update.transpose()<<std::endl;
 
 			// cap the i term

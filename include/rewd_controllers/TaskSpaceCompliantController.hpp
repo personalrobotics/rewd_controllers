@@ -183,12 +183,15 @@ private:
 
   Eigen::VectorXd mContactIntegral;
   Eigen::VectorXd mTaskPoseIntegral;
+  // Eigen::VectorXd mTaskPoseIntegralBuffer;
 
   boost::shared_ptr<luca_dynamics::model> urdf_model;
   boost::shared_ptr<luca_dynamics::luca_dynamics> dyn; 
 
   std::atomic_bool mMaintainZeroContact;
   std::atomic_bool mMaintainNonZeroContact;
+
+  std::atomic_bool mStateChange;
 
   bool mUseIntegralTerm = false;
   Eigen::VectorXd mUseIntegralTermMaxThreshold;
@@ -199,6 +202,19 @@ private:
   double mUseIntegralTermForqueFrameMinThreshold;
 
   std::chrono::time_point<std::chrono::high_resolution_clock> mLastTimePoint;
+  std::chrono::time_point<std::chrono::high_resolution_clock> mFTLastTimePoint;
+
+  std::chrono::time_point<std::chrono::high_resolution_clock> mLastContactTimePoint;
+  Eigen::Isometry3d mLastContactEETransform;
+
+  double mAlpha_;
+  std::vector<double> mFt_reading;
+  std::vector<double> mFt_reading_prev;
+  std::vector<double> mFiltered_ft_reading;
+
+  bool mTargetUpdate = false;
+
+  bool firstRunMaintainContact = true;
 
   int mZeroCount = 0;
 

@@ -145,14 +145,15 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 
 	mRotorInertiaMatrix.resize(numControlledDofs, numControlledDofs);
 	mRotorInertiaMatrix.setZero();
-	mRotorInertiaMatrix.diagonal() << 0.4, 0.4, 0.4, 0.2, 0.2, 0.2;
+	// mRotorInertiaMatrix.diagonal() << 0.4, 0.4, 0.4, 0.2, 0.2, 0.2;
+	mRotorInertiaMatrix.diagonal() << 0.1, 0.25, 0.25, 0.18, 0.18, 0.18;
 
 	mFrictionL.resize(numControlledDofs, numControlledDofs);
 	mFrictionL.setZero();
 	// mFrictionL.diagonal() << 160, 160, 160, 100, 100, 100;	
 	// mFrictionL.diagonal() << 50, 50, 50, 35, 35, 35;
 	// mFrictionL.diagonal() << 75, 75, 75, 45, 45, 45;
-	mFrictionL.diagonal() << 100, 100, 100, 45, 45, 45;	
+	mFrictionL.diagonal() << 100, 100, 100, 45, 45, 45; // no vibrations	
 	// mFrictionL.diagonal() << 200, 200, 200, 130, 130, 130;
 
 	// very high Lp (200) and high L (80) does not work as well
@@ -162,8 +163,8 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 	mFrictionLp.setZero();
 	// mFrictionLp.diagonal() << 40, 40, 40, 30, 30, 30;
 	// mFrictionLp.diagonal() << 15, 15, 15, 10, 10, 10; // last used value
-	mFrictionLp.diagonal() << 5, 5, 5, 5, 5, 5; // last used value
-	// mFrictionLp.diagonal() << 10, 10, 10, 7.5, 7.5, 7.5; // last used value
+	// mFrictionLp.diagonal() << 5, 5, 5, 5, 5, 5; // last used value
+	mFrictionLp.diagonal() << 10, 10, 10, 7.5, 7.5, 7.5; // last used value
 	// mFrictionLp.diagonal() << 20, 20, 20, 15, 15, 15;
 	// mFrictionLp.diagonal() << 50, 50, 50, 50, 50, 50; // Causes large scale vibrations
 	// mFrictionLp.diagonal() << 5, 5, 5, 3.75, 3.75, 3.75;
@@ -190,16 +191,21 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 
 	mTaskIMatrix.resize(6, 6);
 	mTaskIMatrix.setZero();
-	mTaskIMatrix.diagonal() << 0.5, 0.5, 0.5, 0.5, 0.5, 0.5;
+	// mTaskIMatrix.diagonal() << 0.5, 0.5, 0.5, 0.5, 0.5, 0.5;
+	mTaskIMatrix.diagonal() << 0.1, 0.1, 0.1, 0.1, 0.1, 0.1;
 
 	mContactKMatrix.resize(6, 6);
 	mContactKMatrix.setZero();
-	mContactKMatrix.diagonal() << 7.0, 7.0, 7.0, 7.0, 7.0, 7.0;
+	// mContactKMatrix.diagonal() << 2.0, 2.0, 2.0, 2.0, 2.0, 2.0;
+	mContactKMatrix.diagonal() << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
 
 	mContactIMatrix.resize(6, 6);
 	mContactIMatrix.setZero();
+	// mContactIMatrix.diagonal() << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
+	// mContactIMatrix.diagonal() << 20.0, 20.0, 20.0, 20.0, 20.0, 20.0;
 	// mContactIMatrix.diagonal() << 15, 15, 15, 15, 15, 15;
 	mContactIMatrix.diagonal() << 3.0, 3.0, 3.0, 3.0, 3.0, 3.0;
+	// mContactIMatrix.diagonal() << 7.0, 7.0, 7.0, 7.0, 7.0, 7.0;
 
 	mUseIntegralTermMaxThreshold.resize(6);
 	mUseIntegralTermMaxThreshold << 0.015, 0.015, 0.015, M_PI/30, M_PI/30, M_PI/30;
@@ -221,6 +227,20 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 
 	mTaskPoseIntegral.resize(numControlledDofs);
 	mTaskPoseIntegral.setZero();
+
+	// mTaskPoseIntegralBuffer.resize(numControlledDofs);
+	// mTaskPoseIntegralBuffer.setZero();
+
+
+    // Initialize alpha (filter coefficient) based on sampling rate and cutoff frequency
+    // and set previous torque vector size to dof
+    mAlpha_ = 1 / (1 + 2 * M_PI * 5 * 0.001);
+    mFt_reading_prev.resize(6);
+    mFt_reading.resize(6);
+    mFiltered_ft_reading.resize(6);
+
+    mFt_reading_prev = std::vector<double>(6, 0.0);
+    mFt_reading = std::vector<double>(6, 0.0);
 
 	mName = internal::getLeafNamespace(n);
 
@@ -268,6 +288,7 @@ void TaskSpaceCompliantController::modeCallback(
 
 	if(msg.data == "maintain_contact")
 	{
+		mLastContactTimePoint = std::chrono::high_resolution_clock::now();
 		mMaintainNonZeroContact = true;
 		mMaintainZeroContact = false;
 		mUseIntegralTermForqueFrame = false;
@@ -291,27 +312,50 @@ void TaskSpaceCompliantController::modeCallback(
 		mUseIntegralTermForqueFrame = false;
 	}
 
+	mStateChange = true;
 
 }
 
 //=============================================================================
 void TaskSpaceCompliantController::forceTorqueDataCallback(
     const geometry_msgs::WrenchStamped &msg) {
-  std::lock_guard<std::mutex> lock(mForceTorqueDataMutex);
-  mForce.x() = msg.wrench.force.x;
-  mForce.y() = msg.wrench.force.y;
-  mForce.z() = msg.wrench.force.z;
-  mTorque.x() = msg.wrench.torque.x;
-  mTorque.y() = msg.wrench.torque.y;
-  mTorque.z() = msg.wrench.torque.z;
 
-  // if (mForce.norm() < 0.005)
-  // 	mZeroCount = 0;
-  // else
-  // 	mZeroCount++;
+	// mForce.x() = msg.wrench.force.x;
+	// mForce.y() = msg.wrench.force.y;
+	// mForce.z() = msg.wrench.force.z;
+	// mTorque.x() = msg.wrench.torque.x;
+	// mTorque.y() = msg.wrench.torque.y;
+	// mTorque.z() = msg.wrench.torque.z;
 
-  // if(mZeroCount < 100)
-  // 	mForce << 0.0, 0.0, 0.0;
+	// if (mForce.norm() < 0.005)
+	// 	mZeroCount = 0;
+	// else
+	// 	mZeroCount++;
+
+	// if(mZeroCount < 100)
+	// 	mForce << 0.0, 0.0, 0.0;
+
+	auto current_time = std::chrono::high_resolution_clock::now();
+	auto duration = duration_cast<microseconds>(current_time - mFTLastTimePoint);
+
+	// std::cout<<"FT Controller Frequency: "<<1000000.0/duration.count()<<std::endl;
+	mFTLastTimePoint = std::chrono::high_resolution_clock::now();
+
+	std::lock_guard<std::mutex> lock(mForceTorqueDataMutex);
+
+	mFt_reading[0] = msg.wrench.force.x;
+	mFt_reading[1] = msg.wrench.force.y;
+	mFt_reading[2] = msg.wrench.force.z;
+	mFt_reading[3] = msg.wrench.torque.x;
+	mFt_reading[4] = msg.wrench.torque.y;
+	mFt_reading[5] = msg.wrench.torque.z;
+
+	for (int i = 0; i < mFiltered_ft_reading.size(); i++)
+	{
+	    mFiltered_ft_reading[i] = mFt_reading_prev[i] * mAlpha_ + mFt_reading[i] * (1 - mAlpha_);
+	    mFt_reading_prev[i] = mFiltered_ft_reading[i];
+	}
+
 }
 
 //=============================================================================
@@ -321,8 +365,11 @@ void TaskSpaceCompliantController::starting(const ros::Time &time) {
 	mMaintainNonZeroContact = false;
 	mMaintainZeroContact = false;
 	mUseIntegralTermForqueFrame = false;
+	mStateChange = true;
 
 	mLastTimePoint = std::chrono::high_resolution_clock::now();
+	mFTLastTimePoint = std::chrono::high_resolution_clock::now();
+	mLastContactTimePoint = std::chrono::high_resolution_clock::now();
 
 	ROS_DEBUG_STREAM(
 			"Initialized desired position: " << mDesiredPosition.transpose());
@@ -469,6 +516,7 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 		mTrueDesiredEETransform = mDesiredEETransform;
 	}
 
+	mTargetUpdate = false;
 	if ((mDesiredPosition != mLastDesiredPosition || !mDesiredEETransform.isApprox(mLastDesiredEETransform,0.0001) ) && mActualPosition != mDesiredPosition){
 		std::cout<<"3. Updating desired position ..."<<std::endl;
 		std::cout<<"mDesiredEETransform: "<<mDesiredEETransform.translation().transpose()<<std::endl;
@@ -481,6 +529,8 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 		mTrueDesiredPosition = mExtendedJoints->getExtendedJoint();
 		mTrueDesiredVelocity = mDesiredVelocity;
 		mTrueDesiredEETransform = mDesiredEETransform;
+
+		mTargetUpdate = true;
 	}
 	// else
 	// {
@@ -652,6 +702,23 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 	// 	// std::cout<<"mTaskPoseIntegral: "<<mTaskPoseIntegral.transpose()<<std::endl;
 	// }
 
+	{
+		Eigen::VectorXd ee_error(6);  
+		ee_error.head(3) << mActualEETransform.translation() - mTrueDesiredEETransform.translation(); // positional error
+		
+		Eigen::Quaterniond actual_ee_quat(mActualEETransform.linear());
+		Eigen::Quaterniond ee_quat_d(mTrueDesiredEETransform.linear());
+
+		if (ee_quat_d.coeffs().dot(actual_ee_quat.coeffs()) < 0.0) 
+		{
+				actual_ee_quat.coeffs() << -actual_ee_quat.coeffs();
+		}
+		Eigen::Quaterniond error_qtn(actual_ee_quat.inverse() * ee_quat_d);
+		ee_error.tail(3) << error_qtn.x(), error_qtn.y(), error_qtn.z();
+		ee_error.tail(3) << -mActualEETransform.linear() * dart_error.tail(3);
+		std::cout<<"\n actual_error: "<<ee_error.transpose()<<std::endl;
+	}
+
 
 	if(mUseIntegralTermForqueFrame.load())
 	{
@@ -685,9 +752,19 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 		Eigen::VectorXd error_wrench(6);	
 		error_wrench << position_error(0), position_error(1), position_error(2), 0.0, 0.0, 0.0;
 
+		if(mTargetUpdate)
+		{
+			// mTaskPoseIntegralBuffer += mTaskPoseIntegral;
+			mTaskPoseIntegral.setZero();
+		}
+
 		if(error_wrench.norm() > 0.00000001)
 		{
 			mTaskPoseIntegral += dart_nominal_jacobian.transpose() * (-mTaskIMatrix * error_wrench);
+
+			Eigen::VectorXd update;
+			update = dart_nominal_jacobian.transpose() * (-mTaskIMatrix * error_wrench);
+			std::cout<<"Task Pose Integral Update: "<<update.transpose()<<std::endl;
 
 			// cap the i term
 			for(int i=0; i<6; i++)
@@ -697,27 +774,43 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 				if(mTaskPoseIntegral(i) < -1.0)
 					mTaskPoseIntegral(i) = -1.0;
 			}
-
-			mTaskEffort += mTaskPoseIntegral;
 		}
 		else
 		{
 			mTaskPoseIntegral.setZero();
 		}
 
+		// // SAFETY
+		// for(int i=0; i<6; i++)
+		// {
+		// 	if(mTaskPoseIntegralBuffer(i) > 20)
+		// 		mTaskPoseIntegralBuffer(i) = 20;
+		// 	if(mTaskPoseIntegralBuffer(i) < -20)
+		// 		mTaskPoseIntegralBuffer(i) = -20;
+		// }
+
+		// std::cout<<"mTaskPoseIntegralBuffer: "<<mTaskPoseIntegralBuffer.transpose()<<std::endl;
 		std::cout<<"mTaskPoseIntegral: "<<mTaskPoseIntegral.transpose()<<std::endl;
+
+		// mTaskEffort += mTaskPoseIntegral + mTaskPoseIntegralBuffer;
+		mTaskEffort += mTaskPoseIntegral;
 	}
+
+	Eigen::Vector3d force;
+	{
+		std::lock_guard<std::mutex> lock(mForceTorqueDataMutex);
+		force << mFt_reading[0], mFt_reading[1], mFt_reading[2];
+		// force << mFiltered_ft_reading[0], mFiltered_ft_reading[1], mFiltered_ft_reading[2];
+		// force << mForce.x(), mForce.y(), mForce.z();
+		// force << mForce.x(), mForce.y(), 0.0;
+	}
+
+	std::cout<<"FT Sensor Reading: "<<force.transpose()<<std::endl;
 
 	if(mMaintainZeroContact.load() || mMaintainNonZeroContact.load())
 	{
-		Eigen::Vector3d force;
-		{
-			std::lock_guard<std::mutex> lock(mForceTorqueDataMutex);
-			force << mForce.x(), mForce.y(), mForce.z();
-			// force << mForce.x(), mForce.y(), 0.0;
-		}
 
-		Eigen::Vector3d filter(0.1, 0.1, 0.1);
+		Eigen::Vector3d filter(0.2, 0.2, 0.2);
 
 		for(int i=0; i<3; i++)
 		{
@@ -730,11 +823,42 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 				force(i) = std::min(0.0,force(i)+filter(i));
 		}
 
+		if(mStateChange.load())
+		{
+			mStateChange = false;
+			mLastContactEETransform = mActualEETransform;
+		}
+
+		if (force.norm() > 0.0)
+		{
+			mLastContactTimePoint = std::chrono::high_resolution_clock::now();
+			mLastContactEETransform = mActualEETransform;
+		}
+
+		Eigen::Vector3d diff;
+		diff = mLastContactEETransform.translation() - mActualEETransform.translation();
+
+		auto time_since_last_contact = duration_cast<microseconds>(std::chrono::high_resolution_clock::now() - mLastContactTimePoint);
+
+		std::cout<<"Time since last contact: "<<time_since_last_contact.count()/1000000.0<<std::endl;
+		std::cout<<"Difference: "<<diff.norm()<<std::endl;
+
 		if(mMaintainNonZeroContact.load())
 		{
-			force(1) += 2; //maintain 2N force in y-axis
-			// force(0) = 0;
-			// force(2) = 0;
+			// if(time_since_last_contact.count() < 2.0 * 1000000)
+			if(diff.norm() < 0.05) // 5cm difference
+			{
+				std::cout<<"Maintaining 2N contact"<<std::endl;
+				force(1) += 2; //maintain 2N force in y-axis
+				force(0) = 0;
+				force(2) = 0;
+			}
+			else
+			{
+				std::cout<<"Time limit exceeded maintaining 2N contact"<<std::endl;
+				mMaintainNonZeroContact = false;
+				mMaintainZeroContact = true;
+			}
 		}
 
 		force = mActualEETransform.linear() * force; // force in world frame

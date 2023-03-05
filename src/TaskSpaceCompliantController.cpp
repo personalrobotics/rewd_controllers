@@ -172,10 +172,12 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 	mJointKMatrix.resize(numControlledDofs, numControlledDofs);
 	mJointKMatrix.setZero();
 	mJointKMatrix.diagonal() << 80,80,80,60,60,60;
+	// mJointKMatrix.diagonal() << 40,40,40,30,30,30;
 
 	mJointDMatrix.resize(numControlledDofs, numControlledDofs);
 	mJointDMatrix.setZero();
 	mJointDMatrix.diagonal() << 8,8,8,6,6,6;
+	// mJointDMatrix.diagonal() << 20,20,20,12,12,12;
 
 	mTaskKMatrix.resize(6, 6);
 	mTaskKMatrix.setZero();
@@ -191,8 +193,8 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 
 	mTaskIMatrix.resize(6, 6);
 	mTaskIMatrix.setZero();
-	// mTaskIMatrix.diagonal() << 0.5, 0.5, 0.5, 0.5, 0.5, 0.5;
-	mTaskIMatrix.diagonal() << 0.1, 0.1, 0.1, 0.1, 0.1, 0.1;
+	mTaskIMatrix.diagonal() << 0.3, 0.3, 0.3, 0.3, 0.3, 0.3;
+	// mTaskIMatrix.diagonal() << 0.1, 0.1, 0.1, 0.1, 0.1, 0.1;
 
 	mContactKMatrix.resize(6, 6);
 	mContactKMatrix.setZero();
@@ -213,8 +215,8 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 	mUseIntegralTermMinThreshold.resize(6);
 	mUseIntegralTermMinThreshold << 0.003, 0.003, 0.003, M_PI/180, M_PI/180, M_PI/180;
 
-	mUseIntegralTermForqueFrameMaxThreshold = 0.02;
-	mUseIntegralTermForqueFrameMinThreshold = 0.00;
+	mUseIntegralTermForqueFrameMaxThreshold = 0.014;
+	mUseIntegralTermForqueFrameMinThreshold = 0.003;
 
 	// Initialize buffers to avoid dynamic memory allocation at runtime.
 	mDesiredPosition.resize(numControlledDofs);
@@ -802,7 +804,7 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 		Eigen::MatrixXd mActualEERotation = mActualEETransform.linear();
 		position_error = mActualEERotation.inverse() * position_error; 
 		std::cout<<"BF Position error in FT frame: "<<position_error.transpose()<<std::endl;
-		// position_error(2) = 0; // zero out the z term in FT sensor frame of reference
+		position_error(2) = 0; // zero out the z term in FT sensor frame of reference
 
 		// if(std::abs(position_error(0)) > mUseIntegralTermForqueFrameMaxThreshold || std::abs(position_error(1)) > mUseIntegralTermForqueFrameMaxThreshold)
 		// {
@@ -814,12 +816,12 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 		// if(std::abs(position_error(1)) < mUseIntegralTermForqueFrameMinThreshold)
 		// 	position_error(1) = 0;
 
-		if(position_error.norm() > mUseIntegralTermForqueFrameMaxThreshold)
-		{
-			position_error(0) = 0;
-			position_error(1) = 0;
-			position_error(2) = 0;
-		}
+		// if(position_error.norm() > mUseIntegralTermForqueFrameMaxThreshold)
+		// {
+		// 	position_error(0) = 0;
+		// 	position_error(1) = 0;
+		// 	position_error(2) = 0;
+		// }
 
 		std::cout<<"AF Position error in FT frame: "<<position_error.transpose()<<std::endl;
 		std::cout<<"error norm: "<<position_error.norm()<<std::endl;
@@ -834,7 +836,7 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 			mTaskPoseIntegral.setZero();
 		}
 
-		if(error_wrench.norm() > 0.00000001)
+		if(error_wrench.norm() > mUseIntegralTermForqueFrameMinThreshold && error_wrench.norm() < mUseIntegralTermForqueFrameMaxThreshold)
 		{
 			mTaskPoseIntegral += dart_actual_jacobian.transpose() * (-mTaskIMatrix * error_wrench);
 
@@ -851,7 +853,7 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 					mTaskPoseIntegral(i) = -1.0;
 			}
 		}
-		else
+		else if(error_wrench.norm() > mUseIntegralTermForqueFrameMinThreshold)
 		{
 			mTaskPoseIntegral.setZero();
 		}

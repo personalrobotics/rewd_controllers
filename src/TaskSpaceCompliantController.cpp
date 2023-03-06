@@ -183,7 +183,7 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 
 	mTaskKMatrix.resize(6, 6);
 	mTaskKMatrix.setZero();
-	mTaskKMatrix.diagonal() << 200,200,200,75,75,75;
+	mTaskKMatrix.diagonal() << 200,200,100,75,75,75;
 	// mTaskKMatrix.diagonal() << 200,200,200,150,150,150;
 	// mTaskKMatrix.diagonal() << 50,50,50,150,150,150;
 	// mTaskKMatrix.diagonal() << 300,300,300,150,150,150;
@@ -192,7 +192,7 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 	mTaskDMatrix.setZero();
 	// mTaskDMatrix.diagonal() << 40,40,40,30,30,30;
 	// mTaskDMatrix.diagonal() << 60,60,60,40,40,40;
-	mTaskDMatrix.diagonal() << 60,60,60,10,10,10;
+	mTaskDMatrix.diagonal() << 60,60,30,10,10,10;
 	// mTaskDMatrix.diagonal() << 60,60,60,40,40,40;
 	// mTaskDMatrix.diagonal() << 30,30,30,40,40,40;
 	// mTaskDMatrix.diagonal() << 40,40,40,30,30,30;
@@ -224,7 +224,7 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 	mUseIntegralTermMinThreshold.resize(6);
 	mUseIntegralTermMinThreshold << 0.003, 0.003, 0.003, M_PI/180, M_PI/180, M_PI/180;
 
-	mUseIntegralTermForqueFrameMaxThreshold = 0.02;
+	mUseIntegralTermForqueFrameMaxThreshold = 0.025;
 	mUseIntegralTermForqueFrameMinThreshold = 0.003;
 
 	// Initialize buffers to avoid dynamic memory allocation at runtime.

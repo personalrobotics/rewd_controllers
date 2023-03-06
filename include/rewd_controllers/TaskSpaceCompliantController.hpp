@@ -116,6 +116,9 @@ private:
   Eigen::MatrixXd mTaskDMatrix;
   Eigen::MatrixXd mTaskIMatrix;
 
+  Eigen::MatrixXd mTaskKMatrixUpdate;
+  Eigen::MatrixXd mTaskDMatrixUpdate;
+
   Eigen::MatrixXd mContactKMatrix;
   Eigen::MatrixXd mContactIMatrix;
 
@@ -181,6 +184,8 @@ private:
   Eigen::Vector3d mForce;
   Eigen::Vector3d mTorque;
 
+  int mRunCount = 0;
+
   Eigen::VectorXd mContactIntegral;
   Eigen::VectorXd mTaskPoseIntegral;
   // Eigen::VectorXd mTaskPoseIntegralBuffer;
@@ -190,6 +195,13 @@ private:
 
   std::atomic_bool mMaintainZeroContact;
   std::atomic_bool mMaintainNonZeroContact;
+
+  std::atomic_bool mStiffnessUpdate;
+
+  std::atomic_bool mWeirdCompliance;
+  std::atomic_bool mTakeGoalInputs;
+
+  bool mNewContact;
 
   std::atomic_bool mStateChange;
 

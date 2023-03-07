@@ -187,6 +187,7 @@ private:
   int mRunCount = 0;
 
   Eigen::VectorXd mContactIntegral;
+  Eigen::VectorXd mContactProportional;
   Eigen::VectorXd mTaskPoseIntegral;
   // Eigen::VectorXd mTaskPoseIntegralBuffer;
 
@@ -200,6 +201,8 @@ private:
 
   std::atomic_bool mWeirdCompliance;
   std::atomic_bool mTakeGoalInputs;
+
+  std::atomic_bool mMaintainPosition;
 
   bool mNewContact;
 
@@ -225,6 +228,8 @@ private:
   std::vector<double> mFiltered_ft_reading;
 
   bool mTargetUpdate = false;
+
+  bool mFirstSwitchBack = false;
 
   bool firstRunMaintainContact = true;
 

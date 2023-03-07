@@ -200,13 +200,14 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 
 	mTaskIMatrix.resize(6, 6);
 	mTaskIMatrix.setZero();
-	mTaskIMatrix.diagonal() << 0.3, 0.3, 0.3, 0.3, 0.3, 0.3;
+	// mTaskIMatrix.diagonal() << 0.3, 0.3, 0.3, 0.3, 0.3, 0.3;
 	// mTaskIMatrix.diagonal() << 1.0, 1.0, 1.0, 1.0, 1.0, 1.0;
-	// mTaskIMatrix.diagonal() << 0.1, 0.1, 0.1, 0.1, 0.1, 0.1;
+	mTaskIMatrix.diagonal() << 0.1, 0.1, 0.1, 0.1, 0.1, 0.1;
 
 	mContactKMatrix.resize(6, 6);
 	mContactKMatrix.setZero();
-	mContactKMatrix.diagonal() << 2.0, 2.0, 2.0, 2.0, 2.0, 2.0;
+	// mContactKMatrix.diagonal() << 2.0, 2.0, 2.0, 2.0, 2.0, 2.0;
+	mContactKMatrix.diagonal() << 3.0, 3.0, 3.0, 3.0, 3.0, 3.0;
 	// mContactKMatrix.diagonal() << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
 
 	mContactIMatrix.resize(6, 6);
@@ -214,8 +215,8 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 	// mContactIMatrix.diagonal() << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
 	// mContactIMatrix.diagonal() << 20.0, 20.0, 20.0, 20.0, 20.0, 20.0;
 	// mContactIMatrix.diagonal() << 15, 15, 15, 15, 15, 15;
-	mContactIMatrix.diagonal() << 3.0, 3.0, 3.0, 3.0, 3.0, 3.0;
-	// mContactIMatrix.diagonal() << 7.0, 7.0, 7.0, 7.0, 7.0, 7.0;
+	// mContactIMatrix.diagonal() << 3.0, 3.0, 3.0, 3.0, 3.0, 3.0;
+	mContactIMatrix.diagonal() << 7.0, 7.0, 7.0, 7.0, 7.0, 7.0;
 	// mContactIMatrix.diagonal() << 10.0, 10.0, 10.0, 10.0, 10.0, 10.0;
 
 	mUseIntegralTermMaxThreshold.resize(6);
@@ -324,11 +325,11 @@ void TaskSpaceCompliantController::modeCallback(
 	{
 		mTaskKMatrixUpdate.resize(6, 6);
 		mTaskKMatrixUpdate.setZero();
-		mTaskKMatrixUpdate.diagonal() << 200,200,300,150,150,150;
+		mTaskKMatrixUpdate.diagonal() << 200,200,300,75,75,75;
 
 		mTaskDMatrixUpdate.resize(6, 6);
 		mTaskDMatrixUpdate.setZero();
-		mTaskDMatrixUpdate.diagonal() << 60,60,90,40,40,40;
+		mTaskDMatrixUpdate.diagonal() << 60,60,90,10,10,10;
 
 		mStiffnessUpdate = true;
 	}
@@ -336,11 +337,11 @@ void TaskSpaceCompliantController::modeCallback(
 	{
 		mTaskKMatrixUpdate.resize(6, 6);
 		mTaskKMatrixUpdate.setZero();
-		mTaskKMatrixUpdate.diagonal() << 200,200,100,150,150,150;
+		mTaskKMatrixUpdate.diagonal() << 200,200,100,75,75,75;
 
 		mTaskDMatrixUpdate.resize(6, 6);
 		mTaskDMatrixUpdate.setZero();
-		mTaskDMatrixUpdate.diagonal() << 60,60,30,40,40,40;
+		mTaskDMatrixUpdate.diagonal() << 60,60,30,10,10,10;
 
 		mStiffnessUpdate = true;
 	}
@@ -348,11 +349,24 @@ void TaskSpaceCompliantController::modeCallback(
 	{
 		mTaskKMatrixUpdate.resize(6, 6);
 		mTaskKMatrixUpdate.setZero();
-		mTaskKMatrixUpdate.diagonal() << 50,50,50,150,150,150;
+		mTaskKMatrixUpdate.diagonal() << 200,200,200,75,75,75;
 
 		mTaskDMatrixUpdate.resize(6, 6);
 		mTaskDMatrixUpdate.setZero();
-		mTaskDMatrixUpdate.diagonal() << 30,30,30,40,40,40;
+		mTaskDMatrixUpdate.diagonal() << 60,60,60,10,10,10;
+
+		mStiffnessUpdate = true;
+	}
+	else if(msg.data == "default_stiffness")
+	{
+		mTaskKMatrixUpdate.resize(6, 6);
+		mTaskKMatrixUpdate.setZero();
+		mTaskKMatrixUpdate.diagonal() << 200,200,200,75,75,75;
+
+
+		mTaskDMatrixUpdate.resize(6, 6);
+		mTaskDMatrixUpdate.setZero();
+		mTaskDMatrixUpdate.diagonal() << 60,60,60,10,10,10;
 
 		mStiffnessUpdate = true;
 	}
@@ -360,12 +374,23 @@ void TaskSpaceCompliantController::modeCallback(
 	{
 		mWeirdCompliance = true;
 	}
-	else
+	else if(msg.data == "none")
 	{
 		mMaintainNonZeroContact = false;
 		mMaintainZeroContact = false;
+		// mMaintainPosition = false;
 		mUseIntegralTermForqueFrame = false;
+		mTakeGoalInputs = true;
 	}
+	// else if(msg.data == "maintain_position")
+	// {
+	// 	mMaintainNonZeroContact = false;
+	// 	mMaintainZeroContact = false;
+	// 	mUseIntegralTermForqueFrame = false;
+	// 	mMaintainPosition = true;
+	// 	mFirstSwitchBack = true;
+	// 	mTakeGoalInputs = false;
+	// }
 
 	mStateChange = true;
 
@@ -405,11 +430,11 @@ void TaskSpaceCompliantController::forceTorqueDataCallback(
 	mFt_reading[4] = msg.wrench.torque.y;
 	mFt_reading[5] = msg.wrench.torque.z;
 
-	for (int i = 0; i < mFiltered_ft_reading.size(); i++)
-	{
-	    mFiltered_ft_reading[i] = mFt_reading_prev[i] * mAlpha_ + mFt_reading[i] * (1 - mAlpha_);
-	    mFt_reading_prev[i] = mFiltered_ft_reading[i];
-	}
+	// for (int i = 0; i < mFiltered_ft_reading.size(); i++)
+	// {
+	//     mFiltered_ft_reading[i] = mFt_reading_prev[i] * mAlpha_ + mFt_reading[i] * (1 - mAlpha_);
+	//     mFt_reading_prev[i] = mFiltered_ft_reading[i];
+	// }
 
 }
 
@@ -424,6 +449,7 @@ void TaskSpaceCompliantController::starting(const ros::Time &time) {
 	mStiffnessUpdate = false;
 	mWeirdCompliance = false;
 	mTakeGoalInputs = true;
+	// mMaintainPosition = false;
 
 	mNewContact = false;
 
@@ -555,6 +581,16 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 				std::cout<<"Updating goal pose to: "<<mDesiredEETransform.translation()<<std::endl;
 			}
 		}
+		// else if(mMaintainPosition.load())
+		// {
+		// 	if(mFirstSwitchBack)
+		// 	{
+		// 		mContactEffort = mZeros;
+		// 		mContactIntegral.setZero();
+		// 		mDesiredEETransform = mActualEETransform;
+		// 		mFirstSwitchBack = false;
+		// 	}
+		// }
 		else if (mTakeGoalInputs.load())
 		{
 			// std::cout<<"Reading from RT Buffer... "<<std::endl;
@@ -750,7 +786,7 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 
 	// mTaskEffort = dart_nominal_jacobian.transpose() * (-mTaskKMatrix * dart_error - mTaskDMatrix * (dart_nominal_jacobian * mNominalThetaDotPrev)) + mGravity;
 
-	std::cout<<"\n dart_error: "<<dart_error.transpose()<<std::endl;
+	// std::cout<<"\n dart_error: "<<dart_error.transpose()<<std::endl;
 
 	// if(mUseIntegralTerm)
 	// {
@@ -809,7 +845,7 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 		Eigen::Quaterniond error_qtn(actual_ee_quat.inverse() * ee_quat_d);
 		ee_error.tail(3) << error_qtn.x(), error_qtn.y(), error_qtn.z();
 		ee_error.tail(3) << -mActualEETransform.linear() * dart_error.tail(3);
-		std::cout<<"\n actual_error: "<<ee_error.transpose()<<std::endl;
+		// std::cout<<"\n actual_error: "<<ee_error.transpose()<<std::endl;
 	}
 
 
@@ -969,7 +1005,7 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 	{
 		std::lock_guard<std::mutex> lock(mForceTorqueDataMutex);
 		// force << mFt_reading[0], mFt_reading[1], mFt_reading[2];
-		force << mFt_reading[0], mFt_reading[1], mFt_reading[2];
+		force << mFt_reading[0], mFt_reading[1], 0.0;
 
 		// force << mFiltered_ft_reading[0], mFiltered_ft_reading[1], mFiltered_ft_reading[2];
 		// force << mForce.x(), mForce.y(), mForce.z();
@@ -1159,7 +1195,7 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 	if(mMaintainZeroContact.load())
 	{
 		std::cout<<"Unfiltered FT Sensor Forces: "<<force.transpose()<<std::endl;
-		Eigen::Vector3d filter(0.2, 0.2, 0.5);
+		Eigen::Vector3d filter(0.4, 0.4, 0.4);
 
 		for(int i=0; i<3; i++)
 		{
@@ -1188,7 +1224,7 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 			ft_wrench << force(0), force(1), force(2), 0.0, 0.0, 0.0;
 
 			mContactIntegral += step_time*(ft_wrench);
-			// mContactIntegral = dart_actual_jacobian.transpose() * (mContactIMatrix * (step_time*ft_wrench));
+			// mContactIntegral += dart_actual_jacobian.transpose() * (mContactIMatrix * (step_time*ft_wrench));
 
 			// // Cap I term
 			// for(int i=0; i<3; i++)
@@ -1201,6 +1237,7 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 
 			// mContactEffort = dart_actual_jacobian.transpose() * (mContactKMatrix * ft_wrench);
 			mContactEffort = dart_actual_jacobian.transpose() * (mContactKMatrix * ft_wrench + mContactIMatrix * mContactIntegral);
+			// mContactEffort = dart_actual_jacobian.transpose() * (mContactKMatrix * ft_wrench) + mContactIntegral;
 			// mContactEffort = dart_actual_jacobian.transpose() * (mContactIMatrix * mContactIntegral);
 			// mContactEffort += mContactIntegral;
 			mNewContact = true;
@@ -1231,6 +1268,12 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 
 		mTaskEffort = mTaskEffort + mContactEffort;
 		// std::cout<<"Adding to mTaskEffort!"<<std::endl;
+
+		std::cout<<"\n\nTransforms:\n";
+		std::cout<<"mNominalEETransform: "<<mNominalEETransform.translation()<<std::endl;
+		std::cout<<"mActualEETransform: "<<mActualEETransform.translation()<<std::endl;
+		std::cout<<"mTrueDesiredEETransform: "<<mTrueDesiredEETransform.translation()<<std::endl;
+		std::cout<<"\n\n";
 	}
 
 	mNominalThetaDDot = mRotorInertiaMatrix.inverse()*(mTaskEffort+mActualEffort); // mActualEffort is negative of what is required here
@@ -1266,6 +1309,9 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 	// std::cout<<"mNominalThetaPrev: "<<mNominalThetaPrev.transpose()<<std::endl;
 	// std::cout<<"mNominalThetaDotPrev: "<<mNominalThetaDotPrev.transpose()<<std::endl;
 	// std::cout<<"mActualEffort: "<<mActualEffort.transpose()<<std::endl;
+
+	// std::cout<<"mTaskKMatrix: "<<mTaskKMatrix.diagonal()<<std::endl;
+	// std::cout<<"mTaskDMatrix: "<<mTaskDMatrix.diagonal()<<std::endl;
 
 	for (size_t idof = 0; idof < mControlledJointHandles.size(); ++idof) 
 	{

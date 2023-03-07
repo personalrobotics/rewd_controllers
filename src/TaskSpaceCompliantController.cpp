@@ -183,7 +183,7 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 
 	mTaskKMatrix.resize(6, 6);
 	mTaskKMatrix.setZero();
-	mTaskKMatrix.diagonal() << 200,200,100,75,75,75;
+	mTaskKMatrix.diagonal() << 200,200,200,75,75,75;
 	// mTaskKMatrix.diagonal() << 200,200,200,150,150,150;
 	// mTaskKMatrix.diagonal() << 50,50,50,150,150,150;
 	// mTaskKMatrix.diagonal() << 300,300,300,150,150,150;
@@ -192,7 +192,7 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 	mTaskDMatrix.setZero();
 	// mTaskDMatrix.diagonal() << 40,40,40,30,30,30;
 	// mTaskDMatrix.diagonal() << 60,60,60,40,40,40;
-	mTaskDMatrix.diagonal() << 60,60,30,10,10,10;
+	mTaskDMatrix.diagonal() << 60,60,60,10,10,10;
 	// mTaskDMatrix.diagonal() << 60,60,60,40,40,40;
 	// mTaskDMatrix.diagonal() << 30,30,30,40,40,40;
 	// mTaskDMatrix.diagonal() << 40,40,40,30,30,30;
@@ -206,15 +206,15 @@ bool TaskSpaceCompliantController::init(hardware_interface::RobotHW *robot, ros:
 
 	mContactKMatrix.resize(6, 6);
 	mContactKMatrix.setZero();
-	// mContactKMatrix.diagonal() << 2.0, 2.0, 2.0, 2.0, 2.0, 2.0;
-	mContactKMatrix.diagonal() << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
+	mContactKMatrix.diagonal() << 2.0, 2.0, 2.0, 2.0, 2.0, 2.0;
+	// mContactKMatrix.diagonal() << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
 
 	mContactIMatrix.resize(6, 6);
 	mContactIMatrix.setZero();
-	mContactIMatrix.diagonal() << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
+	// mContactIMatrix.diagonal() << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
 	// mContactIMatrix.diagonal() << 20.0, 20.0, 20.0, 20.0, 20.0, 20.0;
 	// mContactIMatrix.diagonal() << 15, 15, 15, 15, 15, 15;
-	// mContactIMatrix.diagonal() << 3.0, 3.0, 3.0, 3.0, 3.0, 3.0;
+	mContactIMatrix.diagonal() << 3.0, 3.0, 3.0, 3.0, 3.0, 3.0;
 	// mContactIMatrix.diagonal() << 7.0, 7.0, 7.0, 7.0, 7.0, 7.0;
 	// mContactIMatrix.diagonal() << 10.0, 10.0, 10.0, 10.0, 10.0, 10.0;
 

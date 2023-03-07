@@ -370,6 +370,20 @@ void TaskSpaceCompliantController::modeCallback(
 
 		mStiffnessUpdate = true;
 	}
+	else if(msg.data == "tilt_inside_mouth_stiffness")
+	{
+		mTaskKMatrixUpdate.resize(6, 6);
+		mTaskKMatrixUpdate.setZero();
+		// mTaskKMatrixUpdate.diagonal() << 100,100,100,75,75,75;
+		mTaskKMatrixUpdate.diagonal() << 100,100,100,60,60,60;
+
+		mTaskDMatrixUpdate.resize(6, 6);
+		mTaskDMatrixUpdate.setZero();
+		// mTaskDMatrixUpdate.diagonal() << 30,30,30,10,10,10;
+		mTaskDMatrixUpdate.diagonal() << 30,30,30,30,30,30;
+
+		mStiffnessUpdate = true;
+	}
 	else if(msg.data == "weird_compliance")
 	{
 		mWeirdCompliance = true;
@@ -1310,8 +1324,8 @@ void TaskSpaceCompliantController::update(const ros::Time &time, const ros::Dura
 	// std::cout<<"mNominalThetaDotPrev: "<<mNominalThetaDotPrev.transpose()<<std::endl;
 	// std::cout<<"mActualEffort: "<<mActualEffort.transpose()<<std::endl;
 
-	// std::cout<<"mTaskKMatrix: "<<mTaskKMatrix.diagonal()<<std::endl;
-	// std::cout<<"mTaskDMatrix: "<<mTaskDMatrix.diagonal()<<std::endl;
+	std::cout<<"mTaskKMatrix: "<<mTaskKMatrix.diagonal()<<std::endl;
+	std::cout<<"mTaskDMatrix: "<<mTaskDMatrix.diagonal()<<std::endl;
 
 	for (size_t idof = 0; idof < mControlledJointHandles.size(); ++idof) 
 	{

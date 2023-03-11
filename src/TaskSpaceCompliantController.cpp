@@ -349,11 +349,11 @@ void TaskSpaceCompliantController::modeCallback(
 	{
 		mTaskKMatrixUpdate.resize(6, 6);
 		mTaskKMatrixUpdate.setZero();
-		mTaskKMatrixUpdate.diagonal() << 200,200,200,75,75,75;
+		mTaskKMatrixUpdate.diagonal() << 200,200,300,75,75,75;
 
 		mTaskDMatrixUpdate.resize(6, 6);
 		mTaskDMatrixUpdate.setZero();
-		mTaskDMatrixUpdate.diagonal() << 60,60,60,10,10,10;
+		mTaskDMatrixUpdate.diagonal() << 60,60,90,10,10,10;
 
 		mStiffnessUpdate = true;
 	}
